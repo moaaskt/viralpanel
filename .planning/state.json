@@ -1,0 +1,48 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Fundação & Orquestração Base",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "Discovery & Scoring no TikTok",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "Análise, Transcrição & Roteiro Gemini",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "Produção Studio (Voz, Avatar & Vídeo Reaction)",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "Observabilidade & Bot Telegram Supervisionado",
+      "status": "pending"
+    },
+    {
+      "number": "6",
+      "name": "Publicação Direta nas APIs Oficiais",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "Painel Web de Controle",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 1 of 7 · 0% · executing"
+  },
+  "updated_at": "2026-11-05T03:26:24.404Z"
+}
