@@ -26,3 +26,4 @@
 ## 3. Divisão de Planos
 - **05-01-PLAN.md (Wave 1)**: Cliente Telegram Bot nativo, configurações em `Settings` e `TelegramNotifier` estruturado com suporte a Mock.
 - **05-02-PLAN.md (Wave 2)**: Teclado inline com Aprovar/Rejeitar, envio de preview de vídeo 9:16, polling de callbacks e integração na task Celery com flag de modo supervisionado.
+
