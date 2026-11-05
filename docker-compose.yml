@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-viraluser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-viralpass}
+      POSTGRES_DB: ${POSTGRES_DB:-viralpanel}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-viraluser} -d $${POSTGRES_DB:-viralpanel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [viralpanel_net]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [viralpanel_net]
+
+  celery_worker:
+    build: .
+    command: celery -A viralpanel.celery_app worker --loglevel=info
+    env_file: [.env.example]
+    environment: &app_env
+      DATABASE_URL: postgresql+psycopg2://viraluser:viralpass@postgres:5432/viralpanel
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [viralpanel_net]
+
+  celery_beat:
+    build: .
+    command: celery -A viralpanel.celery_app beat --loglevel=info
+    env_file: [.env.example]
+    environment: *app_env
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [viralpanel_net]
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  viralpanel_net:

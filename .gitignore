@@ -1,0 +1,10 @@
+.planning/
+
+
+__pycache__/
+.pytest_cache/
+storage/
+.env
+venv/
+.venv/
+*.egg-info/

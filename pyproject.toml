@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viralpanel"
+version = "0.1.0"
+description = "Pipeline autonomo de geracao e publicacao de conteudo viral"
+requires-python = ">=3.12"
+dependencies = [
+  "sqlalchemy>=2.0.0",
+  "psycopg2-binary>=2.9.9",
+  "alembic>=1.13.0",
+  "celery>=5.4.0",
+  "redis>=5.0.0",
+  "pydantic>=2.7.0",
+  "pydantic-settings>=2.2.0",
+  "pyyaml>=6.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "fakeredis>=2.20.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+
