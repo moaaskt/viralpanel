@@ -35,3 +35,4 @@
 - **06-01-PLAN.md (Wave 1)**: Gerenciamento de credenciais OAuth2 das 3 plataformas e gerador de metadados/hashtags específicos (`MetadataGenerator`).
 - **06-02-PLAN.md (Wave 2)**: Contrato `BasePublisher` e implementação dos publicadores TikTok, Instagram Reels e YouTube Shorts (com suporte a Mock).
 - **06-03-PLAN.md (Wave 3)**: `PublishingService`, persistência na tabela `publications`, integração com Telegram e conexão no pipeline Celery `trigger_daily_pipeline`.
+
