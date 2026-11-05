@@ -22,3 +22,4 @@ Requisitos:
    - Considera: engajamento relativo `(likes + 2*comments + 3*shares) / views`, velocidade temporal de visualizações por hora decorrida desde a postagem.
 4. **Integração com Celery & Persistência (`viralpanel/discovery/service.py`)**:
    - Serviço que orquestra a coleta, calcula os scores de todos os 30 itens, salva/atualiza na tabela `source_videos`, e seleciona o item de maior score que ainda tem status `'pending'`.
+
