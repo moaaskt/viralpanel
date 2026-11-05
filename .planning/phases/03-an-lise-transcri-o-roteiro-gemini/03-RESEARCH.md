@@ -28,3 +28,4 @@
 - **03-01-PLAN.md (Wave 1)**: Download de mídia e extração de áudio limpo via FFmpeg com persistência de assets no storage.
 - **03-02-PLAN.md (Wave 2)**: Transcrição com Whisper / timestamps e contrato de dados.
 - **03-03-PLAN.md (Wave 3)**: Integração com Gemini 2.5 Flash, geração do roteiro estruturado (0-3s, 4-45s, CTA), persistência no banco e integração no Celery.
+

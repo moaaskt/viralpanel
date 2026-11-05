@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     storage_dir: str = "./storage"
     timezone: str = "America/Sao_Paulo"
     log_level: str = "INFO"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    whisper_model: str = "small"
+    pipeline_mock_mode: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

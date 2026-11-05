@@ -20,12 +20,12 @@
 - [x] **SCOR-02**: Sistema ranqueia os 30 vídeos candidatos e seleciona o melhor candidato não processado para a esteira do dia
 
 ### Download & Transcrição de Mídia (MEDIA)
-- [ ] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
-- [ ] **MEDIA-02**: Sistema transcreve o áudio com marcações de tempo (timestamps) usando Whisper / faster-whisper
+- [x] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
+- [x] **MEDIA-02**: Sistema transcreve o áudio com marcações de tempo (timestamps) usando Whisper / faster-whisper
 
 ### Roteirização com IA (SCRP)
-- [ ] **SCRP-01**: Sistema envia a transcrição e diretrizes de persona ao Gemini 2.5 Flash para análise estrutural de ganchos e retenção
-- [ ] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
+- [x] **SCRP-01**: Sistema envia a transcrição e diretrizes de persona ao Gemini 2.5 Flash para análise estrutural de ganchos e retenção
+- [x] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
 
 ### Produção de Áudio & Vídeo (PROD)
 - [ ] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
@@ -81,10 +81,10 @@
 | DISC-03 | Phase 2 | Complete |
 | SCOR-01 | Phase 2 | Complete |
 | SCOR-02 | Phase 2 | Complete |
-| MEDIA-01 | Phase 3 | Pending |
-| MEDIA-02 | Phase 3 | Pending |
-| SCRP-01 | Phase 3 | Pending |
-| SCRP-02 | Phase 3 | Pending |
+| MEDIA-01 | Phase 3 | Complete |
+| MEDIA-02 | Phase 3 | Complete |
+| SCRP-01 | Phase 3 | Complete |
+| SCRP-02 | Phase 3 | Complete |
 | PROD-01 | Phase 4 | Pending |
 | PROD-02 | Phase 4 | Pending |
 | PROD-03 | Phase 4 | Pending |
