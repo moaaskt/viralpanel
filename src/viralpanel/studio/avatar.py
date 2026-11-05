@@ -63,3 +63,4 @@ class MockAvatarAnimator(BaseAvatarAnimator):
 
         output_path.write_bytes(b"MOCKAVATARMP4")
         return output_path, duration
+

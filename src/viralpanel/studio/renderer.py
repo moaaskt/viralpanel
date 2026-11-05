@@ -109,3 +109,4 @@ class ReactionVideoRenderer:
         subprocess.run(cmd, check=True, capture_output=True, timeout=self.timeout_seconds)
         actual_duration = probe_duration(output_path) or duration
         return output_path, round(actual_duration, 2)
+

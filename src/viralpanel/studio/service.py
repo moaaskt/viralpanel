@@ -120,3 +120,4 @@ class StudioService:
         db.commit()
         db.refresh(final_asset)
         return final_asset
+

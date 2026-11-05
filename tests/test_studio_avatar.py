@@ -11,3 +11,4 @@ def test_mock_avatar_animator_matches_voice_duration(tmp_path):
 
     assert out_path.exists()
     assert abs(avatar_dur - voice_dur) < 0.5
+

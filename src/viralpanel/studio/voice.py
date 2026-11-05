@@ -124,3 +124,4 @@ class MockVoiceSynthesizer(BaseVoiceSynthesizer):
 
         output_path.write_bytes(b"RIFFMOCKWAV")
         return output_path, duration
+

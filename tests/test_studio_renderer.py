@@ -60,3 +60,4 @@ def test_studio_service_renders_vertical_9x16_reaction_video(tmp_path):
         all_assets = db.scalars(select(Asset).where(Asset.script_id == script.id)).all()
         asset_types = {a.asset_type for a in all_assets}
         assert {"audio", "avatar", "final_video"}.issubset(asset_types)
+

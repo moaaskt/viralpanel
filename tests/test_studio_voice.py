@@ -12,3 +12,4 @@ def test_mock_voice_synthesizer_generates_wav_proportional_to_text(tmp_path):
     assert p1.exists() and p2.exists()
     assert d1 >= 1.4
     assert d2 > d1
+

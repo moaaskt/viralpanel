@@ -67,3 +67,4 @@ def write_ass_subtitles(cues: list[SubtitleCue], output_path: Path) -> Path:
         lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}")
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
+
