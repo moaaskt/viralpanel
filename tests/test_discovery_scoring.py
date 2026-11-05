@@ -56,3 +56,4 @@ def test_recent_high_engagement_beats_old_low_engagement():
 
     assert score_recent > score_old
     assert score_recent > 100.0
+

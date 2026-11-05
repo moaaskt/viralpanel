@@ -81,3 +81,4 @@ class DiscoveryService:
         candidates = self.collect_and_rank(db=db, limit=limit, now=now)
         best = self.select_best_candidate(db=db)
         return candidates, best
+

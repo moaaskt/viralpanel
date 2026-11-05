@@ -42,3 +42,4 @@ behavior_unverified: 0
 | 7 | A task Celery trigger_daily_pipeline integra a rotina de discovery | ✓ VERIFIED | `src/viralpanel/tasks.py` testado em `tests/test_celery_tasks.py` |
 
 **Score:** 7/7 truths verified
+

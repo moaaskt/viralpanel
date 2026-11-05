@@ -22,3 +22,4 @@ requirements:
 - **DiscoveryService (`src/viralpanel/discovery/service.py`)**: Coleta de 30 vídeos, deduplicação por URL no PostgreSQL/SQLite, cálculo de score e seleção automática do melhor candidato com `status == "pending"`.
 - **Integração com Celery (`src/viralpanel/tasks.py`)**: `trigger_daily_pipeline` agora executa o ciclo completo de descoberta e registra o vídeo selecionado em `PipelineRun.run_metadata`.
 - **Testes (`tests/test_discovery_service.py`)**: 2/2 testes de coleta, deduplicação e ranking passando (14/14 na suíte global).
+

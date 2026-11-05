@@ -124,3 +124,4 @@ class TikTokDiscoveryScraper(BaseScraper):
                     break
 
         return list(collected.values())[:limit]
+

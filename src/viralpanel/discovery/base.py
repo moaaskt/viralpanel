@@ -37,3 +37,4 @@ class BaseScraper(ABC):
     ) -> list[ScrapedVideoMetadata]:
         """Coleta os vídeos candidatos do nicho especificado."""
         raise NotImplementedError
+

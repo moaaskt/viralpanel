@@ -48,3 +48,4 @@ def test_discovery_deduplicates_existing_urls():
         service.collect_and_rank(db=db, limit=30, now=now)
         total = db.scalars(select(SourceVideo)).all()
         assert len(total) == 30
+

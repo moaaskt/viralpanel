@@ -99,3 +99,4 @@ def calculate_viral_score(
         + velocity_norm * w.velocity_24h
     ) * 100.0
     return round(score, 4)
+
