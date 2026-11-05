@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     whisper_model: str = "small"
     pipeline_mock_mode: bool = False
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_supervised_mode: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

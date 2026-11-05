@@ -17,20 +17,37 @@ from viralpanel.scripting.service import ScriptingService
 from viralpanel.studio.avatar import MockAvatarAnimator
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.voice import MockVoiceSynthesizer
+from viralpanel.telegram.client import MockTelegramClient, TelegramClient
+from viralpanel.telegram.service import SupervisionService
 
 
-def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, ScriptingService, StudioService]:
+def build_default_services(
+    mock: bool | None = None,
+) -> tuple[DiscoveryService, ScriptingService, StudioService, SupervisionService]:
     settings = get_settings()
     mock = settings.pipeline_mock_mode if mock is None else mock
     studio = StudioService(
         voice_synthesizer=MockVoiceSynthesizer(),
         avatar_animator=MockAvatarAnimator(),
     )
+    if mock or not settings.telegram_bot_token:
+        tg_client = MockTelegramClient()
+    else:
+        tg_client = TelegramClient(
+            bot_token=settings.telegram_bot_token,
+            default_chat_id=settings.telegram_chat_id,
+        )
+    supervision = SupervisionService(
+        client=tg_client,
+        supervised_mode=settings.telegram_supervised_mode,
+    )
+
     if mock:
         return (
             DiscoveryService(scraper=MockDiscoveryScraper()),
             ScriptingService(MockMediaDownloader(), MockTranscriber(), MockGeminiScriptWriter()),
             studio,
+            supervision,
         )
     return (
         DiscoveryService(scraper=TikTokDiscoveryScraper()),
@@ -40,6 +57,7 @@ def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, 
             GeminiScriptWriter(),
         ),
         studio,
+        supervision,
     )
 
 
@@ -49,8 +67,12 @@ def _run_pipeline(
     discovery_service: DiscoveryService,
     scripting_service: ScriptingService | None,
     studio_service: StudioService | None,
+    supervision_service: SupervisionService | None,
 ) -> dict:
     summary: dict = dict(run.run_metadata or {})
+
+    if supervision_service:
+        supervision_service.notifier.notify_pipeline_started(run.id, summary.get("run_date", ""))
 
     run.stage = "discovery"
     db.commit()
@@ -61,6 +83,13 @@ def _run_pipeline(
         selected_video_url=best.url if best else None,
         selected_video_score=best.score if best else None,
     )
+    if supervision_service:
+        supervision_service.notifier.notify_stage_completed(
+            run.id,
+            "discovery",
+            {"collected": len(candidates), "selected_score": best.score if best else None},
+        )
+
     if best is None or scripting_service is None:
         return summary
 
@@ -68,6 +97,10 @@ def _run_pipeline(
     db.commit()
     script = scripting_service.process(db=db, run_id=run.id, source=best)
     summary.update(script_id=script.id, script_hook=script.hook)
+    if supervision_service:
+        supervision_service.notifier.notify_stage_completed(
+            run.id, "scripting", {"script_id": script.id, "hook": script.hook}
+        )
 
     if studio_service is None:
         return summary
@@ -80,6 +113,28 @@ def _run_pipeline(
         final_video_path=final_asset.file_path,
         final_video_duration=final_asset.duration_seconds,
     )
+    if supervision_service:
+        supervision_service.notifier.notify_stage_completed(
+            run.id,
+            "production",
+            {"final_asset_id": final_asset.id, "duration": final_asset.duration_seconds},
+        )
+
+    if supervision_service is None:
+        return summary
+
+    run.stage = "supervision"
+    run.run_metadata = summary
+    db.commit()
+    approval_status = supervision_service.handle_post_production(
+        db=db,
+        run=run,
+        final_asset=final_asset,
+        hook=script.hook or "",
+        score=best.score,
+    )
+    summary["approval_status"] = approval_status
+    supervision_service.notifier.notify_pipeline_success(run.id, summary)
     return summary
 
 
@@ -99,6 +154,7 @@ def trigger_daily_pipeline(
     discovery_service: DiscoveryService | None = None,
     scripting_service: ScriptingService | None = None,
     studio_service: StudioService | None = None,
+    supervision_service: SupervisionService | None = None,
 ):
     run_date = run_date or date.today().isoformat()
     locker = locker or IdempotencyManager()
@@ -107,9 +163,10 @@ def trigger_daily_pipeline(
         return {"status": "skipped", "reason": "duplicate", "run_date": run_date}
 
     if discovery_service is None:
-        discovery_service, default_scripting, default_studio = build_default_services()
+        discovery_service, default_scripting, default_studio, default_supervision = build_default_services()
         scripting_service = scripting_service or default_scripting
         studio_service = studio_service or default_studio
+        supervision_service = supervision_service or default_supervision
 
     factory = session_factory or SessionLocal
     start = time.monotonic()
@@ -118,12 +175,21 @@ def trigger_daily_pipeline(
         db.add(run)
         db.commit()
         try:
-            run.run_metadata = _run_pipeline(run, db, discovery_service, scripting_service, studio_service)
+            run.run_metadata = _run_pipeline(
+                run,
+                db,
+                discovery_service,
+                scripting_service,
+                studio_service,
+                supervision_service,
+            )
             run.status = "success"
         except Exception as exc:
             db.rollback()
             run.status = "failed"
             run.error_message = str(exc)
+            if supervision_service:
+                supervision_service.notifier.notify_error(run.id, run.stage, str(exc))
             locker.release_lock(key)
             raise
         finally:
@@ -137,4 +203,5 @@ def trigger_daily_pipeline(
             "selected_video_id": meta.get("selected_video_id"),
             "script_id": meta.get("script_id"),
             "final_asset_id": meta.get("final_asset_id"),
+            "approval_status": meta.get("approval_status"),
         }

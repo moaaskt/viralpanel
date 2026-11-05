@@ -27,7 +27,7 @@ def test_task_records_run_and_is_idempotent(tmp_path):
     factory = sessionmaker(bind=eng, expire_on_commit=False)
     locker = IdempotencyManager(client=fakeredis.FakeRedis())
 
-    discovery, scripting, studio = build_default_services(mock=True)
+    discovery, scripting, studio, supervision = build_default_services(mock=True)
     storage = StorageManager(tmp_path)
     scripting.downloader.storage = storage
     studio.storage = storage
@@ -37,6 +37,7 @@ def test_task_records_run_and_is_idempotent(tmp_path):
         "discovery_service": discovery,
         "scripting_service": scripting,
         "studio_service": studio,
+        "supervision_service": supervision,
     }
 
     r1 = trigger_daily_pipeline.apply(args=["2026-01-01"], kwargs=kw).get()
@@ -44,6 +45,7 @@ def test_task_records_run_and_is_idempotent(tmp_path):
 
     assert r1["status"] == "success"
     assert r1["selected_video_id"] and r1["script_id"] and r1["final_asset_id"]
+    assert r1["approval_status"] in ("awaiting_approval", "approved")
     assert r2["status"] == "skipped"
     with factory() as s:
         assert len(s.scalars(select(PipelineRun)).all()) == 1
