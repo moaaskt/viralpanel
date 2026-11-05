@@ -11,7 +11,7 @@ O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 
 - Integer phases (1, 2, 3...): Planned milestone work
 - Decimal phases (e.g. 2.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Fundação & Orquestração Base** - Ambiente Docker Compose, PostgreSQL com migrations, Redis e Celery assíncrono
+- [x] **Phase 1: Fundação & Orquestração Base** - Ambiente Docker Compose, PostgreSQL com migrations, Redis e Celery assíncrono (completed 2026-11-05)
 - [ ] **Phase 2: Discovery & Scoring no TikTok** - Scraper próprio (Playwright + yt-dlp) com algoritmo de ranking configurável via YAML
 - [ ] **Phase 3: Análise, Transcrição & Roteiro Gemini** - Download, transcrição com Whisper e criação de roteiros estruturados via Gemini 2.5 Flash
 - [ ] **Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)** - Clonagem de voz com XTTS, avatar virtual e montagem 9:16 com legendas via FFmpeg
@@ -38,15 +38,15 @@ O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 
 Plans:
 **Wave 1**
 
-- [ ] 01-01: Setup do repositório, Docker Compose, PostgreSQL, Redis e configurações de ambiente
+- [x] 01-01: Setup do repositório, Docker Compose, PostgreSQL, Redis e configurações de ambiente
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02: Modelagem do banco de dados (SQLAlchemy / Alembic) e persistência de runs
+- [x] 01-02: Modelagem do banco de dados (SQLAlchemy / Alembic) e persistência de runs
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03: Configuração da fila Celery com retry, idempotência e Celery Beat agendado para 01:00
+- [x] 01-03: Configuração da fila Celery com retry, idempotência e Celery Beat agendado para 01:00
 
 ### Phase 2: Discovery & Scoring no TikTok
 
@@ -173,7 +173,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Fundação & Orquestração Base | 0/3 | Not started | - |
+| 1. Fundação & Orquestração Base | 3/3 | Complete    | 2026-11-05 |
 | 2. Discovery & Scoring no TikTok | 0/2 | Not started | - |
 | 3. Análise, Transcrição & Roteiro Gemini | 0/3 | Not started | - |
 | 4. Produção Studio (Voz, Avatar & Vídeo Reaction) | 0/3 | Not started | - |

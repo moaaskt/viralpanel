@@ -6,9 +6,9 @@
 ## v1 Requirements
 
 ### Orquestração & Agendamento (SCHED)
-- [ ] **SCHED-01**: Sistema executa trigger diário programado às 01:00 (America/Sao_Paulo) via Celery Beat ou cron
-- [ ] **SCHED-02**: Sistema orquestra a fila assíncrona de processamento com Celery + Redis, garantindo retries com backoff exponencial
-- [ ] **SCHED-03**: Sistema garante idempotência das etapas, impedindo processamento duplicado de vídeos ou postagens repetidas
+- [x] **SCHED-01**: Sistema executa trigger diário programado às 01:00 (America/Sao_Paulo) via Celery Beat ou cron
+- [x] **SCHED-02**: Sistema orquestra a fila assíncrona de processamento com Celery + Redis, garantindo retries com backoff exponencial
+- [x] **SCHED-03**: Sistema garante idempotência das etapas, impedindo processamento duplicado de vídeos ou postagens repetidas
 
 ### Discovery & Coleta (DISC)
 - [ ] **DISC-01**: Sistema busca automaticamente os 30 vídeos mais virais no TikTok dentro do nicho de desenvolvimento pessoal e hashtags configuráveis
@@ -44,8 +44,8 @@
 - [ ] **PUBL-04**: Sistema gera título, descrição e hashtags otimizadas para cada plataforma conforme o roteiro aprovado
 
 ### Persistência & Dados (DATA)
-- [ ] **DATA-01**: Banco de dados PostgreSQL armazena todo o histórico nos modelos `source_videos`, `scripts`, `assets`, `publications` e `runs`
-- [ ] **DATA-02**: Sistema gerencia arquivos locais gerados (áudios, vídeos intermediários e renderizações finais) com retenção e limpeza configurável
+- [x] **DATA-01**: Banco de dados PostgreSQL armazena todo o histórico nos modelos `source_videos`, `scripts`, `assets`, `publications` e `runs`
+- [x] **DATA-02**: Sistema gerencia arquivos locais gerados (áudios, vídeos intermediários e renderizações finais) com retenção e limpeza configurável
 
 ### Painel Web de Controle (DASH)
 - [ ] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
@@ -73,9 +73,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHED-01 | Phase 1 | Pending |
-| SCHED-02 | Phase 1 | Pending |
-| SCHED-03 | Phase 1 | Pending |
+| SCHED-01 | Phase 1 | Complete |
+| SCHED-02 | Phase 1 | Complete |
+| SCHED-03 | Phase 1 | Complete |
 | DISC-01 | Phase 2 | Pending |
 | DISC-02 | Phase 2 | Pending |
 | DISC-03 | Phase 2 | Pending |
@@ -95,8 +95,8 @@
 | PUBL-02 | Phase 6 | Pending |
 | PUBL-03 | Phase 6 | Pending |
 | PUBL-04 | Phase 6 | Pending |
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
+| DATA-02 | Phase 1 | Complete |
 | DASH-01 | Phase 7 | Pending |
 | DASH-02 | Phase 7 | Pending |
 | DASH-03 | Phase 7 | Pending |

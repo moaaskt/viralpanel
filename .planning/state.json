@@ -6,7 +6,7 @@
     {
       "number": "1",
       "name": "Fundação & Orquestração Base",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "2",
@@ -41,8 +41,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 1 of 7 · 0% · executing"
+    "label": "Advance to the next step (plan phase 2)",
+    "reason": "Phase 2 of 7 — needs a plan"
   },
-  "updated_at": "2026-11-05T03:26:24.404Z"
+  "updated_at": "2026-11-05T18:38:05.243Z"
 }
