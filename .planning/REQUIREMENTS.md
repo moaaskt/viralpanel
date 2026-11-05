@@ -28,9 +28,9 @@
 - [x] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
 
 ### Produção de Áudio & Vídeo (PROD)
-- [ ] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
-- [ ] **PROD-02**: Módulo gerador de avatar sincroniza movimentos do avatar virtual do criador com o áudio narrado gerado
-- [ ] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
+- [x] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
+- [x] **PROD-02**: Módulo gerador de avatar sincroniza movimentos do avatar virtual do criador com o áudio narrado gerado
+- [x] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
 
 ### Observabilidade & Supervisão no Telegram (TELE)
 - [ ] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
@@ -85,9 +85,9 @@
 | MEDIA-02 | Phase 3 | Complete |
 | SCRP-01 | Phase 3 | Complete |
 | SCRP-02 | Phase 3 | Complete |
-| PROD-01 | Phase 4 | Pending |
-| PROD-02 | Phase 4 | Pending |
-| PROD-03 | Phase 4 | Pending |
+| PROD-01 | Phase 4 | Complete |
+| PROD-02 | Phase 4 | Complete |
+| PROD-03 | Phase 4 | Complete |
 | TELE-01 | Phase 5 | Pending |
 | TELE-02 | Phase 5 | Pending |
 | TELE-03 | Phase 5 | Pending |
