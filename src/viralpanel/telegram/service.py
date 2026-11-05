@@ -90,3 +90,4 @@ class SupervisionService:
 
         self.notifier.notify_stage_completed(run_id, "supervision_decision", {"decision": new_status})
         return new_status
+

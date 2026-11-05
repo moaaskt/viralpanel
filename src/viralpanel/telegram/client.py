@@ -189,3 +189,4 @@ class MockTelegramClient(BaseTelegramClient):
         entry = {"callback_query_id": callback_query_id, "text": text}
         self.callbacks_answered.append(entry)
         return {"ok": True, "result": True}
+

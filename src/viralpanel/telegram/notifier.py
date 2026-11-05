@@ -45,3 +45,4 @@ class TelegramNotifier:
             f"• <b>Status Aprovação:</b> {summary.get('approval_status', 'N/A')}"
         )
         return self.client.send_message(text=text)
+

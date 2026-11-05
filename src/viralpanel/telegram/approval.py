@@ -41,3 +41,4 @@ def send_approval_request(
     )
     markup = build_approval_inline_keyboard(run_id)
     return client.send_video(video_path=video_path, caption=caption, reply_markup=markup)
+

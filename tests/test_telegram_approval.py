@@ -77,3 +77,4 @@ def test_unsupervised_mode_auto_approves_without_video_prompt(tmp_path):
         assert status == "approved"
         assert len(client.videos) == 0
         assert db.get(SourceVideo, src_id).status == "approved"
+

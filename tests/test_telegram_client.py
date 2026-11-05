@@ -31,3 +31,4 @@ def test_telegram_notifier_formats_pipeline_events():
     assert "DISCOVERY" in mock_client.messages[1]["text"]
     assert "Timeout na API" in mock_client.messages[2]["text"]
     assert "Pipeline Finalizado" in mock_client.messages[3]["text"]
+
