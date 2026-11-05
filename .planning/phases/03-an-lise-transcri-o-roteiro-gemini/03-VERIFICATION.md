@@ -1,6 +1,6 @@
 ---
 phase: 03-an-lise-transcri-o-roteiro-gemini
-verified: 2026-11-05T19:41:00Z
+verified: 2026-11-05T19:53:40Z
 status: passed
 score: 10/10 must-haves verified
 covered_files:
@@ -22,26 +22,31 @@ covered_files:
   - tests/test_gemini_scripting.py
   - tests/test_media_downloader.py
   - tests/test_transcription.py
-covered_digest: "v4:sha256:a408140530cee8d3dc1399e21d0842f4f911f9cec49f124b03bb2f5320ff9ae1"
+covered_digest: "v4:sha256:a09803df76667eafb15aa656101f11b8fee8e268ec5af7f84e700be36032dbbc"
 behavior_unverified: 0
 ---
 
 # Phase 03: Análise, Transcrição & Roteiro Gemini — Verification Report
 
-**Status:** passed (suíte 20/20)
+**Phase Goal:** Baixar o vídeo candidato, extrair áudio, transcrever com Whisper e produzir um roteiro original e persuasivo via Gemini
+**Verified:** 2026-11-05T19:53:40Z
+**Status:** passed
+
+## Goal Achievement
+
+### Observable Truths
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Download + extração de áudio via yt-dlp/FFmpeg | ✓ VERIFIED | MediaDownloader; test_media_downloader |
-| 2 | Arquivos isolados por run_id | ✓ VERIFIED | source_dir + _safe; teste de traversal |
-| 3 | Modo mock/offline determinístico | ✓ VERIFIED | MockMediaDownloader |
-| 4 | Transcrição com timestamps | ✓ VERIFIED | test_transcription |
-| 5 | Segmentos start/end/text | ✓ VERIFIED | TranscriptionSegment |
-| 6 | Whisper + Mock | ✓ VERIFIED | WhisperTranscriber / MockTranscriber |
-| 7 | Gemini gera hook/body/CTA | ✓ VERIFIED | test_gemini_writer_parses_structured_json |
-| 8 | Validação Pydantic antes de gravar | ✓ VERIFIED | test_schema_rejects_missing_blocks |
-| 9 | Script persistido vinculado ao SourceVideo | ✓ VERIFIED | test_scripting_service_persists_script_and_asset |
-| 10 | Celery: discovery → scripting | ✓ VERIFIED | test_task_records_run_and_is_idempotent |
+| 1 | MediaDownloader executa download e extração de áudio via yt-dlp e FFmpeg | ✓ VERIFIED | `MediaDownloader` em `src/viralpanel/media/downloader.py` |
+| 2 | Arquivos isolados por run_id via StorageManager | ✓ VERIFIED | `tests/test_media_downloader.py` (2/2) |
+| 3 | Modo mock/offline determinístico | ✓ VERIFIED | `MockMediaDownloader` |
+| 4 | Transcriber extrai texto com timestamps/segmentos | ✓ VERIFIED | `tests/test_transcription.py` (1/1) |
+| 5 | Segmentos contêm início, fim e texto | ✓ VERIFIED | `TranscriptionSegment` |
+| 6 | Suporta Whisper/faster-whisper e MockTranscriber | ✓ VERIFIED | `WhisperTranscriber` & `MockTranscriber` |
+| 7 | GeminiScriptWriter carrega credenciais do .env automaticamente e gera roteiro (gancho 0-3s, corpo 4-45s, CTA) | ✓ VERIFIED | `tests/test_gemini_scripting.py` (4/4) |
+| 8 | Roteiro validado estritamente por schema Pydantic | ✓ VERIFIED | `GeneratedScriptSchema` |
+| 9 | Registro de Script persistido no banco vinculado ao SourceVideo | ✓ VERIFIED | `ScriptingService.process` |
+| 10 | Task Celery trigger_daily_pipeline integra Discovery -> Download -> Whisper -> Gemini | ✓ VERIFIED | `tests/test_celery_tasks.py` (2/2) |
 
-## Observação
-Chamada real à API: `gemini-2.5-flash` → 404 (indisponível para novos usuários); `gemini-3.8-flash` → 503/timeout no momento do teste. Modelo configurável via `GEMINI_MODEL`.
+**Score:** 10/10 truths verified (21/21 automated tests passing)
