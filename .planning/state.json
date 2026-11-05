@@ -31,7 +31,7 @@
     {
       "number": "6",
       "name": "Publicação Direta nas APIs Oficiais",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "7",
@@ -41,8 +41,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step (plan phase 6)",
-    "reason": "Phase 6 of 7 — needs a plan"
+    "label": "Advance to the next step (plan phase 7)",
+    "reason": "Phase 7 of 7 — needs a plan"
   },
-  "updated_at": "2026-11-05T20:37:10.445Z"
+  "updated_at": "2026-11-05T20:55:26.248Z"
 }
