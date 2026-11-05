@@ -59,3 +59,4 @@ Disponibilizar uma interface web moderna, sóbria e profissional (React + Chakra
 - Frontend:
   - Teste de build do Vite (`npm run build`).
   - Validação estática de componentes.
+
