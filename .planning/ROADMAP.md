@@ -15,7 +15,7 @@ O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 
 - [x] **Phase 2: Discovery & Scoring no TikTok** - Scraper próprio (Playwright + yt-dlp) com algoritmo de ranking configurável via YAML (completed 2026-11-05)
 - [x] **Phase 3: Análise, Transcrição & Roteiro Gemini** - Download, transcrição com Whisper e criação de roteiros estruturados via Gemini 2.5 Flash (completed 2026-11-05)
 - [x] **Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)** - Clonagem de voz com XTTS, avatar virtual e montagem 9:16 com legendas via FFmpeg (completed 2026-11-05)
-- [ ] **Phase 5: Observabilidade & Bot Telegram Supervisionado** - Notificações em tempo real e modo supervisionado com preview de vídeo e aprovação
+- [x] **Phase 5: Observabilidade & Bot Telegram Supervisionado** - Notificações em tempo real e modo supervisionado com preview de vídeo e aprovação (completed 2026-11-05)
 - [ ] **Phase 6: Publicação Direta nas APIs Oficiais** - Integração direta com TikTok Content Posting API, Meta Graph API e YouTube Data API v3
 - [ ] **Phase 7: Painel Web de Controle** - Interface React + Chakra UI (sem neon) para monitoramento de filas, histórico e métricas
 
@@ -123,8 +123,8 @@ Plans:
 
 Plans:
 
-- [ ] 05-01: Setup do Telegram Bot com mensageria assíncrona e logs estruturados
-- [ ] 05-02: Implementação do fluxo interativo de aprovação humana com envio de preview de vídeo e handlers de Aprovar/Rejeitar
+- [x] 05-01: Setup do Telegram Bot com mensageria assíncrona e logs estruturados
+- [x] 05-02: Implementação do fluxo interativo de aprovação humana com envio de preview de vídeo e handlers de Aprovar/Rejeitar
 
 ### Phase 6: Publicação Direta nas APIs Oficiais
 
@@ -177,6 +177,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Discovery & Scoring no TikTok | 2/2 | Complete    | 2026-11-05 |
 | 3. Análise, Transcrição & Roteiro Gemini | 3/3 | Complete    | 2026-11-05 |
 | 4. Produção Studio (Voz, Avatar & Vídeo Reaction) | 3/3 | Complete    | 2026-11-05 |
-| 5. Observabilidade & Bot Telegram Supervisionado | 0/2 | Not started | - |
+| 5. Observabilidade & Bot Telegram Supervisionado | 2/2 | Complete    | 2026-11-05 |
 | 6. Publicação Direta nas APIs Oficiais | 0/3 | Not started | - |
 | 7. Painel Web de Controle | 0/3 | Not started | - |

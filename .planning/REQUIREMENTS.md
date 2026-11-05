@@ -33,9 +33,9 @@
 - [x] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
 
 ### Observabilidade & Supervisão no Telegram (TELE)
-- [ ] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
-- [ ] **TELE-02**: Modo supervisionado envia preview do vídeo 9:16 renderizado com botões interativos "Aprovar" e "Rejeitar"
-- [ ] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
+- [x] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
+- [x] **TELE-02**: Modo supervisionado envia preview do vídeo 9:16 renderizado com botões interativos "Aprovar" e "Rejeitar"
+- [x] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
 
 ### Publicação & Agendamento Oficial (PUBL)
 - [ ] **PUBL-01**: Sistema agenda e publica o vídeo aprovado no TikTok através da TikTok Content Posting API oficial
@@ -88,9 +88,9 @@
 | PROD-01 | Phase 4 | Complete |
 | PROD-02 | Phase 4 | Complete |
 | PROD-03 | Phase 4 | Complete |
-| TELE-01 | Phase 5 | Pending |
-| TELE-02 | Phase 5 | Pending |
-| TELE-03 | Phase 5 | Pending |
+| TELE-01 | Phase 5 | Complete |
+| TELE-02 | Phase 5 | Complete |
+| TELE-03 | Phase 5 | Complete |
 | PUBL-01 | Phase 6 | Pending |
 | PUBL-02 | Phase 6 | Pending |
 | PUBL-03 | Phase 6 | Pending |
