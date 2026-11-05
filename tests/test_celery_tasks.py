@@ -27,7 +27,7 @@ def test_task_records_run_and_is_idempotent(tmp_path):
     factory = sessionmaker(bind=eng, expire_on_commit=False)
     locker = IdempotencyManager(client=fakeredis.FakeRedis())
 
-    discovery, scripting, studio, supervision = build_default_services(mock=True)
+    discovery, scripting, studio, supervision, publishing = build_default_services(mock=True)
     storage = StorageManager(tmp_path)
     scripting.downloader.storage = storage
     studio.storage = storage
@@ -38,6 +38,7 @@ def test_task_records_run_and_is_idempotent(tmp_path):
         "scripting_service": scripting,
         "studio_service": studio,
         "supervision_service": supervision,
+        "publishing_service": publishing,
     }
 
     r1 = trigger_daily_pipeline.apply(args=["2026-01-01"], kwargs=kw).get()

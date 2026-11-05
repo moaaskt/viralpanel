@@ -64,6 +64,7 @@ class SupervisionService:
         db: Session,
         callback_data: str,
         callback_query_id: str | None = None,
+        publishing_service=None,
     ) -> str:
         """Processa clique humano nos botões 'Aprovar' ou 'Rejeitar' e atualiza o banco."""
         action, run_id = parse_approval_callback_data(callback_data)
@@ -77,6 +78,7 @@ class SupervisionService:
         run.run_metadata = meta
 
         final_asset_id = meta.get("final_asset_id")
+        asset = None
         if final_asset_id:
             asset = db.get(Asset, final_asset_id)
             if asset and asset.script and asset.script.source_video:
@@ -87,6 +89,12 @@ class SupervisionService:
         if callback_query_id:
             label = "Vídeo aprovado para publicação! ✅" if new_status == "approved" else "Vídeo rejeitado. ❌"
             self.client.answer_callback_query(callback_query_id, text=label)
+
+        if new_status == "approved" and publishing_service and asset and asset.script:
+            publishing_service.publish_asset(db=db, asset=asset, script=asset.script)
+
+        self.notifier.notify_stage_completed(run_id, "supervision_decision", {"decision": new_status})
+        return new_status
 
         self.notifier.notify_stage_completed(run_id, "supervision_decision", {"decision": new_status})
         return new_status

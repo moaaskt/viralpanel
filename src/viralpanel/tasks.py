@@ -12,6 +12,8 @@ from viralpanel.idempotency import IdempotencyManager
 from viralpanel.media.downloader import MediaDownloader, MockMediaDownloader
 from viralpanel.media.transcriber import MockTranscriber, WhisperTranscriber
 from viralpanel.models import PipelineRun
+from viralpanel.publishing.base import MockPublisher
+from viralpanel.publishing.service import PublishingService
 from viralpanel.scripting.gemini import GeminiScriptWriter, MockGeminiScriptWriter
 from viralpanel.scripting.service import ScriptingService
 from viralpanel.studio.avatar import MockAvatarAnimator
@@ -23,7 +25,7 @@ from viralpanel.telegram.service import SupervisionService
 
 def build_default_services(
     mock: bool | None = None,
-) -> tuple[DiscoveryService, ScriptingService, StudioService, SupervisionService]:
+) -> tuple[DiscoveryService, ScriptingService, StudioService, SupervisionService, PublishingService]:
     settings = get_settings()
     mock = settings.pipeline_mock_mode if mock is None else mock
     studio = StudioService(
@@ -43,12 +45,23 @@ def build_default_services(
     )
 
     if mock:
+        publishing = PublishingService(
+            publishers={
+                "tiktok": MockPublisher("tiktok"),
+                "instagram": MockPublisher("instagram"),
+                "youtube": MockPublisher("youtube"),
+            },
+            notifier=supervision.notifier,
+        )
         return (
             DiscoveryService(scraper=MockDiscoveryScraper()),
             ScriptingService(MockMediaDownloader(), MockTranscriber(), MockGeminiScriptWriter()),
             studio,
             supervision,
+            publishing,
         )
+
+    publishing = PublishingService(notifier=supervision.notifier)
     return (
         DiscoveryService(scraper=TikTokDiscoveryScraper()),
         ScriptingService(
@@ -58,6 +71,7 @@ def build_default_services(
         ),
         studio,
         supervision,
+        publishing,
     )
 
 
@@ -68,6 +82,7 @@ def _run_pipeline(
     scripting_service: ScriptingService | None,
     studio_service: StudioService | None,
     supervision_service: SupervisionService | None,
+    publishing_service: PublishingService | None,
 ) -> dict:
     summary: dict = dict(run.run_metadata or {})
 
@@ -134,6 +149,24 @@ def _run_pipeline(
         score=best.score,
     )
     summary["approval_status"] = approval_status
+
+    # Se aprovado (modo automático ou pré-aprovado), avança diretamente para a publicação oficial
+    if approval_status == "approved" and publishing_service:
+        run.stage = "publishing"
+        db.commit()
+        publications = publishing_service.publish_asset(
+            db=db,
+            asset=final_asset,
+            script=script,
+        )
+        summary["published_count"] = len(publications)
+        summary["published_urls"] = [p.url for p in publications if p.url]
+        supervision_service.notifier.notify_stage_completed(
+            run.id,
+            "publishing",
+            {"published_count": len(publications), "platforms": [p.platform for p in publications]},
+        )
+
     supervision_service.notifier.notify_pipeline_success(run.id, summary)
     return summary
 
@@ -155,6 +188,7 @@ def trigger_daily_pipeline(
     scripting_service: ScriptingService | None = None,
     studio_service: StudioService | None = None,
     supervision_service: SupervisionService | None = None,
+    publishing_service: PublishingService | None = None,
 ):
     run_date = run_date or date.today().isoformat()
     locker = locker or IdempotencyManager()
@@ -163,10 +197,17 @@ def trigger_daily_pipeline(
         return {"status": "skipped", "reason": "duplicate", "run_date": run_date}
 
     if discovery_service is None:
-        discovery_service, default_scripting, default_studio, default_supervision = build_default_services()
+        (
+            discovery_service,
+            default_scripting,
+            default_studio,
+            default_supervision,
+            default_publishing,
+        ) = build_default_services()
         scripting_service = scripting_service or default_scripting
         studio_service = studio_service or default_studio
         supervision_service = supervision_service or default_supervision
+        publishing_service = publishing_service or default_publishing
 
     factory = session_factory or SessionLocal
     start = time.monotonic()
@@ -182,6 +223,7 @@ def trigger_daily_pipeline(
                 scripting_service,
                 studio_service,
                 supervision_service,
+                publishing_service,
             )
             run.status = "success"
         except Exception as exc:
@@ -204,4 +246,5 @@ def trigger_daily_pipeline(
             "script_id": meta.get("script_id"),
             "final_asset_id": meta.get("final_asset_id"),
             "approval_status": meta.get("approval_status"),
+            "published_count": meta.get("published_count", 0),
         }
