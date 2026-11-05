@@ -11,3 +11,4 @@ requirements: [PUBL-01, PUBL-02, PUBL-03, PUBL-04]
 - **Integração no Celery**: `trigger_daily_pipeline` em `src/viralpanel/tasks.py` integrando o estágio final `publishing` após a aprovação supervisionada.
 - **Aprovação Interativa**: `SupervisionService.process_callback` agora dispara automaticamente a publicação no momento em que o criador clica no botão "Aprovar ✅" via Telegram.
 - **Testes**: `tests/test_publishing_service.py` e `tests/test_celery_tasks.py` passando (37/37 na suíte global).
+

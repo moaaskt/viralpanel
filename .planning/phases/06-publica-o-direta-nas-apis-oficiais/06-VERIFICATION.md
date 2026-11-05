@@ -54,3 +54,4 @@ behavior_unverified: 0
 | 11 | Task Celery trigger_daily_pipeline integra o estágio publishing completando a esteira ponta a ponta | ✓ VERIFIED | \`tests/test_celery_tasks.py\` |
 
 **Score:** 11/11 truths verified (37/37 automated tests passing)
+

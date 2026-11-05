@@ -12,3 +12,4 @@ requirements: [PUBL-01, PUBL-02, PUBL-03]
 - **Instagram Publisher**: `InstagramPublisher` em `src/viralpanel/publishing/instagram.py` usando Meta Graph API v21.0 com criação de container Reels (`/media`) e publicação (`/media_publish`).
 - **YouTube Publisher**: `YouTubePublisher` em `src/viralpanel/publishing/youtube.py` enviando requisição multipart para a YouTube Data API v3 (`/upload/youtube/v3/videos?part=snippet,status`).
 - **Testes**: `tests/test_publishers.py` cobrindo chamadas reais/mockadas e tratamento de erros de credenciais (5/5 passando).
+
