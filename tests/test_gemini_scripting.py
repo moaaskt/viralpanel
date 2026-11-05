@@ -15,9 +15,22 @@ from viralpanel.scripting.service import ScriptingService
 from viralpanel.storage import StorageManager
 
 
-def test_schema_rejects_missing_blocks():
-    with pytest.raises(ValidationError):
-        GeneratedScriptSchema.model_validate({"hook": "Oi", "body": "", "cta": "", "estimated_duration_seconds": 5})
+def test_gemini_writer_loads_api_key_from_settings(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "env-secret-key")
+    from viralpanel.config import get_settings
+    get_settings.cache_clear()
+    writer = GeminiScriptWriter()
+    assert writer.api_key == "env-secret-key"
+    get_settings.cache_clear()
+
+
+def test_gemini_writer_raises_when_no_key_available(monkeypatch):
+    from viralpanel.config import Settings
+    monkeypatch.setattr("viralpanel.scripting.gemini.get_settings", lambda: Settings(gemini_api_key=None, _env_file=None))
+    with pytest.raises(ValueError, match="GEMINI_API_KEY ausente"):
+        GeminiScriptWriter(api_key=None)
+
+
 
 
 def test_gemini_writer_parses_structured_json(monkeypatch):

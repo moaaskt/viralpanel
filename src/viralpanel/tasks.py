@@ -29,7 +29,7 @@ def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, 
         ScriptingService(
             MediaDownloader(),
             WhisperTranscriber(model_size=settings.whisper_model),
-            GeminiScriptWriter(api_key=settings.gemini_api_key or "", model=settings.gemini_model),
+            GeminiScriptWriter(),
         ),
     )
 

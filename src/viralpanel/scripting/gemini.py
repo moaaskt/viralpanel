@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
+from viralpanel.config import get_settings
 from viralpanel.media.transcriber import TranscriptionResult
 
 PERSONA = (
@@ -61,10 +62,20 @@ class ScriptWriter(ABC):
 class GeminiScriptWriter(ScriptWriter):
     ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash", timeout: int = 60):
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY ausente")
-        self.api_key, self.model, self.timeout = api_key, model, timeout
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: int = 60,
+    ):
+        settings = get_settings()
+        self.api_key = api_key or settings.gemini_api_key
+        if not self.api_key:
+            raise ValueError(
+                "GEMINI_API_KEY ausente. Defina a variável no ambiente/.env ou passe api_key no construtor."
+            )
+        self.model = model or settings.gemini_model or "gemini-2.5-flash"
+        self.timeout = timeout
 
     def build_prompt(self, transcription: TranscriptionResult) -> str:
         return PROMPT_TEMPLATE.format(persona=PERSONA, transcript=transcription.to_timestamped_text())
