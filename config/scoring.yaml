@@ -1,0 +1,24 @@
+# ViralPanel - Configuração de Scoring de Viralidade (TikTok)
+weights:
+  views: 0.25
+  engagement_ratio: 0.45
+  velocity_24h: 0.30
+
+engagement_multipliers:
+  likes: 1.0
+  comments: 2.0
+  shares: 3.0
+
+thresholds:
+  min_views: 1000
+  reference_views: 100000
+  reference_velocity_per_hour: 5000
+
+discovery:
+  default_limit: 30
+  hashtags:
+    - "desenvolvimentopessoal"
+    - "motivacao"
+    - "mentalidade"
+    - "disciplina"
+    - "produtividade"
