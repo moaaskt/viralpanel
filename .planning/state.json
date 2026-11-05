@@ -16,17 +16,17 @@
     {
       "number": "3",
       "name": "Análise, Transcrição & Roteiro Gemini",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "4",
       "name": "Produção Studio (Voz, Avatar & Vídeo Reaction)",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "5",
       "name": "Observabilidade & Bot Telegram Supervisionado",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "6",
@@ -41,8 +41,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step (plan phase 3)",
-    "reason": "Phase 3 of 7 — needs a plan"
+    "label": "Advance to the next step (plan phase 6)",
+    "reason": "Phase 6 of 7 — needs a plan"
   },
-  "updated_at": "2026-11-05T19:23:26.608Z"
+  "updated_at": "2026-11-05T20:37:10.445Z"
 }

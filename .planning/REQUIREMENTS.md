@@ -20,22 +20,22 @@
 - [x] **SCOR-02**: Sistema ranqueia os 30 vídeos candidatos e seleciona o melhor candidato não processado para a esteira do dia
 
 ### Download & Transcrição de Mídia (MEDIA)
-- [ ] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
-- [ ] **MEDIA-02**: Sistema transcreve o áudio com marcações de tempo (timestamps) usando Whisper / faster-whisper
+- [x] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
+- [x] **MEDIA-02**: Sistema transcreve o áudio com marcações de tempo (timestamps) usando Whisper / faster-whisper
 
 ### Roteirização com IA (SCRP)
-- [ ] **SCRP-01**: Sistema envia a transcrição e diretrizes de persona ao Gemini 2.5 Flash para análise estrutural de ganchos e retenção
-- [ ] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
+- [x] **SCRP-01**: Sistema envia a transcrição e diretrizes de persona ao Gemini 2.5 Flash para análise estrutural de ganchos e retenção
+- [x] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
 
 ### Produção de Áudio & Vídeo (PROD)
-- [ ] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
-- [ ] **PROD-02**: Módulo gerador de avatar sincroniza movimentos do avatar virtual do criador com o áudio narrado gerado
-- [ ] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
+- [x] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
+- [x] **PROD-02**: Módulo gerador de avatar sincroniza movimentos do avatar virtual do criador com o áudio narrado gerado
+- [x] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
 
 ### Observabilidade & Supervisão no Telegram (TELE)
-- [ ] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
-- [ ] **TELE-02**: Modo supervisionado envia preview do vídeo 9:16 renderizado com botões interativos "Aprovar" e "Rejeitar"
-- [ ] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
+- [x] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
+- [x] **TELE-02**: Modo supervisionado envia preview do vídeo 9:16 renderizado com botões interativos "Aprovar" e "Rejeitar"
+- [x] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
 
 ### Publicação & Agendamento Oficial (PUBL)
 - [ ] **PUBL-01**: Sistema agenda e publica o vídeo aprovado no TikTok através da TikTok Content Posting API oficial
@@ -81,16 +81,16 @@
 | DISC-03 | Phase 2 | Complete |
 | SCOR-01 | Phase 2 | Complete |
 | SCOR-02 | Phase 2 | Complete |
-| MEDIA-01 | Phase 3 | Pending |
-| MEDIA-02 | Phase 3 | Pending |
-| SCRP-01 | Phase 3 | Pending |
-| SCRP-02 | Phase 3 | Pending |
-| PROD-01 | Phase 4 | Pending |
-| PROD-02 | Phase 4 | Pending |
-| PROD-03 | Phase 4 | Pending |
-| TELE-01 | Phase 5 | Pending |
-| TELE-02 | Phase 5 | Pending |
-| TELE-03 | Phase 5 | Pending |
+| MEDIA-01 | Phase 3 | Complete |
+| MEDIA-02 | Phase 3 | Complete |
+| SCRP-01 | Phase 3 | Complete |
+| SCRP-02 | Phase 3 | Complete |
+| PROD-01 | Phase 4 | Complete |
+| PROD-02 | Phase 4 | Complete |
+| PROD-03 | Phase 4 | Complete |
+| TELE-01 | Phase 5 | Complete |
+| TELE-02 | Phase 5 | Complete |
+| TELE-03 | Phase 5 | Complete |
 | PUBL-01 | Phase 6 | Pending |
 | PUBL-02 | Phase 6 | Pending |
 | PUBL-03 | Phase 6 | Pending |
