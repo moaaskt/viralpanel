@@ -27,15 +27,23 @@ def test_task_records_run_and_is_idempotent(tmp_path):
     factory = sessionmaker(bind=eng, expire_on_commit=False)
     locker = IdempotencyManager(client=fakeredis.FakeRedis())
 
-    discovery, scripting = build_default_services(mock=True)
-    scripting.downloader.storage = StorageManager(tmp_path)
-    kw = {"session_factory": factory, "locker": locker, "discovery_service": discovery, "scripting_service": scripting}
+    discovery, scripting, studio = build_default_services(mock=True)
+    storage = StorageManager(tmp_path)
+    scripting.downloader.storage = storage
+    studio.storage = storage
+    kw = {
+        "session_factory": factory,
+        "locker": locker,
+        "discovery_service": discovery,
+        "scripting_service": scripting,
+        "studio_service": studio,
+    }
 
     r1 = trigger_daily_pipeline.apply(args=["2026-01-01"], kwargs=kw).get()
     r2 = trigger_daily_pipeline.apply(args=["2026-01-01"], kwargs=kw).get()
 
     assert r1["status"] == "success"
-    assert r1["selected_video_id"] and r1["script_id"]
+    assert r1["selected_video_id"] and r1["script_id"] and r1["final_asset_id"]
     assert r2["status"] == "skipped"
     with factory() as s:
         assert len(s.scalars(select(PipelineRun)).all()) == 1

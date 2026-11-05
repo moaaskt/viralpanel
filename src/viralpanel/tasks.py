@@ -14,15 +14,23 @@ from viralpanel.media.transcriber import MockTranscriber, WhisperTranscriber
 from viralpanel.models import PipelineRun
 from viralpanel.scripting.gemini import GeminiScriptWriter, MockGeminiScriptWriter
 from viralpanel.scripting.service import ScriptingService
+from viralpanel.studio.avatar import MockAvatarAnimator
+from viralpanel.studio.service import StudioService
+from viralpanel.studio.voice import MockVoiceSynthesizer
 
 
-def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, ScriptingService]:
+def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, ScriptingService, StudioService]:
     settings = get_settings()
     mock = settings.pipeline_mock_mode if mock is None else mock
+    studio = StudioService(
+        voice_synthesizer=MockVoiceSynthesizer(),
+        avatar_animator=MockAvatarAnimator(),
+    )
     if mock:
         return (
             DiscoveryService(scraper=MockDiscoveryScraper()),
             ScriptingService(MockMediaDownloader(), MockTranscriber(), MockGeminiScriptWriter()),
+            studio,
         )
     return (
         DiscoveryService(scraper=TikTokDiscoveryScraper()),
@@ -31,6 +39,7 @@ def build_default_services(mock: bool | None = None) -> tuple[DiscoveryService, 
             WhisperTranscriber(model_size=settings.whisper_model),
             GeminiScriptWriter(),
         ),
+        studio,
     )
 
 
@@ -39,6 +48,7 @@ def _run_pipeline(
     db: Session,
     discovery_service: DiscoveryService,
     scripting_service: ScriptingService | None,
+    studio_service: StudioService | None,
 ) -> dict:
     summary: dict = dict(run.run_metadata or {})
 
@@ -58,6 +68,18 @@ def _run_pipeline(
     db.commit()
     script = scripting_service.process(db=db, run_id=run.id, source=best)
     summary.update(script_id=script.id, script_hook=script.hook)
+
+    if studio_service is None:
+        return summary
+
+    run.stage = "production"
+    db.commit()
+    final_asset = studio_service.produce(db=db, run_id=run.id, script=script)
+    summary.update(
+        final_asset_id=final_asset.id,
+        final_video_path=final_asset.file_path,
+        final_video_duration=final_asset.duration_seconds,
+    )
     return summary
 
 
@@ -76,6 +98,7 @@ def trigger_daily_pipeline(
     locker=None,
     discovery_service: DiscoveryService | None = None,
     scripting_service: ScriptingService | None = None,
+    studio_service: StudioService | None = None,
 ):
     run_date = run_date or date.today().isoformat()
     locker = locker or IdempotencyManager()
@@ -84,8 +107,9 @@ def trigger_daily_pipeline(
         return {"status": "skipped", "reason": "duplicate", "run_date": run_date}
 
     if discovery_service is None:
-        discovery_service, default_scripting = build_default_services()
+        discovery_service, default_scripting, default_studio = build_default_services()
         scripting_service = scripting_service or default_scripting
+        studio_service = studio_service or default_studio
 
     factory = session_factory or SessionLocal
     start = time.monotonic()
@@ -94,7 +118,7 @@ def trigger_daily_pipeline(
         db.add(run)
         db.commit()
         try:
-            run.run_metadata = _run_pipeline(run, db, discovery_service, scripting_service)
+            run.run_metadata = _run_pipeline(run, db, discovery_service, scripting_service, studio_service)
             run.status = "success"
         except Exception as exc:
             db.rollback()
@@ -112,4 +136,5 @@ def trigger_daily_pipeline(
             "run_date": run_date,
             "selected_video_id": meta.get("selected_video_id"),
             "script_id": meta.get("script_id"),
+            "final_asset_id": meta.get("final_asset_id"),
         }
