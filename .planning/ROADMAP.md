@@ -16,8 +16,8 @@ O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 
 - [x] **Phase 3: Análise, Transcrição & Roteiro Gemini** - Download, transcrição com Whisper e criação de roteiros estruturados via Gemini 2.5 Flash (completed 2026-11-05)
 - [x] **Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)** - Clonagem de voz com XTTS, avatar virtual e montagem 9:16 com legendas via FFmpeg (completed 2026-11-05)
 - [x] **Phase 5: Observabilidade & Bot Telegram Supervisionado** - Notificações em tempo real e modo supervisionado com preview de vídeo e aprovação (completed 2026-11-05)
-- [ ] **Phase 6: Publicação Direta nas APIs Oficiais** - Integração direta com TikTok Content Posting API, Meta Graph API e YouTube Data API v3
-- [ ] **Phase 7: Painel Web de Controle** - Interface React + Chakra UI (sem neon) para monitoramento de filas, histórico e métricas
+- [x] **Phase 6: Publicação Direta nas APIs Oficiais** - Integração direta com TikTok Content Posting API, Meta Graph API e YouTube Data API v3 (completed 2026-11-05)
+- [x] **Phase 7: Painel Web de Controle** - Interface React + Chakra UI (sem neon) para monitoramento de filas, histórico e métricas (completed 2026-11-05)
 
 ## Phase Details
 
@@ -142,9 +142,9 @@ Plans:
 
 Plans:
 
-- [ ] 06-01: Módulo de autenticação OAuth2 e gerenciamento de tokens das três plataformas
-- [ ] 06-02: Publicador TikTok Content Posting API
-- [ ] 06-03: Publicador Meta Graph API (Instagram Reels) e YouTube Data API v3 (Shorts) com geração de metadados
+- [x] 06-01: Módulo de autenticação OAuth2 e gerenciamento de tokens das três plataformas
+- [x] 06-02: Publicador TikTok Content Posting API
+- [x] 06-03: Publicador Meta Graph API (Instagram Reels) e YouTube Data API v3 (Shorts) com geração de metadados
 
 ### Phase 7: Painel Web de Controle
 
@@ -162,9 +162,9 @@ Plans:
 
 Plans:
 
-- [ ] 07-01: Setup do frontend React com Chakra UI e integração de API com o backend
-- [ ] 07-02: Telas de monitoramento de fila Celery, status dos jobs e disparo manual
-- [ ] 07-03: Tela de histórico de publicações, biblioteca de roteiros/assets e visualização de métricas
+- [x] 07-01: Setup do frontend React com Chakra UI e integração de API com o backend
+- [x] 07-02: Telas de monitoramento de fila Celery, status dos jobs e disparo manual
+- [x] 07-03: Tela de histórico de publicações, biblioteca de roteiros/assets e visualização de métricas
 
 ## Progress
 
@@ -178,5 +178,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Análise, Transcrição & Roteiro Gemini | 3/3 | Complete    | 2026-11-05 |
 | 4. Produção Studio (Voz, Avatar & Vídeo Reaction) | 3/3 | Complete    | 2026-11-05 |
 | 5. Observabilidade & Bot Telegram Supervisionado | 2/2 | Complete    | 2026-11-05 |
-| 6. Publicação Direta nas APIs Oficiais | 0/3 | Not started | - |
-| 7. Painel Web de Controle | 0/3 | Not started | - |
+| 6. Publicação Direta nas APIs Oficiais | 3/3 | Complete    | 2026-11-05 |
+| 7. Painel Web de Controle | 3/3 | Complete    | 2026-11-05 |

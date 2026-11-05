@@ -19,23 +19,23 @@ Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos cu
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] RF01: Execução agendada diária às 01:00 (America/Sao_Paulo) e orquestração de tarefas distribuídas via Celery + Redis
+- [x] RF02: Módulo Discovery de vídeos virais no TikTok no nicho de desenvolvimento pessoal via scraper próprio (Playwright + yt-dlp)
+- [x] RF03: Algoritmo de cálculo de score de viralidade configurável via YAML (views mínimas, likes/views ratio, taxa de crescimento em 24h)
+- [x] RF04: Seleção do melhor vídeo candidato por score com filtro de descarte para itens já processados
+- [x] RF05: Download automatizado do vídeo candidato e extração de áudio isolado via yt-dlp e FFmpeg
+- [x] RF06: Transcrição de áudio com marcação de tempo (timestamps) usando Whisper / faster-whisper
+- [x] RF07: Geração de roteiro original com Gemini 2.5 Flash com estrutura rígida (gancho 0–3s, desenvolvimento 4–45s, CTA final)
+- [x] RF08: Módulo de voz com interface modular para voz clonada do criador utilizando XTTS / Voice Studio
+- [x] RF09: Geração do avatar virtual (formato reaction em overlay) e composição do vídeo final 9:16 com legendas automáticas via FFmpeg
+- [x] RF10: Integração de publicação direta com APIs oficiais: TikTok Content Posting API, Meta Graph API (Instagram Reels) e YouTube Data API v3
+- [x] RF11: Bot no Telegram para observabilidade em tempo real e modo supervisionado (aprovação/rejeição com preview de vídeo antes da postagem)
+- [x] RF12: Persistência relacional em PostgreSQL (modelos: source_videos, scripts, assets, publications, runs)
+- [x] RF13: Painel web administrativo em React + Chakra UI (design limpo, profissional, sem neon) para monitoramento de filas, histórico e métricas
 
 ### Active
 
-- [ ] RF01: Execução agendada diária às 01:00 (America/Sao_Paulo) e orquestração de tarefas distribuídas via Celery + Redis
-- [ ] RF02: Módulo Discovery de vídeos virais no TikTok no nicho de desenvolvimento pessoal via scraper próprio (Playwright + yt-dlp)
-- [ ] RF03: Algoritmo de cálculo de score de viralidade configurável via YAML (views mínimas, likes/views ratio, taxa de crescimento em 24h)
-- [ ] RF04: Seleção do melhor vídeo candidato por score com filtro de descarte para itens já processados
-- [ ] RF05: Download automatizado do vídeo candidato e extração de áudio isolado via yt-dlp e FFmpeg
-- [ ] RF06: Transcrição de áudio com marcação de tempo (timestamps) usando Whisper / faster-whisper
-- [ ] RF07: Geração de roteiro original com Gemini 2.5 Flash com estrutura rígida (gancho 0–3s, desenvolvimento 4–45s, CTA final)
-- [ ] RF08: Módulo de voz com interface modular para voz clonada do criador utilizando XTTS / Voice Studio
-- [ ] RF09: Geração do avatar virtual (formato reaction em overlay) e composição do vídeo final 9:16 com legendas automáticas via FFmpeg
-- [ ] RF10: Integração de publicação direta com APIs oficiais: TikTok Content Posting API, Meta Graph API (Instagram Reels) e YouTube Data API v3
-- [ ] RF11: Bot no Telegram para observabilidade em tempo real e modo supervisionado (aprovação/rejeição com preview de vídeo antes da postagem)
-- [ ] RF12: Persistência relacional em PostgreSQL (modelos: source_videos, scripts, assets, publications, runs)
-- [ ] RF13: Painel web administrativo em React + Chakra UI (design limpo, profissional, sem neon) para monitoramento de filas, histórico e métricas
+(None currently active — Milestone v1.0 complete)
 
 ### Out of Scope
 

@@ -31,18 +31,18 @@
     {
       "number": "6",
       "name": "Publicação Direta nas APIs Oficiais",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "7",
       "name": "Painel Web de Controle",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd-progress --next",
-    "label": "Advance to the next step (plan phase 6)",
-    "reason": "Phase 6 of 7 — needs a plan"
+    "command": "/gsd-new-milestone",
+    "label": "Start a new milestone",
+    "reason": "All phases complete — start a new milestone"
   },
-  "updated_at": "2026-11-05T20:37:10.445Z"
+  "updated_at": "2026-11-05T21:14:06.276Z"
 }

@@ -38,19 +38,19 @@
 - [x] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
 
 ### Publicação & Agendamento Oficial (PUBL)
-- [ ] **PUBL-01**: Sistema agenda e publica o vídeo aprovado no TikTok através da TikTok Content Posting API oficial
-- [ ] **PUBL-02**: Sistema agenda e publica o vídeo aprovado no Instagram Reels via Meta Graph API oficial
-- [ ] **PUBL-03**: Sistema agenda e publica o vídeo aprovado no YouTube Shorts via YouTube Data API v3 oficial
-- [ ] **PUBL-04**: Sistema gera título, descrição e hashtags otimizadas para cada plataforma conforme o roteiro aprovado
+- [x] **PUBL-01**: Sistema agenda e publica o vídeo aprovado no TikTok através da TikTok Content Posting API oficial
+- [x] **PUBL-02**: Sistema agenda e publica o vídeo aprovado no Instagram Reels via Meta Graph API oficial
+- [x] **PUBL-03**: Sistema agenda e publica o vídeo aprovado no YouTube Shorts via YouTube Data API v3 oficial
+- [x] **PUBL-04**: Sistema gera título, descrição e hashtags otimizadas para cada plataforma conforme o roteiro aprovado
 
 ### Persistência & Dados (DATA)
 - [x] **DATA-01**: Banco de dados PostgreSQL armazena todo o histórico nos modelos `source_videos`, `scripts`, `assets`, `publications` e `runs`
 - [x] **DATA-02**: Sistema gerencia arquivos locais gerados (áudios, vídeos intermediários e renderizações finais) com retenção e limpeza configurável
 
 ### Painel Web de Controle (DASH)
-- [ ] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
-- [ ] **DASH-02**: Frontend exibe histórico de vídeos produzidos, roteiros gerados, métricas e links das publicações realizadas
-- [ ] **DASH-03**: Interface com design limpo, moderno e profissional, sem cores neon
+- [x] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
+- [x] **DASH-02**: Frontend exibe histórico de vídeos produzidos, roteiros gerados, métricas e links das publicações realizadas
+- [x] **DASH-03**: Interface com design limpo, moderno e profissional, sem cores neon
 
 ## v2 Requirements
 
@@ -91,15 +91,15 @@
 | TELE-01 | Phase 5 | Complete |
 | TELE-02 | Phase 5 | Complete |
 | TELE-03 | Phase 5 | Complete |
-| PUBL-01 | Phase 6 | Pending |
-| PUBL-02 | Phase 6 | Pending |
-| PUBL-03 | Phase 6 | Pending |
-| PUBL-04 | Phase 6 | Pending |
+| PUBL-01 | Phase 6 | Complete |
+| PUBL-02 | Phase 6 | Complete |
+| PUBL-03 | Phase 6 | Complete |
+| PUBL-04 | Phase 6 | Complete |
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
-| DASH-01 | Phase 7 | Pending |
-| DASH-02 | Phase 7 | Pending |
-| DASH-03 | Phase 7 | Pending |
+| DASH-01 | Phase 7 | Complete |
+| DASH-02 | Phase 7 | Complete |
+| DASH-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total

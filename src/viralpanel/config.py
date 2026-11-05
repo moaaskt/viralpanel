@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
     telegram_supervised_mode: bool = True
+    tiktok_access_token: str | None = None
+    instagram_access_token: str | None = None
+    instagram_account_id: str | None = None
+    youtube_client_secret: str | None = None
+    youtube_refresh_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
