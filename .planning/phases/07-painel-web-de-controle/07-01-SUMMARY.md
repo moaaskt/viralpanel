@@ -17,3 +17,4 @@
    - `GET /api/assets`
 4. Criado módulo `src/viralpanel/api/app.py` configurando a aplicação FastAPI com middleware CORS aberto para desenvolvimento local e montagem de `/media` para servir arquivos de vídeo/áudio gerados pelo storage.
 5. Criada suite de testes `tests/test_api.py` cobrindo 100% dos fluxos REST com SQLite em memória e mock de fila Celery. Todos os 42 testes da aplicação passam com sucesso.
+

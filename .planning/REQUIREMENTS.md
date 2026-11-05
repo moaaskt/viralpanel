@@ -48,9 +48,9 @@
 - [x] **DATA-02**: Sistema gerencia arquivos locais gerados (áudios, vídeos intermediários e renderizações finais) com retenção e limpeza configurável
 
 ### Painel Web de Controle (DASH)
-- [ ] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
-- [ ] **DASH-02**: Frontend exibe histórico de vídeos produzidos, roteiros gerados, métricas e links das publicações realizadas
-- [ ] **DASH-03**: Interface com design limpo, moderno e profissional, sem cores neon
+- [x] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
+- [x] **DASH-02**: Frontend exibe histórico de vídeos produzidos, roteiros gerados, métricas e links das publicações realizadas
+- [x] **DASH-03**: Interface com design limpo, moderno e profissional, sem cores neon
 
 ## v2 Requirements
 
@@ -97,9 +97,9 @@
 | PUBL-04 | Phase 6 | Complete |
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
-| DASH-01 | Phase 7 | Pending |
-| DASH-02 | Phase 7 | Pending |
-| DASH-03 | Phase 7 | Pending |
+| DASH-01 | Phase 7 | Complete |
+| DASH-02 | Phase 7 | Complete |
+| DASH-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total
