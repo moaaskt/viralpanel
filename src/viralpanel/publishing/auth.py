@@ -40,3 +40,4 @@ class PlatformCredentials:
         if self.is_platform_configured("youtube"):
             configured.append("youtube")
         return configured
+

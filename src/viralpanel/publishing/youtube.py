@@ -107,3 +107,4 @@ class YouTubePublisher(BasePublisher):
                 error_message=str(exc),
                 scheduled_for=scheduled_for,
             )
+

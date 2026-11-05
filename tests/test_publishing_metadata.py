@@ -48,3 +48,4 @@ def test_metadata_generator_for_all_platforms():
     assert meta_yt.title.endswith("#Shorts")
     assert len(meta_yt.title) <= 100
     assert "#Shorts" in meta_yt.formatted_caption
+

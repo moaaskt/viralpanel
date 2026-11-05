@@ -92,3 +92,4 @@ class PublishingService:
             self.notifier.client.send_message(text=msg)
 
         return persisted_publications
+

@@ -76,3 +76,4 @@ def test_publishing_service_persists_publications(tmp_path):
         assert "Tiktok:" in msg
         assert "Instagram:" in msg
         assert "Youtube:" in msg
+

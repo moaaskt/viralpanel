@@ -107,3 +107,4 @@ class MetadataGenerator:
                 hashtags=unique_tags,
                 formatted_caption=caption,
             )
+

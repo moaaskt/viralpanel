@@ -73,3 +73,4 @@ class MockPublisher(BasePublisher):
             status=status,
             scheduled_for=scheduled_for,
         )
+
