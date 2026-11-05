@@ -12,7 +12,7 @@ O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 
 - Decimal phases (e.g. 2.1): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Fundação & Orquestração Base** - Ambiente Docker Compose, PostgreSQL com migrations, Redis e Celery assíncrono (completed 2026-11-05)
-- [ ] **Phase 2: Discovery & Scoring no TikTok** - Scraper próprio (Playwright + yt-dlp) com algoritmo de ranking configurável via YAML
+- [x] **Phase 2: Discovery & Scoring no TikTok** - Scraper próprio (Playwright + yt-dlp) com algoritmo de ranking configurável via YAML (completed 2026-11-05)
 - [ ] **Phase 3: Análise, Transcrição & Roteiro Gemini** - Download, transcrição com Whisper e criação de roteiros estruturados via Gemini 2.5 Flash
 - [ ] **Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)** - Clonagem de voz com XTTS, avatar virtual e montagem 9:16 com legendas via FFmpeg
 - [ ] **Phase 5: Observabilidade & Bot Telegram Supervisionado** - Notificações em tempo real e modo supervisionado com preview de vídeo e aprovação
@@ -64,8 +64,8 @@ Plans:
 
 Plans:
 
-- [ ] 02-01: Implementação da interface e módulo de scraping próprio (Playwright + yt-dlp) para coleta dos 30 vídeos
-- [ ] 02-02: Módulo de cálculo de viralidade baseado em regras YAML e rotina de seleção e deduplicação no banco
+- [x] 02-01: Implementação da interface e módulo de scraping próprio (Playwright + yt-dlp) para coleta dos 30 vídeos
+- [x] 02-02: Módulo de cálculo de viralidade baseado em regras YAML e rotina de seleção e deduplicação no banco
 
 ### Phase 3: Análise, Transcrição & Roteiro Gemini
 
@@ -174,7 +174,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Fundação & Orquestração Base | 3/3 | Complete    | 2026-11-05 |
-| 2. Discovery & Scoring no TikTok | 0/2 | Not started | - |
+| 2. Discovery & Scoring no TikTok | 2/2 | Complete    | 2026-11-05 |
 | 3. Análise, Transcrição & Roteiro Gemini | 0/3 | Not started | - |
 | 4. Produção Studio (Voz, Avatar & Vídeo Reaction) | 0/3 | Not started | - |
 | 5. Observabilidade & Bot Telegram Supervisionado | 0/2 | Not started | - |

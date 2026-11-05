@@ -11,13 +11,13 @@
 - [x] **SCHED-03**: Sistema garante idempotência das etapas, impedindo processamento duplicado de vídeos ou postagens repetidas
 
 ### Discovery & Coleta (DISC)
-- [ ] **DISC-01**: Sistema busca automaticamente os 30 vídeos mais virais no TikTok dentro do nicho de desenvolvimento pessoal e hashtags configuráveis
-- [ ] **DISC-02**: Módulo de scraping próprio baseado em Playwright + yt-dlp extrai metadados completos (views, likes, comentários, shares, data de postagem) de cada vídeo coletado
-- [ ] **DISC-03**: Sistema isola a interface de coleta permitindo evolução ou troca de estratégia sem quebrar o pipeline
+- [x] **DISC-01**: Sistema busca automaticamente os 30 vídeos mais virais no TikTok dentro do nicho de desenvolvimento pessoal e hashtags configuráveis
+- [x] **DISC-02**: Módulo de scraping próprio baseado em Playwright + yt-dlp extrai metadados completos (views, likes, comentários, shares, data de postagem) de cada vídeo coletado
+- [x] **DISC-03**: Sistema isola a interface de coleta permitindo evolução ou troca de estratégia sem quebrar o pipeline
 
 ### Scoring & Seleção (SCOR)
-- [ ] **SCOR-01**: Sistema calcula score de viralidade a partir de fórmula matemática parametrizável via YAML (considerando views, ratio de engajamento e velocidade de crescimento em 24h)
-- [ ] **SCOR-02**: Sistema ranqueia os 30 vídeos candidatos e seleciona o melhor candidato não processado para a esteira do dia
+- [x] **SCOR-01**: Sistema calcula score de viralidade a partir de fórmula matemática parametrizável via YAML (considerando views, ratio de engajamento e velocidade de crescimento em 24h)
+- [x] **SCOR-02**: Sistema ranqueia os 30 vídeos candidatos e seleciona o melhor candidato não processado para a esteira do dia
 
 ### Download & Transcrição de Mídia (MEDIA)
 - [ ] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
@@ -76,11 +76,11 @@
 | SCHED-01 | Phase 1 | Complete |
 | SCHED-02 | Phase 1 | Complete |
 | SCHED-03 | Phase 1 | Complete |
-| DISC-01 | Phase 2 | Pending |
-| DISC-02 | Phase 2 | Pending |
-| DISC-03 | Phase 2 | Pending |
-| SCOR-01 | Phase 2 | Pending |
-| SCOR-02 | Phase 2 | Pending |
+| DISC-01 | Phase 2 | Complete |
+| DISC-02 | Phase 2 | Complete |
+| DISC-03 | Phase 2 | Complete |
+| SCOR-01 | Phase 2 | Complete |
+| SCOR-02 | Phase 2 | Complete |
 | MEDIA-01 | Phase 3 | Pending |
 | MEDIA-02 | Phase 3 | Pending |
 | SCRP-01 | Phase 3 | Pending |
