@@ -25,3 +25,4 @@ requirements:
 - **Alembic Migrations**: Versão inicial `001_initial_schema.py` criada e aplicada com sucesso.
 - **StorageManager**: Gerenciamento de arquivos e diretórios isolados por `run_id`, com política de retenção temporal e proteção contra directory traversal.
 - **Validação Automatizada**: `tests/test_models.py` e `tests/test_storage.py` passando 100%.
+

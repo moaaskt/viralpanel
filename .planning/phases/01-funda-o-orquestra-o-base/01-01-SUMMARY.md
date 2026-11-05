@@ -27,3 +27,4 @@ requirements:
 - **Configurações Centralizadas**: `src/viralpanel/config.py` validando variáveis com `pydantic-settings`.
 - **Database Engine**: `src/viralpanel/database.py` fornecendo gerenciamento de conexões com pre-ping e `SessionLocal`.
 - **Validação Automatizada**: `tests/test_infra.py` passando 100%.
+

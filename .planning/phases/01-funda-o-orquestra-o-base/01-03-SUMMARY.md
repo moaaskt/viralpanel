@@ -25,3 +25,4 @@ requirements:
 - **Tasks & Pipeline Run**: Task `trigger_daily_pipeline` orquestrada com registro de auditoria na tabela `pipeline_runs`.
 - **Serviços no Compose**: `celery_worker` e `celery_beat` adicionados ao Docker Compose.
 - **Validação Automatizada**: `tests/test_idempotency.py` e `tests/test_celery_tasks.py` passando 100%.
+

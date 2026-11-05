@@ -47,3 +47,4 @@ behavior_unverified: 0
 | 10 | Docker Compose orquestra worker e beat | ✓ VERIFIED | `docker-compose.yml` validado com `docker compose config` |
 
 **Score:** 10/10 truths verified
+
