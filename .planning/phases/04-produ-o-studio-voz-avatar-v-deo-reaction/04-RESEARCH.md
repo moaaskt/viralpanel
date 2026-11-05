@@ -24,3 +24,4 @@
        - Mixagem de áudio: voz clonada em destaque (0dB) + áudio do vídeo original atenuado (-14dB) para criar ambientação autêntica de reaction.
 4. **Integração no Celery (`src/viralpanel/tasks.py`)**:
    - Etapa diária: avança para stage="production" -> gera voz -> anima avatar -> renderiza vídeo final 9:16 -> persiste em `Asset(asset_type="final_video")`.
+
