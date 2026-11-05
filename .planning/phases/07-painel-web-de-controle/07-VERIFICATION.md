@@ -23,7 +23,7 @@ covered_files:
   - src/viralpanel/api/routes.py
   - src/viralpanel/api/schemas.py
   - tests/test_api.py
-covered_digest: "v4:sha256:4cf51dd60fa29641b4885cdae568f021e48ce179cfd7f5bb9429fbdfee7d7aa6"
+covered_digest: "v4:sha256:c33464dcc93e8ef736e1f2fcbb44ad352cfdae4d1e3833cdbb3802fa0666f354"
 behavior_unverified: 0
 ---
 
