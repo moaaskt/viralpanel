@@ -134,3 +134,4 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
     </Modal>
   );
 };
+

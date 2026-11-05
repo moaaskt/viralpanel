@@ -12,3 +12,4 @@
    - `StatsCards.tsx`: Cards com métricas consolidadas de vídeos minerados, roteiros, publicações e execuções concluídas.
    - `PipelineMonitor.tsx`: Monitor da esteira diária com tabela de execuções Celery, status com badges coloridos discretos, timestamps e mensagens de erro/progresso.
 5. `npm install` e `npm run build` executados com sucesso (bundle Vite gerado sem erros de tipagem).
+

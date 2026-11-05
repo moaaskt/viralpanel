@@ -16,3 +16,4 @@
    - Publicações Oficiais
 5. Validação de build em produção (`npm run build`) concluída com sucesso (bundle Vite gerado e TypeScript verificado sem erros).
 6. Suite completa do backend (`pytest`) executada com 42/42 testes passando com sucesso.
+
