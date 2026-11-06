@@ -1,48 +1,12 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": null,
-  "phases": [
-    {
-      "number": "1",
-      "name": "Fundação & Orquestração Base",
-      "status": "complete"
-    },
-    {
-      "number": "2",
-      "name": "Discovery & Scoring no TikTok",
-      "status": "complete"
-    },
-    {
-      "number": "3",
-      "name": "Análise, Transcrição & Roteiro Gemini",
-      "status": "complete"
-    },
-    {
-      "number": "4",
-      "name": "Produção Studio (Voz, Avatar & Vídeo Reaction)",
-      "status": "complete"
-    },
-    {
-      "number": "5",
-      "name": "Observabilidade & Bot Telegram Supervisionado",
-      "status": "complete"
-    },
-    {
-      "number": "6",
-      "name": "Publicação Direta nas APIs Oficiais",
-      "status": "complete"
-    },
-    {
-      "number": "7",
-      "name": "Painel Web de Controle",
-      "status": "complete"
-    }
-  ],
+  "milestone": "v1.1 — ZUNTO! Visual Engine",
+  "phases": [],
   "next": {
-    "command": "/gsd-new-milestone",
-    "label": "Start a new milestone",
-    "reason": "All phases complete — start a new milestone"
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step (verify)",
+    "reason": "Phase 1 of 6 · 0% · ready to verify"
   },
-  "updated_at": "2026-11-05T21:14:06.276Z"
+  "updated_at": "2026-11-06T08:42:08.558Z"
 }
