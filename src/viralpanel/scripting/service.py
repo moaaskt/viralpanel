@@ -61,12 +61,18 @@ class ScriptingService:
             generated = self.writer.generate(transcription, fallback_context=fallback_context)
 
             last_version = max((s.version for s in source.scripts), default=0)
+            metadata_json = {
+                "factual_claims": [c.model_dump() for c in generated.factual_claims],
+                "closing_thought": generated.closing_thought,
+                "cta": generated.cta,
+            }
             script = Script(
                 source_video_id=source.id,
                 transcription=transcription.model_dump_json(),
                 script_text=generated.full_text,
                 hook=generated.hook,
                 version=last_version + 1,
+                metadata_json=metadata_json,
             )
             db.add(script)
             db.flush()

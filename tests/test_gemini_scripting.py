@@ -47,8 +47,18 @@ def test_gemini_writer_parses_structured_json(monkeypatch):
         "theme": "foco",
         "hook": "Seu celular está roubando sua vida.",
         "body": "Cada notificação quebra seu foco por minutos. " * 3,
+        "closing_thought": "Você não sabia. Agora sabe.",
         "cta": "Me segue para mais.",
         "estimated_duration_seconds": 30,
+        "factual_claims": [
+            {
+                "claim": "Notificações quebram o foco.",
+                "source_reference": "Universidade da Califórnia",
+                "source_excerpt": "quebra seu foco por minutos",
+                "timestamp": "00:05",
+                "verification_status": "extracted_from_transcript",
+            }
+        ],
     }
     captured = {}
 
@@ -59,6 +69,9 @@ def test_gemini_writer_parses_structured_json(monkeypatch):
     monkeypatch.setattr(writer, "_call", fake_call)
     out = writer.generate(MockTranscriber().transcribe(None))
     assert out.hook == payload["hook"]
+    assert out.closing_thought == "Você não sabia. Agora sabe."
+    assert len(out.factual_claims) == 1
+    assert out.factual_claims[0].claim == "Notificações quebram o foco."
     assert ("[000.00-003.00]" in captured["prompt"]) and ("0–3" in captured["prompt"] or "0-3" in captured["prompt"])
 
 
@@ -77,12 +90,53 @@ def test_scripting_service_persists_script_and_asset(tmp_path):
         assert script.version == 1
         assert script.hook and "Salva" in script.script_text
         assert src.status == "scripted"
+        assert script.metadata_json is not None
+        assert script.metadata_json["closing_thought"] == "Quem domina a própria rotina não precisa de sorte."
+        assert script.metadata_json["cta"] == "Salva esse vídeo e me segue para mais."
+        assert len(script.metadata_json["factual_claims"]) == 1
+        claim = script.metadata_json["factual_claims"][0]
+        assert claim["claim"] == "Pessoas de alta performance dependem de sistemas, não de inspiração diária."
+        assert claim["source_reference"] == "Hábitos Atômicos / James Clear"
+        assert claim["verification_status"] == "extracted_from_transcript"
+
         assets = list(db.scalars(select(Asset)).all())
         assert len(assets) == 2
         asset_types = {a.asset_type for a in assets}
         assert "source_video" in asset_types
         assert "source_audio" in asset_types
         assert len(db.scalars(select(Script)).all()) == 1
+
+
+def test_scripting_service_persists_script_without_cta(tmp_path):
+    class NoCtaWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            return GeneratedScriptSchema(
+                theme="minimalismo mental",
+                hook="Elimine o excesso da sua mente.",
+                body="Menos decisões superficiais liberam energia cognitiva para o que realmente importa.",
+                closing_thought="Você não sabia. Agora sabe.",
+                cta=None,
+                estimated_duration_seconds=20.0,
+                factual_claims=[],
+            )
+
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+    svc = ScriptingService(
+        MockMediaDownloader(storage=StorageManager(tmp_path)), MockTranscriber(), NoCtaWriter()
+    )
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@a/video/no_cta", author="b", score=20)
+        db.add(src)
+        db.commit()
+        script = svc.process(db, run_id="r2", source=src)
+        assert script.metadata_json is not None
+        assert script.metadata_json["closing_thought"] == "Você não sabia. Agora sabe."
+        assert script.metadata_json["cta"] is None
+        assert script.metadata_json["factual_claims"] == []
+        assert "Você não sabia. Agora sabe." in script.script_text
+        assert script.script_text.endswith("Você não sabia. Agora sabe.")
 
 
 def test_groq_writer_raises_when_no_key_available(monkeypatch):
@@ -98,8 +152,10 @@ def test_groq_writer_parses_structured_json(monkeypatch):
         "theme": "foco e dopamina",
         "hook": "Seu cérebro está sendo hackeado.",
         "body": "A dopamina barata destrói sua disciplina diária.",
+        "closing_thought": "A clareza mental começa quando o ruído cessa.",
         "cta": "Me segue para blindar sua mente.",
         "estimated_duration_seconds": 35.0,
+        "factual_claims": [],
     }
 
     def fake_call(prompt):
@@ -109,6 +165,8 @@ def test_groq_writer_parses_structured_json(monkeypatch):
     out = writer.generate(TranscriptionResult(text="foco e disciplina", language="pt", segments=[]))
     assert out.theme == payload["theme"]
     assert out.hook == payload["hook"]
+    assert out.closing_thought == payload["closing_thought"]
+    assert out.estimated_duration_seconds == 35.0
     assert out.estimated_duration_seconds == 35.0
 
 
