@@ -4,7 +4,34 @@
 **Milestone:** v1.1 — ZUNTO! Visual Engine  
 **Fase:** 08 — Auditoria, Contratos e Diagnóstico de Causa Raiz  
 **Requisitos Cobertos:** `COMP-01`, `SUB-01`, `AVTR-01`  
-**Natureza da Fase:** 100% Diagnóstica e Analítica (D-15 — Zero modificações em `src/viralpanel/`)
+**Natureza da Fase:** 100% Diagnóstica e Analítica (D-15 — Zero modificações em `src/viralpanel/` e `assets/`)
+
+---
+
+## Sumário Executivo
+
+Esta auditoria técnica investigou, por meio de análise estática de código-fonte, inspeção dinâmica de assinaturas em runtime (`inspect.signature`), varredura de metadados via `ffprobe`/`file` e inspeção de frames dos vídeos reais gerados em `storage/runs/`, as causas raiz das falhas visuais do pipeline audiovisual do **ViralPanel** e mapeou todos os contratos de integração para blindar a evolução do **Milestone v1.1 — ZUNTO! Visual Engine**.
+
+### Principais Vereditos e Conclusões Comprovadas:
+
+1. **Fronteira Pública e Contratos (`COMP-01` / D-01 a D-03):**
+   - A assinatura `StudioService.produce(self, db: Session, run_id: str, script: Script) -> Asset` e a criação dos 3 registros `Asset` (`audio`, `avatar`, `final_video`) na sessão SQLAlchemy constituem um contrato imutável com `src/viralpanel/tasks.py` (`_run_pipeline`).
+   - Internamente, o tráfego de 5 `Path`s soltos e a ausência de um objeto de contexto causam **3 leituras `ffprobe` redundantes** sobre `narration.wav`, **2 verificações `ffprobe` redundantes** sobre `source.mp4` e descompasso dimensional entre `avatar.py` (`360x360`) e `renderer.py` (`340x340` + `pad` `352x352`). A introdução dos DTOs internos tipados (`StudioRenderRequest`, `AvatarConfig`, `SubtitleJobConfig`, `SubtitleCue`, `ReactionCompositionSpec`) isola a complexidade sem tocar em `tasks.py`.
+
+2. **Causa Raiz das Legendas Duplicadas (`SUB-01` / D-04 a D-07):**
+   - **Descartada duplicação interna no FFmpeg:** `ReactionVideoRenderer.render` (`renderer.py:130`) executa **uma única** chamada do filtro `ass`, os eventos `Dialogue:` em `captions.ass` são estritamente disjuntos `[start, end)` e os vídeos `source.mp4` não possuem streams soft-sub (`nb_streams: 2`).
+   - **Confirmada causa primária em vídeos reais (`storage/runs/14f4a7a1-...` e `ca28df90-...`):** Os vídeos virais baixados do TikTok (`source.mp4`) já possuem **hard-subs queimadas nos pixels** na região central-inferior (`Y ≈ 1080px–1150px`, ex.: `"tu tá"` e `"a si mesmo"`). Como o ViralPanel queima a nova legenda ASS logo abaixo (`MarginV=480`, `Y ≈ 1310px–1440px`) com contorno simples (`BorderStyle=1`, sem caixa opaca), **ambas as legendas ficam visíveis simultaneamente**.
+   - **Confirmada causa secundária em `subtitles.py`:** Fatiamento léxico cego a cada 6 palavras (deixando conjunções/artigos órfãos como `"Se"`, `"o"`) e divisão linear uniforme do tempo (`duration / len(chunks)`), gerando dessincronia progressiva com a fala sintetizada.
+
+3. **Causa Raiz da "Caixa Quadrada" do Avatar Reaction (`AVTR-01` / D-08 a D-11):**
+   - A auditoria empírica comprovou que o defeito **não possui uma causa única isolada**, mas resulta da **atuação simultânea de 4 cenários técnicos independentes**:
+     1. **Cenário 1 (Asset Fonte Opaco):** `assets/creator_avatar.png` é `512x512` no formato `rgb24` (sem canal alfa), gerado por `ensure_default_avatar_image()` (`avatar.py:22-46`) com fundo sólido `#0f172b` e 4 retângulos `drawbox` concêntricos.
+     2. **Cenário 2 (Destruição de Alfa no Filtro do Avatar):** `AudioReactiveAvatarAnimator` (`avatar.py:96,120`) força `format=yuv420p[base_avatar]`, destruindo qualquer canal alfa em memória antes do `overlay` com `showwaves` (e causando distorção cromática que deixa a onda sonora verde no `avatar.mp4` real!).
+     3. **Cenário 3 (Moldura Branca Hardcoded no Renderer):** `ReactionVideoRenderer` (`renderer.py:128`) aplica `pad=352:352:6:6:color=white[pip]`, desenhando uma borda retangular branca sólida de 6px (`#FFFFFF`) ao redor do quadrado de `340x340`.
+     4. **Cenário 4 (Barreira de Container/Codec Intermediário):** O arquivo intermediário `avatar.mp4` usa `libx264` + `yuv420p`, que **não suporta canal alfa** (plano A). Mesmo corrigindo os Cenários 1, 2 e 3, enquanto existir um `avatar.mp4` (`libx264/yuv420p`) entre `avatar.py` e `renderer.py`, os cantos transparentes serão convertidos em preto sólido opaco.
+
+4. **Unificação Single-Pass FFmpeg (`COMP-01` / D-12 a D-14):**
+   - A unificação do pipeline em **um único comando FFmpeg (`filter_complex` single-pass)** — lendo o vídeo fonte (ou `lavfi` direto), o avatar em canal alfa (`rgba`/`yuva420p` com recorte circular orgânico e `showwaves` via `asplit`) e o arquivo `captions.ass` ZUNTO! — resolve simultaneamente o **Cenário 4 de transparência do avatar**, elimina **2 codificações H.264 intermediárias** (`source_visual_bg.mp4` e `avatar.mp4`) e padroniza a saída em `1080x1920` @ `24fps`.
 
 ---
 
@@ -771,12 +798,85 @@ cmd = [
 
 ---
 
-## 5. Matriz de Decisões e Plano de Implementação (Phases 9 a 12)
+## 5. Matriz de Recomendações e Roteiro de Implementação (Phases 9 a 13)
 
-*(Seção a ser consolidada no Plano 08-02)*
+Esta seção consolida o plano de ação técnico derivado das evidências desta auditoria para guiar, sem ambiguidades, a execução das fases subsequentes do **Milestone v1.1 — ZUNTO! Visual Engine**.
 
 ---
 
-## 6. Verificação de Integridade da Fase Diagnóstica
+### 5.1 Roteiro Técnico por Fase e Mapeamento de Requisitos
 
-*(Seção a ser consolidada no Plano 08-02)*
+| Fase Alvo | Requisitos | Arquivos Impactados | Diretrizes Técnicas Obrigatórias (Baseadas na Auditoria da Phase 8) | Critério de Aceite Técnico |
+|-----------|------------|---------------------|----------------------------------------------------------------------|----------------------------|
+| **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** | `BRND-01`, `BRND-02`, `SCRP-01`, `SCRP-02` | `src/viralpanel/scripting/gemini.py`, `src/viralpanel/scripting/service.py`, especificação de marca ZUNTO! | 1. Definir constantes oficiais da paleta **ZUNTO!**: Preto Profundo (`#0A0A0A` / ASS `&H000A0A0A`), Amarelo de Impacto (`#FACC15` / ASS BGR `&H0015CCFA`) e Branco Puro (`#FFFFFF` / ASS `&H00FFFFFF`).<br>2. Refinar o prompt do Gemini 2.5 Flash para gerar sentenças curtas, ritmadas e pontuadas para TTS, gancho magnético nos primeiros 3s (`hook`), rastreabilidade de afirmações factuais em relação à transcrição/metadados fonte e CTA contextual opcional (sem repetição mecânica forçada do slogan `"Você não sabia. Agora sabe."`).<br>3. Formalizar o guia de Safe Zones `1080x1920` (Seção 3.5 deste relatório). | Roteiros gerados com estrutura validada, rastreabilidade de fonte preservada e constantes de paleta/safe zones prontas para consumo pelos motores de legenda e vídeo. |
+| **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** | `SUB-01`, `SUB-02`, `SUB-03`, `BRND-01` | `src/viralpanel/studio/subtitles.py`, `tests/test_studio_renderer.py` | 1. Implementar `SubtitleJobConfig` e estender `SubtitleCue` (com suporte a `highlight_word`).<br>2. Substituir o fatiamento cego de 6 palavras por **quebra sintática consciente de pontuação** (`.`, `,`, `;`, `?`, `!`, `—`) e limite máximo de caracteres por linha (`<= 28 chars`, máx. 3–4 palavras por cue), impedindo conjunções/artigos órfãos no fim do cue.<br>3. Substituir a divisão linear uniforme (`duration / len(chunks)`) por **temporização ponderada por peso fonético/contagem de caracteres e pausas de pontuação** (ou word boundaries do sintetizador).<br>4. Adotar estilo ASS ZUNTO! com **`BorderStyle=3` (caixa opaca `#0A0A0A`)**, tipografia bold de alto impacto, destaque dinâmico em amarelo (`{\c&H0015CCFA&}`) para palavras-chave e posicionamento na zona `MarginV=640` (`Y ≈ 1080–1280px`), **cobrindo diretamente as hard-subs nativas dos vídeos baixados do TikTok**. | Arquivo `.ass` gerado sem palavras órfãs, sincronizado proporcionalmente à extensão fonética, com caixa opaca ZUNTO! (`BorderStyle=3`) e tags de destaque amarelo preservadas (sem strip destrutivo de `{}` nas tags válidas). |
+| **Phase 11: Avatar Reaction e Composição Visual Orgânica** | `AVTR-01`, `AVTR-02`, `AVTR-03`, `BRND-02` | `src/viralpanel/studio/avatar.py`, `assets/creator_avatar.png`, `tests/test_studio_avatar.py` | 1. Tratar simultaneamente os **Cenários 1 e 2** diagnosticados na Seção 3.2: garantir geração/preparação de asset de avatar em formato **`rgba`** (`pix_fmt="rgba"`) com recorte circular orgânico anti-aliased e anel de contorno circular ZUNTO! (`#FACC15`), eliminando o fundo quadrado `#0f172b` e os 4 `drawbox` retangulares de `ensure_default_avatar_image`.<br>2. Implementar `AvatarConfig` calibrado para as **Safe Zones 9:16** (`size=280..300`, `overlay_y="H-h-320"` na faixa `Y = 1320–1600px`), garantindo zero sobreposição com as legendas (`Y <= 1280px`) e zero oclusão pela UI inferior do TikTok/Reels/Shorts (`Y >= 1600px`).<br>3. Corrigir o espaço de cor do `showwaves` (`format=yuva420p`, cor `#FACC15@0.90`) para eliminar a distorção cromática verde observada nos runs reais. | Asset e pipeline de avatar operando nativamente com canal alfa (`rgba`/`yuva420p`), formato circular orgânico sem bordas quadradas e posicionado na safe zone homologada. |
+| **Phase 12: Refatoração do Video Composer FFmpeg e Integração** | `COMP-01`, `COMP-02`, `COMP-03`, `BRND-01`, `BRND-02` | `src/viralpanel/studio/renderer.py`, `src/viralpanel/studio/service.py`, `src/viralpanel/storage.py` | 1. Tratar definitivamente os **Cenários 3 e 4** da Seção 3.2: remover `pad=...color=white` (`renderer.py:128`) e unificar a renderização em **comando FFmpeg Single-Pass** (Seção 4.4), compondo `[bg]` (`1080x1920`, `fps=24`, `setsar=1`), avatar circular transparente (`yuva420p`), onda sonora (`asplit` + `showwaves`) e legendas ASS (`captions.ass`) em memória com **uma única codificação `libx264` final**.<br>2. Eliminar a criação do vídeo intermediário `source_visual_bg.mp4` em disco (passando `lavfi` diretamente como Input `[0]` quando necessário) e eliminar leituras `ffprobe` redundantes via `StudioRenderRequest`.<br>3. Expor método público `storage.get_source_dir(run_id)` para eliminar chamadas externas ao método privado `storage._safe(...)`.<br>4. **Preservar estritamente (D-01):** assinatura `StudioService.produce(db, run_id, script) -> Asset` e persistência dos 3 registros `Asset` (`audio`, `avatar`, `final_video`). | Renderização 9:16 (`1080x1920` @ `24fps`) executada em single-pass, sem caixa quadrada no avatar, sem dupla legenda aparente e com 100% dos testes de `StudioService` e Celery passando sem regressão. |
+| **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** | `QUAL-01`, `QUAL-02` | `src/viralpanel/studio/validator.py` *(novo)*, `tests/` | 1. Implementar validador automatizado pós-renderização (`ffprobe`) verificando resolução exata `1080x1920`, SAR `1:1`, DAR `9:16`, codec `h264`/`aac`, `pix_fmt="yuv420p"`, frame rate constante e duração consistente com `narration.wav`.<br>2. Executar bateria de regressão E2E com vídeos reais e submeter frames/vídeos à **inspeção visual humana obrigatória**. | Aprovação cumulativa: suíte automatizada 100% verde + sign-off humano de qualidade visual e editorial. |
+
+---
+
+### 5.2 Matriz de Riscos de Regressão e Salvaguardas
+
+| Risco Identificado | Severidade | Causa Potencial | Salvaguarda / Mitigação Arquitetural |
+|--------------------|------------|-----------------|--------------------------------------|
+| **Quebra da task Celery `trigger_daily_pipeline`** | Alta | Alterar parâmetros ou tipo de retorno de `StudioService.produce`. | Manter `produce(self, db: Session, run_id: str, script: Script) -> Asset` imutável (D-01) e encapsular novos parâmetros em DTOs internos instanciados dentro do próprio `StudioService`. |
+| **Quebra de testes que verificam os 3 `Asset`s no banco (`audio`, `avatar`, `final_video`)** | Alta | Em `tests/test_studio_renderer.py:62`, há a asserção `assert {"audio", "avatar", "final_video"}.issubset(asset_types)`. Eliminar o registro `Asset(asset_type="avatar")` ao adotar o Single-Pass quebraria o teste e o histórico relacional. | Manter a gravação do registro `Asset(asset_type="avatar", ...)` em `StudioService.produce` mesmo no modo Single-Pass, apontando para o asset preparado do avatar com `duration_seconds=voice_duration`. |
+| **Injeção de caracteres especiais no caminho do filtro `ass='...'` do FFmpeg** | Média | Caminhos com `:`, `\`, `'` ou espaços quebram o parser do `filter_complex`. | Manter e reforçar o escaping sanitizado de caminhos no filtro `ass` (`renderer.py:122`). |
+| **Descarte de tags ASS de cor amarela ZUNTO! por sanitização ingênua** | Média | Atualmente `subtitles.py:66` faz `.replace("{", "").replace("}", "")` em todo o texto. | Sanitizar `{` e `}` **antes** de inserir as tags controladas de override ASS (`{\c&H0015CCFA&}...{\c&H00FFFFFF&}`) no formatador ZUNTO! da Phase 10. |
+
+---
+
+## 6. Verificação de Integridade da Fase Diagnóstica (D-15)
+
+Em estrita observância à diretriz **D-15** (*"FASE EXCLUSIVAMENTE DIAGNÓSTICA. Não modificar assets, não aplicar patches rápidos, não alterar código de produção e não criar dependências sem justificativa"*), foram executadas as verificações formais de integridade do repositório e da suíte de testes ao término desta auditoria.
+
+### 6.1 Comprovação de Zero Alterações em Código de Produção e Assets
+
+- **Comando de verificação Git executado:**
+  ```bash
+  git status --porcelain src/ assets/ tests/ pyproject.toml
+  ```
+- **Saída obtida:**
+  ```text
+  (vazio — zero bytes alterados em src/, assets/, tests/ ou pyproject.toml)
+  ```
+- **Verificação do hash e formato de `assets/creator_avatar.png`:**
+  ```bash
+  ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt,width,height -of json assets/creator_avatar.png
+  ```
+  - Retorno intacto: `width: 512`, `height: 512`, `pix_fmt: "rgb24"` (`4.081 bytes`).
+
+### 6.2 Comprovação de Execução da Suíte Automatizada de Testes (`pytest`)
+
+- **Testes específicos do subsistema de estúdio (`renderer` e `avatar`):**
+  ```bash
+  .venv/bin/pytest tests/test_studio_renderer.py tests/test_studio_avatar.py -v
+  ```
+  ```text
+  tests/test_studio_renderer.py::test_ass_subtitles_generation PASSED                              [ 20%]
+  tests/test_studio_renderer.py::test_studio_service_renders_vertical_9x16_reaction_video PASSED   [ 40%]
+  tests/test_studio_avatar.py::test_mock_avatar_animator_matches_voice_duration PASSED             [ 60%]
+  tests/test_studio_avatar.py::test_ensure_default_avatar_image_creates_file PASSED                [ 80%]
+  tests/test_studio_avatar.py::test_audio_reactive_avatar_animator PASSED                          [100%]
+  ============================== 5 passed in 2.27s ===============================
+  ```
+
+- **Suíte completa do projeto ViralPanel:**
+  ```bash
+  .venv/bin/pytest -q
+  ```
+  ```text
+  .......................................................                  [100%]
+  55 passed in 10.35s
+  ```
+
+### 6.3 Checklist Final de Conformidade da Phase 8
+
+- [x] **`COMP-01` (Contratos & Single-Pass):** Assinaturas de `tasks.py`, `StudioService.produce`, `StorageManager`, `voice.py`, `avatar.py`, `subtitles.py` e `renderer.py` auditadas; DTOs tipados internos especificados; 3 passes de vídeo FFmpeg e 6 chamadas `ffprobe` mapeados; grafo `filter_complex` Single-Pass especificado para a Phase 12 (Seções 1 e 4).
+- [x] **`SUB-01` (Causa Raiz de Legendas Duplicadas):** Comprovada aplicação única do filtro `ass` em `renderer.py:130` e ausência de faixas soft-sub; comprovada empiricamente nos runs reais (`14f4a7a1` e `ca28df90`) a presença de hard-subs queimadas nos vídeos baixados do TikTok colidindo com a legenda ASS (`MarginV=480`) + falhas de fatiamento/temporização linear em `subtitles.py`; definida estratégia de cobertura via caixa opaca ZUNTO! (`BorderStyle=3`) e reposicionamento (Seção 2).
+- [x] **`AVTR-01` (Causa Raiz da Caixa Quadrada do Avatar):** Inspecionados via `ffprobe`/`file`/RGB todos os arquivos reais (`assets/creator_avatar.png` e `storage/runs/*/assets/avatar.mp4` + `final_reaction_9x16.mp4`); distinguidos e comprovados tecnicamente os **4 cenários independentes e simultâneos** (Cenário 1: PNG fonte `rgb24` opaco com `drawbox`; Cenário 2: `format=yuv420p` em `avatar.py:96` destruindo alfa e alterando a cor do `showwaves`; Cenário 3: `pad=...color=white` em `renderer.py:128`; Cenário 4: limitação do codec/container `mp4`/`libx264`/`yuv420p` sem canal alfa); mapeadas safe zones 9:16 (Seção 3).
+- [x] **`D-15` (Isolamento Diagnóstico):** Zero arquivos modificados em `src/viralpanel/` ou `assets/`; 55/55 testes automatizados passando.
+
+---
+*Relatório Técnico Oficial concluído em 2026-11-06 — Phase 08 (Auditoria, Contratos e Diagnóstico de Causa Raiz).*
