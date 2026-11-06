@@ -29,8 +29,8 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 ### Roteirista Editorial (SCRP)
 
-- [ ] **SCRP-01**: Refinamento do prompt e diretrizes do Gemini 2.5 Flash para construção de ganchos irresistíveis (0–3s), narrativa provocativa e CTAs contextuais e opcionais.
-- [ ] **SCRP-02**: Garantia de precisão factual rigorosa combinada com rastreabilidade/preservação de fontes e cadência natural para síntese de voz (TTS).
+- [x] **SCRP-01**: Refinamento do prompt e diretrizes do Gemini 2.5 Flash para construção de ganchos irresistíveis (0–3s), narrativa provocativa e CTAs contextuais e opcionais.
+- [x] **SCRP-02**: Garantia de precisão factual rigorosa combinada com rastreabilidade/preservação de fontes e cadência natural para síntese de voz (TTS).
 
 ### Validação de Qualidade & Integridade (QUAL)
 
@@ -71,7 +71,7 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | COMP-03 | Phase 12 | Mapped |
 | BRND-01 | Phase 9, Phase 10, Phase 12 | Complete |
 | BRND-02 | Phase 9, Phase 11, Phase 12 | Complete |
-| SCRP-01 | Phase 9 | Mapped |
-| SCRP-02 | Phase 9 | Mapped |
+| SCRP-01 | Phase 9 | Complete |
+| SCRP-02 | Phase 9 | Complete |
 | QUAL-01 | Phase 13 | Mapped |
 | QUAL-02 | Phase 13 | Mapped |

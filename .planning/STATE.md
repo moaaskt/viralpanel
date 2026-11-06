@@ -4,17 +4,18 @@ milestone: v1.1
 milestone_name: ZUNTO! Visual Engine
 current_phase: 9
 current_phase_name: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!
+current_plan: 2
 status: verifying
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-11-06T09:22:38.944Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-11-06T09:30:57.015Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 08 complete, transitioned to Phase 9
-state_head: 5f1e7ad0c609ddb5fea51467c90a637e164e0d68
+state_head: a1a034356f10e7016bdaccb0dd285bfe8b2bd6c8
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 17
 ---
 
@@ -32,7 +33,7 @@ See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 Phase: 9 — Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!
 Current Plan: 2
 Total Plans in Phase: 2
-Status: In progress
+Status: Phase complete — ready for verification
 Last activity: 2026-11-06 — Completed 09-01-PLAN.md (Branding ZUNTO! e Safe Zones)
 
 Progress: [██░░░░░░░░] 17%
@@ -47,6 +48,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 08 P01 | 5min | 2 tasks | 1 files |
 | Phase 08 P02 | 10min | 2 tasks | 1 files |
 | Phase 09 P01 | 4min | 2 tasks | 2 files |
+| Phase 09 P02 | 6m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,6 +67,10 @@ Progress: [██░░░░░░░░] 17%
 - [Phase 08]: Reposicionar o avatar circular (280-300px) para a safe zone Y=1320..1600px (H-h-320), eliminando colisao com legendas ASS e com a UI do TikTok/Reels/Shorts
 - [Phase 09]: Centralizar paleta oficial ZUNTO! (#0A0A0A, #FACC15, #FFFFFF, #1A1A1A) e safe zones em classes imutáveis com Final em src/viralpanel/branding.py
 - [Phase 09]: Implementar hex_to_ass_color para conversão segura de Hex para ASS BGR (&HAABBGGRR&) prevenindo inversão de cores no libass
+- [Phase 09]: D-01/D-02: Persona ZUNTO! orientada por 'Você não sabia. Agora sabe.' com ganchos de 0-3s e sem encerramentos forçados
+- [Phase 09]: D-03/D-04: Separação estrita de closing_thought e cta opcional nullable em GeneratedScriptSchema e full_text limpo sem linhas órfãs
+- [Phase 09]: D-06/D-07: FactualClaim com preservação rigorosa da transcrição original sem inventar fontes externas
+- [Phase 09]: D-08: Script.metadata_json armazena factual_claims e metadados de roteirização preservando compatibilidade com o banco
 
 ### Pending Todos
 
@@ -76,6 +82,6 @@ None yet.
 
 ## Session
 
-**Last session:** 2026-11-06T09:22:38.909Z
-**Stopped at:** Completed 09-01-PLAN.md
+**Last session:** 2026-11-06T09:30:56.977Z
+**Stopped at:** Completed 09-02-PLAN.md
 **Resume file:** None
