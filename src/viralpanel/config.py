@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.5-flash"
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
+    groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-120b"
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
     whisper_model: str = "small"
     pipeline_mock_mode: bool = False
     telegram_bot_token: str | None = None

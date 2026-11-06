@@ -14,7 +14,7 @@ from viralpanel.media.transcriber import MockTranscriber, WhisperTranscriber
 from viralpanel.models import PipelineRun
 from viralpanel.publishing.base import MockPublisher
 from viralpanel.publishing.service import PublishingService
-from viralpanel.scripting.gemini import GeminiScriptWriter, MockGeminiScriptWriter
+from viralpanel.scripting.gemini import FallbackScriptWriter, MockGeminiScriptWriter
 from viralpanel.scripting.service import ScriptingService
 from viralpanel.studio.avatar import MockAvatarAnimator
 from viralpanel.studio.service import StudioService
@@ -67,7 +67,7 @@ def build_default_services(
         ScriptingService(
             MediaDownloader(),
             WhisperTranscriber(model_size=settings.whisper_model),
-            GeminiScriptWriter(),
+            FallbackScriptWriter(),
         ),
         studio,
         supervision,
