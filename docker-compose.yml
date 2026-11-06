@@ -30,9 +30,9 @@ services:
     networks: [viralpanel_net]
 
   celery_worker:
+    env_file: .env
     build: .
     command: celery -A viralpanel.celery_app worker --loglevel=info
-    env_file: [.env.example]
     environment: &app_env
       DATABASE_URL: postgresql+psycopg2://viraluser:viralpass@postgres:5432/viralpanel
       REDIS_URL: redis://redis:6379/0
@@ -48,7 +48,7 @@ services:
   celery_beat:
     build: .
     command: celery -A viralpanel.celery_app beat --loglevel=info
-    env_file: [.env.example]
+    env_file: .env
     environment: *app_env
     depends_on:
       postgres: {condition: service_healthy}
