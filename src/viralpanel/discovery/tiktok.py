@@ -8,6 +8,7 @@ from typing import Any
 
 from viralpanel.config import get_settings
 from viralpanel.discovery.base import BaseScraper, ScrapedVideoMetadata
+from viralpanel.discovery.utils import netscape_to_patchright_storage
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class MockDiscoveryScraper(BaseScraper):
                     likes=likes,
                     comments=comments,
                     shares=shares,
+                    duration=35 + (idx % 25),
                     posted_at=self.base_now - timedelta(hours=hours_ago),
                     hashtags=[tags[idx % len(tags)]],
                 )
@@ -53,7 +55,7 @@ class MockDiscoveryScraper(BaseScraper):
 class TikTokDiscoveryScraper(BaseScraper):
     """Scraper robusto do TikTok em camadas:
 
-    Camada 1: Playwright Chromium com network interception de JSONs de busca/tag e rehydration tags.
+    Camada 1: Patchright/Playwright Chromium com network interception de JSONs de busca/tag e rehydration tags.
     Camada 2: yt-dlp via Seed Profiles e busca direta por hashtag/termos.
     Zero fallback para mocks se use_fallback=False.
     """
@@ -94,6 +96,12 @@ class TikTokDiscoveryScraper(BaseScraper):
             comments = int(stats.get("commentCount") or 0)
             shares = int(stats.get("shareCount") or stats.get("repostCount") or 0)
 
+            video_obj = item.get("video") or {}
+            raw_dur = (
+                video_obj.get("duration") if isinstance(video_obj, dict) else item.get("duration")
+            ) or item.get("duration") or 0
+            duration = int(float(raw_dur))
+
             create_time = item.get("createTime") or item.get("createdAt")
             if create_time:
                 posted_at = datetime.fromtimestamp(int(create_time), tz=timezone.utc)
@@ -117,6 +125,7 @@ class TikTokDiscoveryScraper(BaseScraper):
                 likes=likes,
                 comments=comments,
                 shares=shares,
+                duration=duration,
                 posted_at=posted_at,
                 hashtags=found_tags,
             )
@@ -125,7 +134,7 @@ class TikTokDiscoveryScraper(BaseScraper):
             return None
 
     # =========================================================================
-    # Camada 1: Playwright com Network Interception & Rehydration Script Tags
+    # Camada 1: Patchright/Playwright com Network Interception & Rehydration
     # =========================================================================
     def _collect_via_playwright(
         self,
@@ -133,10 +142,13 @@ class TikTokDiscoveryScraper(BaseScraper):
         limit: int,
     ) -> list[ScrapedVideoMetadata]:
         try:
-            from playwright.sync_api import sync_playwright
+            from patchright.sync_api import sync_playwright
         except ImportError:
-            logger.warning("Playwright não instalado no ambiente. Pulando camada 1.")
-            return []
+            try:
+                from playwright.sync_api import sync_playwright
+            except ImportError:
+                logger.warning("Nem Patchright nem Playwright instalados no ambiente. Pulando camada 1.")
+                return []
 
         collected: dict[str, ScrapedVideoMetadata] = {}
 
@@ -145,20 +157,26 @@ class TikTokDiscoveryScraper(BaseScraper):
                 browser = p.chromium.launch(
                     headless=True,
                     args=[
+                        "--disable-blink-features=AutomationControlled",
                         "--no-sandbox",
                         "--disable-setuid-sandbox",
                         "--disable-dev-shm-usage",
-                        "--disable-blink-features=AutomationControlled",
                     ],
                 )
-                context = browser.new_context(
-                    user_agent=(
+                context_kwargs: dict[str, Any] = {
+                    "user_agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                     ),
-                    viewport={"width": 1280, "height": 800},
-                    locale="pt-BR",
-                )
+                    "viewport": {"width": 1280, "height": 800},
+                    "locale": "pt-BR",
+                }
+                storage_state = netscape_to_patchright_storage(self.cookies_path)
+                if storage_state and storage_state.get("cookies"):
+                    context_kwargs["storage_state"] = storage_state
+                    logger.info("Patchright: Injetando %d cookies de sessão no contexto.", len(storage_state["cookies"]))
+
+                context = browser.new_context(**context_kwargs)
 
                 page = context.new_page()
 
@@ -319,6 +337,7 @@ class TikTokDiscoveryScraper(BaseScraper):
                             likes=int(data.get("like_count") or 0),
                             comments=int(data.get("comment_count") or 0),
                             shares=int(data.get("repost_count") or 0),
+                            duration=int(float(data.get("duration") or 0)),
                             posted_at=posted_at,
                             hashtags=[tag_or_acc],
                         )

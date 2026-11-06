@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from viralpanel.database import Base
 from viralpanel.media.downloader import MockMediaDownloader
-from viralpanel.media.transcriber import MockTranscriber, TranscriptionResult
+from viralpanel.media.transcriber import AudioTranscriber, MockTranscriber, TranscriptionResult
 from viralpanel.models import Asset, Script, SourceVideo
 from viralpanel.scripting.gemini import (
     FallbackScriptWriter,
@@ -18,7 +18,7 @@ from viralpanel.scripting.gemini import (
     MockGeminiScriptWriter,
     ScriptWriter,
 )
-from viralpanel.scripting.service import ScriptingService
+from viralpanel.scripting.service import InsufficientSpeechError, ScriptingService
 from viralpanel.storage import StorageManager
 
 
@@ -140,5 +140,30 @@ def test_fallback_script_writer_raises_when_all_fail():
     writer = FallbackScriptWriter(writers=[FailingWriter(), FailingWriter()])
     with pytest.raises(RuntimeError, match="Todos os provedores da cadeia de IA falharam"):
         writer.generate(TranscriptionResult(text="teste", language="pt", segments=[]))
+
+
+def test_scripting_service_rejects_insufficient_speech(tmp_path):
+    class ShortSpeechTranscriber(AudioTranscriber):
+        def transcribe(self, audio_path):
+            return TranscriptionResult(text="apenas tres palavras", language="pt", segments=[])
+
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+    svc = ScriptingService(
+        MockMediaDownloader(storage=StorageManager(tmp_path)),
+        ShortSpeechTranscriber(),
+        MockGeminiScriptWriter(),
+        min_speech_words=15,
+    )
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@a/video/music_only", author="a", score=50)
+        db.add(src)
+        db.commit()
+        with pytest.raises(InsufficientSpeechError, match="rejeitado"):
+            svc.process(db, run_id="r_skip", source=src)
+        db.refresh(src)
+        assert src.status == "skipped_no_speech"
+
 
 

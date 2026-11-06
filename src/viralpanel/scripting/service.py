@@ -1,16 +1,34 @@
+import logging
 from sqlalchemy.orm import Session
 
 from viralpanel.media.downloader import MediaDownloader
-from viralpanel.media.transcriber import AudioTranscriber
+from viralpanel.media.transcriber import AudioTranscriber, MockTranscriber
 from viralpanel.models import Asset, Script, SourceVideo
 from viralpanel.scripting.gemini import ScriptWriter
 
+logger = logging.getLogger(__name__)
+
+MIN_SPEECH_WORDS = 15
+
+
+class InsufficientSpeechError(RuntimeError):
+    """Levantada quando o vídeo transcrito possui menos palavras faladas que o mínimo exigido."""
+
 
 class ScriptingService:
-    """Download -> extração de áudio -> transcrição -> roteiro Gemini -> persistência."""
+    """Download -> extração de áudio -> transcrição -> portão pós-Whisper -> roteiro IA -> persistência."""
 
-    def __init__(self, downloader: MediaDownloader, transcriber: AudioTranscriber, writer: ScriptWriter):
-        self.downloader, self.transcriber, self.writer = downloader, transcriber, writer
+    def __init__(
+        self,
+        downloader: MediaDownloader,
+        transcriber: AudioTranscriber,
+        writer: ScriptWriter,
+        min_speech_words: int = MIN_SPEECH_WORDS,
+    ):
+        self.downloader = downloader
+        self.transcriber = transcriber
+        self.writer = writer
+        self.min_speech_words = min_speech_words
 
     def process(self, db: Session, run_id: str, source: SourceVideo) -> Script:
         source.status = "analyzing"
@@ -18,6 +36,19 @@ class ScriptingService:
         try:
             video, audio = self.downloader.fetch(run_id, source.url)
             transcription = self.transcriber.transcribe(audio)
+
+            # Portão Pós-Whisper: exige ao menos N palavras reais faladas (exceto se for MockTranscriber)
+            words = [w for w in transcription.text.strip().split() if w.strip()]
+            word_count = len(words)
+            if not isinstance(self.transcriber, MockTranscriber) and word_count < self.min_speech_words:
+                source.status = "skipped_no_speech"
+                db.commit()
+                msg = (
+                    f"Vídeo {source.url} rejeitado: apenas {word_count} palavras faladas "
+                    f"(mínimo exigido: {self.min_speech_words})"
+                )
+                logger.warning(msg)
+                raise InsufficientSpeechError(msg)
 
             # Contexto complementar a partir dos metadados do vídeo fonte (título, autor, tags)
             fallback_context = ""
@@ -48,6 +79,8 @@ class ScriptingService:
             db.commit()
             db.refresh(script)
             return script
+        except InsufficientSpeechError:
+            raise
         except Exception:
             db.rollback()
             source.status = "failed"

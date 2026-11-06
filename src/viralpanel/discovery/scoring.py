@@ -23,6 +23,8 @@ class ThresholdsConfig(BaseModel):
     min_views: int = 1000
     reference_views: int = 100000
     reference_velocity_per_hour: float = 5000.0
+    min_duration_seconds: int = 15
+    max_duration_seconds: int = 180
 
 
 class DiscoverySettings(BaseModel):
@@ -77,6 +79,11 @@ def calculate_viral_score(
 ) -> float:
     cfg = config or ScoringConfig()
     if video.views < cfg.thresholds.min_views or video.views <= 0:
+        return 0.0
+    if video.duration > 0 and (
+        video.duration < cfg.thresholds.min_duration_seconds
+        or video.duration > cfg.thresholds.max_duration_seconds
+    ):
         return 0.0
 
     ref_now = now or datetime.now(timezone.utc)

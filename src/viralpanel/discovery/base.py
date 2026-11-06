@@ -13,6 +13,7 @@ class ScrapedVideoMetadata(BaseModel):
     likes: int = Field(ge=0)
     comments: int = Field(ge=0)
     shares: int = Field(ge=0)
+    duration: int = Field(default=0, ge=0)
     posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     hashtags: list[str] = Field(default_factory=list)
 
@@ -23,6 +24,7 @@ class ScrapedVideoMetadata(BaseModel):
             "likes": self.likes,
             "comments": self.comments,
             "shares": self.shares,
+            "duration": self.duration,
             "posted_at": self.posted_at.isoformat(),
             "hashtags": self.hashtags,
         }

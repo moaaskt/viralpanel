@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import date
 
@@ -15,7 +16,9 @@ from viralpanel.models import PipelineRun
 from viralpanel.publishing.base import MockPublisher
 from viralpanel.publishing.service import PublishingService
 from viralpanel.scripting.gemini import FallbackScriptWriter, MockGeminiScriptWriter
-from viralpanel.scripting.service import ScriptingService
+from viralpanel.scripting.service import InsufficientSpeechError, ScriptingService
+
+logger = logging.getLogger(__name__)
 from viralpanel.studio.avatar import AudioReactiveAvatarAnimator, MockAvatarAnimator
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.voice import FallbackVoiceSynthesizer, MockVoiceSynthesizer
@@ -114,7 +117,48 @@ def _run_pipeline(
 
     run.stage = "scripting"
     db.commit()
-    script = scripting_service.process(db=db, run_id=run.id, source=best)
+
+    script = None
+    selected_candidate = best
+    skipped_urls: list[str] = []
+    max_candidate_attempts = 5
+
+    for attempt in range(1, max_candidate_attempts + 1):
+        if selected_candidate is None:
+            break
+        try:
+            script = scripting_service.process(db=db, run_id=run.id, source=selected_candidate)
+            best = selected_candidate
+            summary.update(
+                selected_video_id=best.id,
+                selected_video_url=best.url,
+                selected_video_score=best.score,
+                candidate_attempts=attempt,
+            )
+            break
+        except InsufficientSpeechError as exc:
+            logger.warning("Tentativa %d/%d rejeitada (sem fala suficiente): %s", attempt, max_candidate_attempts, exc)
+            skipped_urls.append(selected_candidate.url)
+            selected_candidate = discovery_service.select_best_candidate(db=db)
+        except Exception as exc:
+            logger.warning(
+                "Tentativa %d/%d falhou no vídeo %s: %s. Tentando próximo candidato...",
+                attempt,
+                max_candidate_attempts,
+                selected_candidate.url,
+                exc,
+            )
+            skipped_urls.append(selected_candidate.url)
+            selected_candidate = discovery_service.select_best_candidate(db=db)
+
+    if skipped_urls:
+        summary["skipped_candidates"] = skipped_urls
+
+    if script is None:
+        raise RuntimeError(
+            f"Nenhum candidato válido pôde ser roteirizado após {len(skipped_urls)} tentativas (rejeitados: {skipped_urls})"
+        )
+
     summary.update(script_id=script.id, script_hook=script.hook)
     if supervision_service:
         supervision_service.notifier.notify_stage_completed(
