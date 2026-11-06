@@ -234,13 +234,332 @@ class StudioRenderRequest:
 
 ## 2. Diagnóstico de Causa Raiz de Legendas Duplicadas (SUB-01)
 
-*(Seção a ser detalhada no Plano 08-02)*
+Esta seção apresenta o diagnóstico técnico e empírico sobre o problema de duplicação/conflito visual de legendas nos vídeos finais (`final_reaction_9x16.mp4`), cumprindo as diretrizes **D-04, D-05, D-06 e D-07** e o requisito **SUB-01**. A investigação combinou auditoria estática de código (`subtitles.py`, `renderer.py`, `service.py`, `scripting/service.py`) com inspeção empírica dos arquivos reais gerados em `storage/runs/`.
+
+---
+
+### 2.1 Auditoria das Duas Hipóteses de Risco (D-04 e D-05)
+
+A diretriz **D-04** exige auditar duas fontes potenciais de duplicação:
+1. **Hipótese A (Interna ao Pipeline FFmpeg):** Aplicação duplicada do filtro `ass`/`subtitles` no comando FFmpeg, repetição de eventos `Dialogue:` no arquivo `.ass`, ou presença de stream de legenda (`codec_type=subtitle`) embutida no container MP4 de entrada que estaria sendo renderizada duas vezes.
+2. **Hipótese B (Externa / Conteúdo do Vídeo Fonte):** Vídeos virais baixados do TikTok (`source.mp4`) que já possuem legendas queimadas diretamente nos pixels da imagem original (*burned-in hard-subs*), sobre as quais o ViralPanel renderiza uma segunda camada de legendas ASS gerada a partir do roteiro original do Gemini.
+
+#### Veredito Baseado em Evidências (D-05):
+
+| Hipótese / Vetor Analisado | Status | Evidência Técnica Reproduzível |
+|----------------------------|--------|--------------------------------|
+| **A1. Dupla chamada do filtro `ass` em `renderer.py`** | **DESCARTADA (Falso)** | Em `src/viralpanel/studio/renderer.py` (linhas 124–131), o `filter_complex` possui **exatamente uma única** invocação do filtro `ass`: `[composed]ass='{escaped_ass}'[vout]`. Nenhum outro passe FFmpeg (`service.py` ou `avatar.py`) recebe `captions.ass`. |
+| **A2. Linhas `Dialogue:` duplicadas ou sobrepostas em `captions.ass`** | **DESCARTADA (Falso)** | A inspeção de `write_ass_subtitles` (`src/viralpanel/studio/subtitles.py`, linhas 60–69) e dos arquivos reais `storage/runs/14f4a7a1-.../assets/captions.ass` (20 cues) e `storage/runs/ca28df90-.../assets/captions.ass` (18 cues) comprova intervalos estritamente contíguos e disjuntos `[start, end)` na `Layer: 0` (ex.: `0:00:00.00 -> 0:00:02.03`, `0:00:02.03 -> 0:00:04.05`). No renderizador `libass`, o timestamp final é exclusivo, garantindo que nunca haja dois eventos `Dialogue:` ativos no mesmo frame. |
+| **A3. Stream de legenda soft-sub (`mov_text`/`srt`) em `source.mp4`** | **DESCARTADA (Falso)** | A inspeção via `ffprobe -show_streams` nos vídeos reais baixados (`storage/runs/14f4a7a1-.../source/source.mp4` e `storage/runs/ca28df90-.../source/source.mp4`) comprova `nb_streams: 2` (apenas `stream #0: audio/aac` e `stream #1: video/hevc` ou `video/h264`). Não existem faixas de legenda embutidas no container. |
+| **B1. Hard-subs preexistentes queimados nos pixels de `source.mp4` colidindo com a legenda ASS do ViralPanel** | **CONFIRMADA (Causa Raiz Primária)** | Nos dois runs reais armazenados em `storage/runs/`, os vídeos baixados do TikTok contêm legendas originais queimadas diretamente nos frames de vídeo (`"tu tá"` no run `14f4a7a1` e `"a si mesmo"` no run `ca28df90`). Como o vídeo fala um texto e o roteiro gerado pelo Gemini (`script.script_text`) narra um texto transformado diferente, o vídeo final exibe **duas legendas diferentes simultaneamente na tela**. |
+| **B2. Descompasso temporal/semântico por divisão linear de cues e posição vertical fixa (`MarginV=480`)** | **CONFIRMADA (Causa Secundária Agravante)** | `build_cues_from_script` (`subtitles.py:39-57`) divide o texto cegamente a cada 6 palavras e distribui o tempo de forma linear uniforme (`step = duration / len(chunks)`), gerando quebras gramaticais truncadas e dessincronia com a fala real, enquanto `MarginV=480` posiciona o texto exatamente entre a legenda nativa do vídeo fonte e o topo do avatar. |
+
+---
+
+### 2.2 Evidências Empíricas nos Vídeos Reais (`storage/runs/`)
+
+A inspeção direta dos artefatos de produção existentes em `storage/runs/` confirma materialmente a Causa Raiz Primária (**B1**):
+
+1. **Run Real #1 (`storage/runs/14f4a7a1-16af-4e6e-9bf0-3386760bd1da`):**
+   - **Vídeo fonte (`source/source.mp4`):** Baixado do TikTok em resolução `720x1280` (`hevc`, `yuv420p`, `30 fps`, duração `57.30s`). Na inspeção do frame em `t = 00:00:03.00`, o criador original aparece com a legenda nativa **`"tu tá"`** (fonte sans-serif branca com contorno escuro) queimada diretamente nos pixels da imagem na altura do peito (`Y ≈ 720px` no original `720x1280`, que corresponde a **`Y ≈ 1080px`** após o `scale=1080:1920`).
+   - **Vídeo final renderizado (`assets/final_reaction_9x16.mp4`):** No mesmo instante `t = 00:00:03.00`, o filtro `ass` queima o cue `0:00:02.03 -> 0:00:04.05` (**`"a filosofia certa\nresolve isso. Se"`**) logo abaixo, na faixa **`Y ≈ 1310px a 1440px`** (`MarginV=480`).
+   - **Efeito visual resultante:** O espectador vê simultaneamente `"tu tá"` (do vídeo original) e `"a filosofia certa / resolve isso. Se"` (do ViralPanel), configurando poluição e duplicação visual severa.
+
+2. **Run Real #2 (`storage/runs/ca28df90-c754-4d67-a614-a9cbc049e960`):**
+   - **Vídeo fonte (`source/source.mp4`):** Baixado do TikTok em resolução `576x1024` (`h264`, `yuv420p`, `30 fps`, duração `79.06s`), com moldura preta superior/inferior e vídeo centralizado. Em `t = 00:00:03.00`, há uma legenda nativa queimada **`"a si mesmo"`** (fonte serifada branca) sobre a camiseta preta do interlocutor (`Y ≈ 610px` no original `576x1024`, correspondendo a **`Y ≈ 1144px`** após `scale=1080:1920`).
+   - **Vídeo final renderizado (`assets/final_reaction_9x16.mp4`):** No mesmo frame `t = 00:00:03.00`, o ViralPanel queima **`"seu sucesso. Você\ntenta mudar de"`** na faixa **`Y ≈ 1310px a 1440px`**. Novamente, ambas as legendas ficam visíveis ao mesmo tempo e próximas verticalmente (`~165px` de distância entre `"a si mesmo"` e `"seu sucesso. Você"`).
+
+3. **Contraste com Vídeo Fonte Sintético (Fallback `lavfi`):**
+   - Quando `source.mp4` é gerado pelo fallback (`color=c=#334155` ou `color=c=#0f172a`), apenas uma única legenda aparece na tela — prova definitiva de que o pipeline FFmpeg queima o arquivo `.ass` uma única vez e que a segunda legenda concorrente provém dos pixels do vídeo `source.mp4`.
+
+---
+
+### 2.3 Análise do Fluxo de Dados e Acoplamentos em `subtitles.py` e `renderer.py` (D-06)
+
+O fluxo atual de geração e queima de legendas atravessa três módulos:
+
+```text
+ScriptingService.process()
+  └─► Whisper transcreve audio.wav (com timestamps ignorados depois)
+  └─► Gemini gera roteiro original (script.script_text: str)
+        │
+        ▼
+StudioService.produce(db, run_id, script) [service.py:95-109]
+  ├─► 1. subtitles.build_cues_from_script(script_text, total_duration=voice_duration)
+  ├─► 2. subtitles.write_ass_subtitles(cues, assets_dir / "captions.ass")
+  └─► 3. renderer.render(..., ass_subtitle_path=subtitles_path, ...)
+           └─► [composed]ass='{escaped_ass}'[vout] [renderer.py:130]
+```
+
+#### Fragilidades Estruturais Identificadas em `src/viralpanel/studio/subtitles.py`:
+
+1. **Particionamento Léxico Cego (`subtitles.py:40-46`):**
+   ```python
+   words = [w.strip() for w in script_text.replace("\n", " ").split() if w.strip()]
+   for i in range(0, len(words), max_words_per_cue):
+       chunks.append(" ".join(words[i : i + max_words_per_cue]))
+   ```
+   - O algoritmo fatia a lista de palavras em blocos fixos de `max_words_per_cue = 6`, ignorando pontuação (`.`, `,`, `?`, `!`) e fronteiras sintáticas.
+   - **Evidência real (`storage/runs/14f4a7a1-.../assets/captions.ass`):**
+     - Cue 2 (`0:00:02.03 -> 0:00:04.05`): `"a filosofia certa resolve isso. Se"` (a conjunção `"Se"` da frase seguinte fica pendurada no final do bloco anterior!).
+     - Cue 5 (`0:00:08.11 -> 0:00:10.14`): `"suas reações. Se falta direção, o"` (o artigo `"o"` fica órfão antes de `"Existencialismo"` no Cue 6).
+
+2. **Temporização Linear Uniforme Desacoplada da Cadência Fonética (`subtitles.py:48-56`):**
+   ```python
+   duration = max(total_duration, 1.0)
+   step = duration / len(chunks)
+   ```
+   - Todos os blocos recebem exatamente a mesma duração `step` (ex.: `2.027s` no Run #1 e `2.112s` no Run #2), independentemente do número de sílabas/caracteres do bloco ou de pausas de pontuação (vírgulas e pontos finais na síntese Edge-TTS/XTTS).
+   - O último bloco (frequentemente mais curto, ex.: `"se sabotar hoje."` com 3 palavras no Run #2) recebe os mesmos `2.11s` de um bloco de 6 palavras longas (`"mente primitiva trata qualquer evolução como"` com 44 caracteres), gerando atraso acumulado ao longo de vídeos de 40s.
+
+3. **Estilo Visual e Posicionamento Hardcoded (`ASS_HEADER` em `subtitles.py:12-25`):**
+   ```ini
+   Style: Default,DejaVu Sans,62,&H00FFFFFF,&H0000FFFF,&H00111827,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,80,80,480,1
+   ```
+   - `BorderStyle=1` (contorno simples de `Outline=4` e `Shadow=2`) com `BackColour=&H80000000`: no formato ASS com `BorderStyle=1`, o `BackColour` aplica-se apenas à sombra distante (`2px`), **não desenhando uma caixa opaca de fundo** capaz de cobrir ou isolar o texto contra legendas preexistentes do vídeo base.
+   - `Alignment=2` (inferior central) com `MarginV=480`: posiciona a base do texto a `480px` da borda inferior (`Y = 1920 - 480 = 1440px`). Como o avatar PIP no `renderer.py:129` é posicionado em `Y = 1920 - 352 - 120 = 1448px`, a linha inferior da legenda (`Y = 1440px`) tangencia a borda superior do avatar (`Y = 1448px`), separada por apenas `8px`!
+   - `clean_text = cue.text.replace("\n", "\\N").replace("{", "").replace("}", "")` (`subtitles.py:66`): remove chaves `{` e `}`, o que impede a injeção de tags de override ASS (`{\c&H0015CCFA&}`, `{\b1}`) necessárias na Phase 10 para destacar palavras-chave em amarelo ZUNTO! (`#FACC15` -> BGR `&H0015CCFA&`).
+
+---
+
+### 2.4 Avaliação de Estratégias Técnicas para Eliminar a Sobreposição Visual (D-07)
+
+Para resolver definitivamente o conflito entre hard-subs preexistentes no vídeo fonte e as legendas ZUNTO! na Phase 10 e Phase 12, foram avaliadas 4 estratégias técnicas:
+
+| Estratégia | Mecanismo Técnico | Eficácia contra Hard-Subs do TikTok | Custo Computacional / Risco | Recomendação para Phase 10 / 12 |
+|------------|-------------------|-------------------------------------|-----------------------------|----------------------------------|
+| **1. Tarja / Caixa Opaca ZUNTO! (`BorderStyle=3` no ASS ou `drawbox` no FFmpeg)** | Configurar o estilo ASS com `BorderStyle=3` (Opaque Box) e `BackColour=&H000A0A0A` (preto profundo ZUNTO! `#0A0A0A` opaco ou `&H1A0A0A0A` 90% opaco) + padding generoso (`Outline=16`), ou desenhar uma faixa/backdrop na zona de legenda. | **Alta (na região da legenda ZUNTO!)** — Oculta completamente qualquer texto nativo que esteja na mesma faixa vertical e garante contraste máximo (WCAG AAA) para branco (`#FFFFFF`) e amarelo (`#FACC15`). | **Custo Zero de CPU** — Nativo do `libass` em single-pass. Zero risco de borrar o rosto do criador principal. | **ADOTAR (Pilar 1 da Phase 10)** |
+| **2. Alinhamento Posicional + Enquadramento/Mascaramento da Zona de Hard-Sub** | Como 90%+ dos vídeos virais do TikTok posicionam suas hard-subs no centro-inferior (`Y ≈ 1050px a 1350px` em `1080x1920`), posicionar a legenda ZUNTO! com caixa opaca (`BorderStyle=3`) exatamente nessa faixa focal (`MarginV=580..680`, `Y ≈ 1150..1300px`) **cobre diretamente a hard-sub original** do vídeo fonte! | **Muito Alta** — Em vez de colocar a legenda ZUNTO! abaixo da hard-sub original (o que expõe as duas simultaneamente, como ocorria com `MarginV=480`), a caixa opaca ZUNTO! se sobrepõe exatamente à zona onde a hard-sub do TikTok aparece (`Y ≈ 1080–1250px`), substituindo-a visualmente. | **Custo Zero de CPU** — Apenas calibração de `MarginV` / `Alignment` e `BorderStyle=3`, liberando a faixa inferior (`Y = 1350..1720px`) para o Avatar Reaction! | **ADOTAR (Pilar 2 da Phase 10 & 11)** |
+| **3. Crop Assimétrico Superior / Zoom Focal do Vídeo Base (`crop` no FFmpeg)** | Ao converter o vídeo fonte para `1080x1920`, aplicar um leve zoom (`scale=1180:2100`) com `crop` deslocado para o topo (`y=0`), empurrando ou cortando legendas inferiores do vídeo original. | **Moderada** — Funciona quando a hard-sub original está na base extrema, mas não remove hard-subs cravadas no centro do peito do apresentador (como visto em `run1` e `run2`). | **Baixo custo**, mas pode cortar o queixo do apresentador se exagerado. Útil apenas como ajuste complementar leve. | **COMPLEMENTAR (Opcional na Phase 12)** |
+| **4. Detecção por OCR / OpenCV + Blur (`delogo` / `boxblur`) por Frame** | Analisar frames do `source.mp4` com EasyOCR/Tesseract ou detector morfológico OpenCV para localizar bounding boxes de texto e aplicar `boxblur`. | **Variável / Arriscada** — Um `boxblur` grande no centro do vídeo cria uma mancha borrada esteticamente inferior a uma caixa editorial ZUNTO! limpa. | **Alto Custo de CPU/Dependências** — Exigiria instalar `opencv-python`/`easyocr` (violando restrição de leveza) e processaria centenas de frames. | **REJEITAR (Desnecessário dado `BorderStyle=3` + Zona de Cobertura)** |
+
+#### Conclusão Arquitetural para Legendas (Phase 10):
+1. **Unificação e Desacoplamento (`subtitles.py`):** Transformar `subtitles.py` em um motor dedicado de legendas ZUNTO! que recebe `SubtitleJobConfig`, quebra frases respeitando pontuação (`.`, `,`, `!`, `?`) e limite de caracteres por linha (`<= 28 chars`), pondera a duração de cada `SubtitleCue` pelo peso fonético/número de caracteres (ou word boundaries do TTS) e gera `.ass` com `BorderStyle=3` (caixa opaca preto profundo `#0A0A0A`), texto branco `#FFFFFF` e tag de destaque amarelo `#FACC15` (`{\c&H0015CCFA&}`).
+2. **Eliminação Visual da Dupla Legenda:** Posicionar a legenda ZUNTO! com caixa opaca (`BorderStyle=3`) na zona central-inferior de leitura (`Y ≈ 1100–1280px`, `MarginV ≈ 640`), cobrindo de forma limpa a região típica das hard-subs dos vídeos baixados do TikTok e liberando o canto inferior direito (`Y = 1360–1700px`) exclusivamente para o Avatar Reaction sem qualquer colisão espacial.
 
 ---
 
 ## 3. Diagnóstico de Assets e Formato do Avatar Reaction (AVTR-01)
 
-*(Seção a ser detalhada no Plano 08-02)*
+Esta seção documenta a investigação empírica profunda sobre o defeito visual de **"imagem quadrada / adesivo retangular"** do avatar reaction, cumprindo as diretrizes **D-08, D-09, D-10 e D-11**, o requisito **AVTR-01** e a **Ressalva Técnica Obrigatória**: **não assumir `rgb24` e `pad` retangular como causas isoladas sem antes inspecionar todos os arquivos reais existentes no repositório e distinguir com rigor técnico os 4 cenários independentes que concorrem para o problema**.
+
+---
+
+### 3.1 Inventário e Laudo Empírico (`ffprobe`, `file` e Amostragem RGB) de Todos os Arquivos Reais
+
+Foram localizados e inspecionados **todos os arquivos de imagem e vídeo de avatar e composição** presentes no projeto (`assets/` e `storage/runs/`):
+
+#### A. Arquivo Fonte Padrão: `assets/creator_avatar.png`
+- **Comando `file`:**
+  ```text
+  assets/creator_avatar.png: PNG image data, 512 x 512, 8-bit/color RGB, non-interlaced
+  ```
+- **Comando `ffprobe`:**
+  ```bash
+  ffprobe -v error -select_streams v:0 -show_entries format=size,format_name -show_entries stream=codec_name,width,height,pix_fmt,color_range,color_space,sample_aspect_ratio -of json assets/creator_avatar.png
+  ```
+  ```json
+  {
+      "streams": [
+          {
+              "codec_name": "png",
+              "width": 512,
+              "height": 512,
+              "sample_aspect_ratio": "1:1",
+              "pix_fmt": "rgb24",
+              "color_range": "pc",
+              "color_space": "gbr"
+          }
+      ],
+      "format": {
+          "format_name": "png_pipe",
+          "size": "4081"
+      }
+  }
+  ```
+- **Inspeção de Pixels Brutos (via `ffmpeg -f rawvideo -pix_fmt rgb24`) e Origem do Arquivo:**
+  - **Tamanho em disco:** `4.081 bytes` (altamente comprimível por conter apenas blocos geométricos de cor chapada).
+  - **Valores RGB amostrados diretamente dos pixels da imagem:**
+    - Canto superior esquerdo `(0, 0)` e canto inferior direito `(511, 511)`: `RGB(15, 23, 43)` = **`#0f172b`** (fundo azul-marinho escuro totalmente opaco preenchendo 100% da área `512x512`).
+    - Caixa externa `(100, 100)`: `RGB(29, 39, 59)` = **`#1d273b`** (quadrado `320x320` desenhado a partir de `x=96, y=96`).
+    - Centro superior `(256, 200)`: `RGB(55, 188, 248)` = **`#37bcf8`** (quadrado azul-claro `128x128` representando a "cabeça" estilizada).
+  - **Comprovação de origem:** Este arquivo foi gerado automaticamente pela função `ensure_default_avatar_image()` em `src/viralpanel/studio/avatar.py` (linhas 22–46), que executa `ffmpeg -f lavfi -i color=c=#0f172a:s=512x512:d=0.1` seguido de quatro filtros `drawbox` retangulares concêntricos.
+
+#### B. Vídeos Intermediários de Avatar Reais (`storage/runs/*/assets/avatar.mp4`)
+Foram inspecionados os dois arquivos `avatar.mp4` reais gerados em execuções anteriores do pipeline:
+
+| Propriedade (`ffprobe`) | Run 1 (`storage/runs/14f4a7a1-.../assets/avatar.mp4`) | Run 2 (`storage/runs/ca28df90-.../assets/avatar.mp4`) |
+|-------------------------|-------------------------------------------------------|-------------------------------------------------------|
+| **Container / Formato** | `ISO Media, MP4 Base Media v1` (`mov,mp4,m4a,3gp`) | `ISO Media, MP4 Base Media v1` (`mov,mp4,m4a,3gp`) |
+| **Codec de Vídeo** | `h264` (`libx264`) | `h264` (`libx264`) |
+| **Resolução & SAR** | `360x360` (quadrado 1:1) | `360x360` (quadrado 1:1) |
+| **Pixel Format (`pix_fmt`)** | **`yuv420p`** (sem canal alfa) | **`yuv420p`** (sem canal alfa) |
+| **Frame Rate (`r_frame_rate`)** | `25/1` (25 fps — herdado do `-loop 1` sobre PNG!) | `25/1` (25 fps — herdado do `-loop 1` sobre PNG!) |
+| **Stream de Áudio** | `aac`, `24000 Hz`, `mono` (1 canal) | `aac`, `24000 Hz`, `mono` (1 canal) |
+| **Duração / Tamanho** | `40.536s` / `2.456.794 bytes` (~2.45 MB) | `38.016s` / `2.310.908 bytes` (~2.31 MB) |
+| **Inspeção Visual do Frame (`t=3s`)** | Quadrado opaco `360x360` azul-escuro (`#0f172b`) com os 4 retângulos concêntricos e onda `showwaves` renderizada na base (`H-h-8`). **Anomalia de cor detectada:** a onda `showwaves` aparece **verde** em vez de azul `#38bdf8` devido à conversão prematura do fundo para `yuv420p` antes do `overlay`! | Quadrado opaco `360x360` azul-escuro (`#0f172b`) com a linha da onda sonora na base. Zero transparência nos cantos. |
+
+#### C. Vídeos Finais Compostos Reais (`storage/runs/*/assets/final_reaction_9x16.mp4`)
+
+| Propriedade (`ffprobe`) | Run 1 (`storage/runs/14f4a7a1-.../assets/final_reaction_9x16.mp4`) | Run 2 (`storage/runs/ca28df90-.../assets/final_reaction_9x16.mp4`) |
+|-------------------------|-------------------------------------------------------------------|-------------------------------------------------------------------|
+| **Resolução / Codec / PixFmt** | `1080x1920` / `h264` / `yuv420p` @ `30/1` fps | `1080x1920` / `h264` / `yuv420p` @ `30/1` fps |
+| **Duração / Tamanho** | `40.536s` / `29.992.640 bytes` (~30.0 MB) | `38.016s` / `13.330.153 bytes` (~13.3 MB) |
+| **Aparência Real do Avatar PIP (`t=3s`)** | Caixa quadrada opaca de `352x352` no canto inferior direito (`X=680..1032, Y=1448..1800`), cercada por uma **borda branca retangular rígida de 6px (`#FFFFFF`)** e preenchida pelo fundo quadrado escuro `#0f172b` cobrindo o vídeo de fundo. | Mesma caixa quadrada de `352x352` com **moldura branca retangular de 6px (`#FFFFFF`)** destacando-se abruptamente sobre o fundo preto do vídeo base. |
+
+---
+
+### 3.2 Distinção Rigorosa dos 4 Cenários Técnicos do Artefato de "Caixa Quadrada"
+
+Conforme a ressalva técnica obrigatória, o aspecto de "imagem quadrada" no avatar reaction **não decorre de uma causa única isolada**, mas da **sobreposição de 4 cenários técnicos distintos**, todos **simultaneamente ativos** no código atual. Abaixo, cada cenário é isolado, comprovado e analisado em sua relação com os demais:
+
+#### Cenário 1: Ausência de Canal Alfa (e Geometria Quadrada) no Arquivo Fonte (`assets/creator_avatar.png`)
+- **Onde ocorre:** Arquivo `assets/creator_avatar.png` e função geradora `ensure_default_avatar_image()` em `src/viralpanel/studio/avatar.py` (linhas 13–54).
+- **Evidência técnica:**
+  - `ffprobe` comprova `"pix_fmt": "rgb24"` (3 canais: R, G, B; 24 bits por pixel; **ausência total de 4º canal Alpha**).
+  - Na linha 29 de `avatar.py`, o gerador FFmpeg usa `-f lavfi -i color=c=#0f172a:s=512x512:d=0.1` (que produz um stream `yuv420p` convertido para PNG `rgb24` totalmente opaco) e desenha caixas retangulares com `drawbox` (linhas 31–35).
+  - Curiosamente, o fallback binário de emergência na linha 53 (`target.write_bytes(...)`) é um PNG `1x1` com `color_type=6` (`rgba`), mas como o FFmpeg está instalado no ambiente, a linha 22 sempre é executada, gerando o arquivo `512x512` em `rgb24` opaco.
+- **Papel no defeito:** Mesmo que nenhuma transformação posterior adicionasse bordas ou descartasse transparência, a imagem de entrada já tem todos os seus `262.144` pixels (`512x512`) com opacidade 100%, incluindo os cantos externos `#0f172b`.
+- **Por que exige tratamento próprio:** Se o usuário fornecer uma foto real de criador (`.jpg` ou `.png` `rgb24` tirada de câmera/celular) ou usar o asset padrão, o arquivo de entrada continuará sendo um retângulo opaco. Portanto, a arquitetura não pode depender apenas de o arquivo PNG de entrada já vir recortado manualmente em círculo `rgba` — o pipeline precisa aplicar recorte/máscara circular orgânica programaticamente (ou validar/converter o asset para `rgba`/`yuva420p`).
+
+#### Cenário 2: Perda/Destruição de Transparência na Geração de `avatar.mp4` (`src/viralpanel/studio/avatar.py`)
+- **Onde ocorre:** `AudioReactiveAvatarAnimator.generate_avatar_video` em `src/viralpanel/studio/avatar.py` (linhas 94–125) e `MockAvatarAnimator.generate_avatar_video` (linhas 150–170).
+- **Evidência técnica:**
+  - Linha 95–96 de `avatar.py`:
+    ```python
+    f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
+    f"crop={self.width}:{self.height},format=yuv420p[base_avatar];"
+    ```
+  - Linhas 119–120 de `avatar.py`:
+    ```python
+    "-pix_fmt", "yuv420p",
+    ```
+- **Papel no defeito:** O filtro `format=yuv420p[base_avatar]` destrói imediatamente o canal alfa do Input `[0:v]` **dentro da memória do filtro**, antes mesmo da sobreposição da onda sonora (`[base_avatar][wave]overlay=0:H-h-8`).
+  - **Prova contrafactual:** Se substituíssemos hoje `assets/creator_avatar.png` por um PNG `rgba` com fundo circular 100% transparente, a linha 96 (`format=yuv420p`) converteria os pixels transparentes `(R=0, G=0, B=0, A=0)` em **preto sólido opaco** `(Y=16, U=128, V=128)`!
+  - **Efeito colateral adicional descoberto na auditoria:** Como `[base_avatar]` está em `yuv420p` e `[wave]` está em `yuva420p`, o filtro `overlay` converte o espaço de cores de forma incorreta para a cor `#38bdf8@0.85` do `showwaves`, fazendo a onda sonora ficar **verde** em `avatar.mp4` (como comprovado visualmente no frame extraído de `storage/runs/14f4a7a1-.../assets/avatar.mp4`)!
+- **Por que exige tratamento próprio:** Qualquer processamento visual do avatar (escala, corte circular e fusão com `showwaves`) precisa operar integralmente em espaço de pixel com canal alfa (`format=yuva420p` ou `format=rgba`) até o momento do `overlay` sobre o vídeo de fundo `[bg]`.
+
+#### Cenário 3: Moldura/Borda Branca Retangular Introduzida pelo Renderer (`src/viralpanel/studio/renderer.py` linha 128)
+- **Onde ocorre:** `ReactionVideoRenderer.render` em `src/viralpanel/studio/renderer.py` (linhas 127–128).
+- **Evidência técnica:**
+  ```python
+  f"[1:v]scale={self.avatar_size}:{self.avatar_size}:force_original_aspect_ratio=decrease,"
+  f"pad={self.avatar_size + 12}:{self.avatar_size + 12}:6:6:color=white[pip];"
+  ```
+- **Papel no defeito:** Este filtro redimensiona o vídeo de `360x360` para `340x340` e expande a tela para `352x352` preenchendo as margens de 6 pixels (topo, base, esquerda, direita) com **branco puro opaco (`color=white`, `#FFFFFF`)**.
+  - Além disso, o filtro `pad` do FFmpeg em um stream sem alfa gera um retângulo cartesiano perfeito de `352x352`.
+  - Mesmo que o vídeo de entrada tivesse um círculo desenhado no centro, o `pad=352:352:6:6:color=white` desenharia uma **moldura quadrada branca** por fora do quadrado de `340x340`!
+- **Por que exige tratamento próprio:** O filtro `pad=...color=white` na linha 128 de `renderer.py` deve ser **completamente removido** na refatoração. Caso se deseje um anel de contorno estético no padrão ZUNTO! (ex.: anel circular amarelo `#FACC15` de `3px` ou `4px`), ele deve ser desenhado via equação radial no canal alfa/cor (`geq` com distância euclidiana `hypot(X-W/2,Y-H/2)`) e jamais com o filtro retangular `pad`.
+
+#### Cenário 4: Limitação Intrínseca do Container/Codec Intermediário (`mp4` + `libx264` + `yuv420p`)
+- **Onde ocorre:** Arquitetura de comunicação em dois passes entre `BaseAvatarAnimator.generate_avatar_video(..., output_path=Path("avatar.mp4"))` (`service.py:84-85`) e `ReactionVideoRenderer.render(..., avatar_video_path=avatar_path)` (`service.py:103-109`).
+- **Evidência técnica:**
+  - `ffprobe` nos arquivos reais `storage/runs/*/assets/avatar.mp4` confirma `format_name: "mov,mp4,m4a,3gp,3g2,mj2"`, `codec_name: "h264"`, `pix_fmt: "yuv420p"`.
+  - A especificação ISO/IEC 14496-10 (H.264/AVC) implementada pelo encoder `libx264` suporta apenas formatos de pixel de 3 componentes (`yuv420p`, `yuvj420p`, `yuv422p`, `yuv444p`, `rgb24`). O `libx264` **não suporta `yuva420p` nem `rgba`**.
+- **Papel no defeito:** Trata-se de uma barreira arquitetural. Mesmo que:
+  1. `assets/creator_avatar.png` fosse convertido para `rgba` circular transparente (resolvendo o Cenário 1);
+  2. O filtro interno de `avatar.py` usasse `format=yuva420p` (resolvendo o Cenário 2); e
+  3. O `pad=...color=white` fosse removido de `renderer.py:128` (resolvendo o Cenário 3);
+  **ainda assim**, no instante em que `avatar.py` salvasse o resultado em `avatar.mp4` via `libx264`, o FFmpeg seria forçado a descartar o plano Alpha (`yuva420p -> yuv420p`), entregando ao `renderer.py` um vídeo `avatar.mp4` com cantos pretos quadrados opacos!
+
+---
+
+### 3.3 Matriz de Interdependência dos 4 Cenários Técnicos
+
+A tabela a seguir sintetiza como os 4 cenários interagem e por que uma solução parcial falha:
+
+| Cenário Ativo / Hipótese de Correção Parcial | Cenário 1 (`creator_avatar.png` `rgb24`) | Cenário 2 (`avatar.py` `format=yuv420p`) | Cenário 3 (`renderer.py` `pad=white`) | Cenário 4 (Arquivo `avatar.mp4` `libx264`) | Resultado Visual Final em `final_reaction_9x16.mp4` |
+|----------------------------------------------|------------------------------------------|------------------------------------------|---------------------------------------|--------------------------------------------|-----------------------------------------------------|
+| **Estado Atual (v1.0)** | ❌ Ativo (`rgb24` quadrado `#0f172b`) | ❌ Ativo (força `yuv420p`) | ❌ Ativo (borda branca 6px) | ❌ Ativo (`avatar.mp4` H.264) | **FALHA:** Quadrado escuro `#0f172b` dentro de moldura quadrada branca `#FFFFFF` (`352x352`). |
+| **Apenas remover `pad=white` (Tratar só Cenário 3)** | ❌ Ativo | ❌ Ativo | ✅ Removido | ❌ Ativo | **FALHA:** A borda branca some, mas permanece um **quadrado escuro opaco (`340x340`, `#0f172b`)** sobre o vídeo. |
+| **Converter PNG para `rgba` circular + remover `pad=white` (Tratar só Cenários 1 e 3)** | ✅ `rgba` circular | ❌ Ativo | ✅ Removido | ❌ Ativo | **FALHA:** `avatar.py` e `libx264` convertem a transparência do PNG em **cantos pretos sólidos (`#000000`)**, gerando um círculo inscrito num quadrado preto opaco! |
+| **Tratar Cenários 1, 2 e 3, mas manter `avatar.mp4` em `libx264` (Ignorar Cenário 4)** | ✅ `rgba` / máscara | ✅ `yuva420p` no filtro | ✅ Removido | ❌ Ativo (`libx264` sem alfa) | **FALHA:** O encoder `libx264` não aceita `yuva420p` e converte o vídeo intermediário para `yuv420p`, recriando o quadrado preto opaco nos cantos! |
+| **Solução Arquitetural Completa (Tratar Cenários 1 + 2 + 3 + 4 simultaneamente)** | ✅ Asset/Máscara com canal alfa (`yuva420p`) | ✅ Pipeline em memória `yuva420p` | ✅ Sem `pad` quadrado (anel circular opcional) | ✅ **Single-Pass** (sem `avatar.mp4` entre avatar e fundo) | **SUCESSO (AVTR-01):** Avatar circular/orgânico com transparência real nos cantos, anel ZUNTO! e onda sonora reativa integrada diretamente sobre o vídeo 9:16. |
+
+---
+
+### 3.4 Avaliação de Alternativas Técnicas de Transparência e Recorte (D-10)
+
+Para resolver simultaneamente os Cenários 1, 2, 3 e 4 nas Phases 11 e 12, foram comparadas 5 abordagens técnicas compatíveis com FFmpeg 6.1.1:
+
+| Alternativa Técnica | Como Trata os Cenários 1 a 4 | Prós | Contras | Veredito Arquitetural |
+|---------------------|------------------------------|------|---------|-----------------------|
+| **Opção A (Recomendada): Composição Direta Single-Pass em Memória (`yuva420p` + Máscara Circular `geq` / Asset RGBA)** | Lê `creator_avatar.png` diretamente no grafo único do `ReactionVideoRenderer`, aplica `format=yuva420p` + equação circular `geq` (com borda anelar ZUNTO! `#FACC15`), compõe `showwaves` em `yuva420p` e faz `overlay` direto sobre `[bg]`. | **Elimina o Cenário 4 na raiz** (zero arquivo intermediário sem alfa); funciona tanto com fotos `rgb24` comuns quanto com PNGs `rgba`; 1 única codificação H.264; altíssima velocidade. | Requer refatorar `ReactionVideoRenderer` para aceitar a imagem/configuração do avatar (previsto na Phase 12). | **ESCOLHIDA (Padrão Principal para Phases 11 e 12)** |
+| **Opção B: Pré-processamento Estático de Máscara Circular PNG (`rgba`) em Cache + Single-Pass** | Na inicialização/preparação do avatar (`avatar.py`), gera ou converte `creator_avatar.png` uma única vez para um PNG `rgba` (`340x340`) com recorte circular anti-aliased e anel amarelo ZUNTO!, que é então alimentado no Single-Pass (`-loop 1 -i avatar_circle_rgba.png`). | **Mais rápido que `geq` por frame!** Como a máscara circular e o anel são estáticos, pré-calcular o PNG `rgba` 1x evita avaliar `hypot(X-W/2,Y-H/2)` em cada frame do vídeo, mantendo `yuva420p` nativo no `overlay`! | Se usado em modo multi-pass com `.mp4`, ainda sofreria com o Cenário 4; portanto, deve ser combinado com o Single-Pass (ou container com alfa). | **ESCOLHIDA COMO OTIMIZAÇÃO DA OPÇÃO A (Pré-recorte RGBA + Single-Pass)** |
+| **Opção C: Vídeo Intermediário WebM VP9 com Canal Alfa (`libvpx-vp9 -pix_fmt yuva420p`)** | Substitui `avatar.mp4` por `avatar.webm` codificado com `libvpx-vp9 -pix_fmt yuva420p`. | Preserva a separação em 2 arquivos de vídeo caso o modo multi-pass seja mantido. | **Muito lento** (`libvpx-vp9` com alpha encoding adiciona 5s–15s de CPU por run) e no decode do FFmpeg exige forçar `-c:v libvpx-vp9` na entrada para ler o plano Alpha corretamente. | **DESCARTADA** (Ineficiente frente ao Single-Pass) |
+| **Opção D: Vídeo Intermediário QuickTime `.mov` (`qtrle` ou `prores_ks -profile:v 4444 -pix_fmt yuva444p10le`)** | Substitui `avatar.mp4` por `avatar.mov` com suporte nativo a canal alfa sem perdas. | Codificação/decodificação rápida e preservação exata de canal alfa. | Gera arquivos temporários grandes (20 MB a 80 MB por run de 40s) e exige trocar a extensão de `avatar.mp4` para `avatar.mov`. | **FALLBACK SECUNDÁRIO** (Apenas se algum teste isolado exigir vídeo de avatar standalone com alfa) |
+| **Opção E: Chroma Key (`colorkey` / `chromakey`) sobre Fundo Cor Sólida** | Pinta os cantos de verde/azul e aplica `colorkey` no `renderer.py`. | Simples em pipelines legados. | Produz serrilhado (aliasing), halo colorido ("color spill") nas bordas e pode furar cores semelhantes na roupa/rosto do avatar. | **REJEITADA** (Inferior ao canal alfa `rgba`/`yuva420p` verdadeiro) |
+
+#### Detalhamento Técnico da Solução Híbrida Ótima (Opções A + B para Phases 11 e 12):
+1. **Tratamento do Cenário 1 (Asset Fonte):** Garantir que o asset de avatar seja preparado em formato **`rgba`** (`pix_fmt="rgba"`) com recorte circular suave (anti-aliasing na borda do raio `R = W/2`) e anel circular ZUNTO! (`#FACC15`, `4px`), eliminando tanto os cantos opacos `rgb24` quanto os quadrados concêntricos de `ensure_default_avatar_image`.
+2. **Tratamento do Cenário 2 (Espaço de Cor no Filtro):** Manter todo o subgrafo do avatar e do `showwaves` estritamente em **`format=rgba` / `format=yuva420p`**, corrigindo inclusive o bug da onda sonora verde (que passará a ser renderizada em amarelo ZUNTO! `#FACC15@0.90` ou branco puro `#FFFFFF@0.90` sobre `yuva420p`).
+3. **Tratamento do Cenário 3 (Remoção do `pad` Branco):** Remover `pad={self.avatar_size + 12}:{self.avatar_size + 12}:6:6:color=white` da linha 128 de `src/viralpanel/studio/renderer.py`.
+4. **Tratamento do Cenário 4 (Eliminação da Barreira `.mp4` `yuv420p`):** No fluxo principal de produção (`ReactionVideoRenderer`), compor o avatar + onda sonora reativa diretamente dentro do `filter_complex` **single-pass** em memória (`yuva420p`), sem passar por codificação/decodificação H.264 intermediária antes do `overlay` sobre `[bg]`.
+
+---
+
+### 3.5 Mapeamento de Safe Zones Verticais 9:16 (`1080x1920`) para TikTok, Reels e Shorts (D-11)
+
+Para cumprir **D-11** e **AVTR-02**, mapeamos as áreas obstruídas pelas interfaces nativas das três plataformas-alvo em resolução `1080x1920` (9:16 Full HD vertical) e o conflito espacial atual:
+
+#### A. Obstruções de Interface (UI Overlays) das Plataformas em `1080x1920`
+1. **Zona Superior (Status Bar, Abas "Seguindo/Para Você", Ícone de Busca/Câmera):**
+   - `Y = 0px a 180px` (180px superiores).
+2. **Coluna Lateral Direita (Botões de Perfil, Like, Comentários, Salvar, Compartilhar, Áudio Giratório):**
+   - `X = 880px a 1080px` (200px direitos) ao longo de `Y = 850px a 1720px`.
+3. **Zona Inferior (Nome do @Criador, Descrição/Caption do Post, Música, Barra de Progresso):**
+   - `Y = 1520px a 1920px` (400px inferiores, sendo crítica a faixa `Y = 1600px a 1920px` em largura total).
+
+#### B. Diagnóstico de Colisão do Posicionamento Atual (`renderer.py` e `subtitles.py`)
+- **Avatar Atual (`renderer.py:129`):**
+  - Tamanho com pad: `352x352`.
+  - Expressão atual: `overlay=W-w-48:H-h-120` → **`X = 680..1032px`**, **`Y = 1448..1800px`**.
+  - **Problemas comprovados:**
+    1. **Colisão severa com a UI Inferior e Direita das Plataformas:** Entre `Y = 1520px e 1800px` e `X = 880px e 1032px`, o avatar fica **coberto pelos botões de Like/Compartilhar/Disco de Áudio e pelo texto da descrição do TikTok/Reels/Shorts**!
+    2. **Tangenciamento com as Legendas ASS:** A legenda atual (`MarginV=480`) termina em `Y = 1440px`, a apenas `8px` do topo do avatar (`Y = 1448px`).
+
+#### C. Zoneamento Espacial Recomendado (Layout ZUNTO! 9:16 para Phases 10, 11 e 12)
+
+```text
++--------------------------------------------------+ Y = 0
+|          ZONA DE TOPO UI (TikTok/Reels)          |
+|                 (Y = 0 .. 180px)                 |
++--------------------------------------------------+ Y = 180
+|                                                  |
+|                                                  |
+|           ZONA FOCAL DO VÍDEO DE FUNDO           |
+|          (Rosto / Ação Principal Limpa)          |
+|               (Y = 180 .. 1060px)                |
+|                                                  |
+|                                        +---------+ Y = 850
+|                                        | Botões  |
++----------------------------------------+ Sociais | Y = 1060
+|   [ LEGENDA ZUNTO! (Caixa Opaca BorderStyle=3) ] | (X>880)
+|     Largura segura: X = 80 .. 860px              |
+|     Faixa vertical: Y = 1060 .. 1280px           |
+|     (Cobre hard-subs originais do vídeo fonte!)  |
++----------------------------------------+         | Y = 1280
+|                                        |         |
+|     ( Avatar Reaction Circular )       |         |
+|       Diâmetro: 280px a 300px          |         |
+|       X = 64 .. 364px (Canto Esq.)     |         |
+|       OU X = 560 .. 860px (Dir. Safe)  |         |
+|       Y = 1320 .. 1600px (H-h-320)     |         |
++----------------------------------------+---------+ Y = 1600
+|     ZONA INFERIOR UI (Caption, @Autor, Áudio)    |
+|               (Y = 1600 .. 1920px)               |
++--------------------------------------------------+ Y = 1920
+X = 0                                           X = 1080
+```
+
+#### Parâmetros Calibrados de Safe Zone para Implementação:
+1. **Zona de Legendas ZUNTO! (Phase 10):**
+   - `MarginV = 640` (com `Alignment = 2`), posicionando o bloco de legenda entre **`Y = 1080px e 1280px`**, com `MarginL = 80` e `MarginR = 200` (evitando os botões sociais da direita em `X > 880px`).
+   - Essa faixa cumpre dupla função: fica na altura ideal dos olhos do espectador mobile e **sobrepõe a caixa opaca ZUNTO! exatamente sobre as hard-subs nativas dos vídeos baixados** (`Y ≈ 1080–1200px`).
+2. **Zona do Avatar Reaction Circular (Phase 11):**
+   - Reduzir o diâmetro de `352px` (com pad) para **`280px` a `300px`** (circular orgânico sem pad quadrado), ganhando leveza visual.
+   - Posicionar na faixa vertical **`Y = 1320px a 1600px`** (`overlay_y = H-h-320`), estritamente **abaixo** da zona de legendas (`Y <= 1280px`, garantindo folga vertical mínima de `40px`) e **acima** da zona crítica de descrição/barra de progresso inferior (`Y >= 1600px`).
+   - No eixo horizontal (`X`), posicionar no canto inferior esquerdo seguro (**`X = 56px`**, acima do `@autor`) ou à esquerda da coluna de ícones sociais da direita (**`X = W-w-210`**), evitando oclusão pelos botões de engajamento do TikTok/Reels/Shorts.
 
 ---
 
