@@ -42,16 +42,34 @@ Transcrição de referência:
 """
 
 
+class FactualClaim(BaseModel):
+    claim: str = Field(description="Afirmação factual feita no roteiro")
+    source_reference: str | None = Field(default=None, description="Referência ou origem mencionada")
+    source_excerpt: str | None = Field(default=None, description="Trecho da transcrição original correspondente")
+    timestamp: str | None = Field(default=None, description="Timestamp aproximado na transcrição original")
+    verification_status: str = Field(
+        default="unverified_source_claim",
+        description="Status de verificação do claim (sem presumir veracidade externa)",
+    )
+
+
 class GeneratedScriptSchema(BaseModel):
     theme: str = ""
     hook: str = Field(min_length=3)
     body: str = Field(min_length=20)
-    cta: str = Field(min_length=3)
+    closing_thought: str = Field(default="", description="Fechamento narrativo reflexivo")
+    cta: str | None = Field(default=None, description="Chamada para ação opcional")
     estimated_duration_seconds: float = Field(ge=10, le=75)
+    factual_claims: list[FactualClaim] = Field(default_factory=list)
 
     @property
     def full_text(self) -> str:
-        return f"{self.hook}\n\n{self.body}\n\n{self.cta}"
+        parts = [self.hook.strip(), self.body.strip()]
+        if self.closing_thought and self.closing_thought.strip():
+            parts.append(self.closing_thought.strip())
+        if self.cta and self.cta.strip():
+            parts.append(self.cta.strip())
+        return "\n\n".join(parts)
 
 
 RESPONSE_SCHEMA = {
@@ -60,10 +78,25 @@ RESPONSE_SCHEMA = {
         "theme": {"type": "STRING"},
         "hook": {"type": "STRING"},
         "body": {"type": "STRING"},
-        "cta": {"type": "STRING"},
+        "closing_thought": {"type": "STRING"},
+        "cta": {"type": "STRING", "nullable": True},
         "estimated_duration_seconds": {"type": "NUMBER"},
+        "factual_claims": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "claim": {"type": "STRING"},
+                    "source_reference": {"type": "STRING", "nullable": True},
+                    "source_excerpt": {"type": "STRING", "nullable": True},
+                    "timestamp": {"type": "STRING", "nullable": True},
+                    "verification_status": {"type": "STRING"},
+                },
+                "required": ["claim", "verification_status"],
+            },
+        },
     },
-    "required": ["hook", "body", "cta", "estimated_duration_seconds"],
+    "required": ["hook", "body", "closing_thought", "estimated_duration_seconds"],
 }
 
 

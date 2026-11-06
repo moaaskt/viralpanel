@@ -12,6 +12,7 @@ from viralpanel.media.transcriber import AudioTranscriber, MockTranscriber, Tran
 from viralpanel.models import Asset, Script, SourceVideo
 from viralpanel.scripting.gemini import (
     FallbackScriptWriter,
+    FactualClaim,
     GeminiScriptWriter,
     GeneratedScriptSchema,
     GroqScriptWriter,
@@ -164,6 +165,80 @@ def test_scripting_service_rejects_insufficient_speech(tmp_path):
             svc.process(db, run_id="r_skip", source=src)
         db.refresh(src)
         assert src.status == "skipped_no_speech"
+
+
+def test_factual_claim_validation():
+    claim = FactualClaim(
+        claim="80% das distrações vêm de notificações passivas.",
+        source_reference="Dr. Gloria Mark / Estudo de Atenção",
+        source_excerpt="notificações quebram o fluxo em 80%",
+        timestamp="00:15",
+        verification_status="extracted_from_transcript",
+    )
+    assert claim.claim.startswith("80%")
+    assert claim.verification_status == "extracted_from_transcript"
+    assert claim.source_reference == "Dr. Gloria Mark / Estudo de Atenção"
+
+    # Default verification status
+    simple_claim = FactualClaim(claim="Afirmação simples")
+    assert simple_claim.verification_status == "unverified_source_claim"
+    assert simple_claim.source_reference is None
+
+
+def test_generated_script_schema_closing_thought_and_cta_optional():
+    # Com closing_thought e sem cta (cta=None)
+    schema_no_cta = GeneratedScriptSchema(
+        hook="Você foi condicionado a falhar.",
+        body="O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.",
+        closing_thought="Você não sabia. Agora sabe.",
+        cta=None,
+        estimated_duration_seconds=30.0,
+    )
+    assert schema_no_cta.closing_thought == "Você não sabia. Agora sabe."
+    assert schema_no_cta.cta is None
+    assert schema_no_cta.full_text == (
+        "Você foi condicionado a falhar.\n\n"
+        "O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.\n\n"
+        "Você não sabia. Agora sabe."
+    )
+
+    # Com cta preenchida
+    schema_with_cta = GeneratedScriptSchema(
+        hook="Você foi condicionado a falhar.",
+        body="O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.",
+        closing_thought="A decisão final continua sendo sua.",
+        cta="Compartilhe este vídeo com quem precisa acordar.",
+        estimated_duration_seconds=35.0,
+    )
+    assert schema_with_cta.cta == "Compartilhe este vídeo com quem precisa acordar."
+    assert schema_with_cta.full_text == (
+        "Você foi condicionado a falhar.\n\n"
+        "O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.\n\n"
+        "A decisão final continua sendo sua.\n\n"
+        "Compartilhe este vídeo com quem precisa acordar."
+    )
+
+
+def test_generated_script_schema_full_text_ignores_blank_cta():
+    # CTA com string vazia ou apenas espaços não deve gerar quebras de linha órfãs
+    schema_empty_cta = GeneratedScriptSchema(
+        hook="Gancho de teste afiado.",
+        body="Desenvolvimento prático e direto sem enrolação de nenhum tipo.",
+        closing_thought="Fechamento reflexivo e impactante.",
+        cta="   ",
+        estimated_duration_seconds=25.0,
+    )
+    assert schema_empty_cta.full_text == (
+        "Gancho de teste afiado.\n\n"
+        "Desenvolvimento prático e direto sem enrolação de nenhum tipo.\n\n"
+        "Fechamento reflexivo e impactante."
+    )
+
+
+def test_script_model_metadata_json_default():
+    script = Script(source_video_id="vid_1")
+    assert script.metadata_json == {} or script.metadata_json is None
+
 
 
 
