@@ -12,11 +12,14 @@ from viralpanel.media.transcriber import TranscriptionResult
 
 logger = logging.getLogger(__name__)
 
-# Diretriz de persona masculina/neutra: voz firme de mentor/criador solo (nunca feminina)
+# Diretriz de persona masculina/neutra: voz firme de mentor/criador solo (marca ZUNTO!)
 PERSONA = (
-    "Você é um roteirista profissional de vídeos virais curtos (TikTok, Reels, Shorts) "
-    "no nicho de desenvolvimento pessoal, alta performance, foco e mentalidade de sucesso. "
-    "Voz e postura: Criador solo masculino/neutro, tom direto, maduro, confiante, firme e sem enrolação. "
+    "Você é o roteirista editorial da marca ZUNTO!, focado em vídeos curtos verticais (9:16 para TikTok, Reels e Shorts) "
+    "no nicho de desenvolvimento pessoal, alta performance, foco, clareza mental e mentalidade estratégica. "
+    "Voz e postura: Criador solo masculino/neutro, tom direto, maduro, confiante, firme, provocativo e sem enrolação. "
+    "Filosofia editorial: Orientada pela máxima 'Você não sabia. Agora sabe.' — uma postura de revelação, suspense e "
+    "desconstrução de ilusões, sem impor frases de encerramento forçadas ou chavões artificiais. "
+    "Cadência e fala: Escreva frases com pontuação limpa e cadência rítmica natural ideal para síntese de voz (TTS). "
     "IMPORTANTE: Sempre escreva na primeira ou segunda pessoa com concordância masculina ou neutra "
     "(exemplo: 'focado', 'determinado', 'preparado'). Nunca assuma gênero feminino, mesmo que o vídeo original "
     "de referência tenha sido gravado por uma mulher."
@@ -24,16 +27,30 @@ PERSONA = (
 
 PROMPT_TEMPLATE = """{persona}
 
-Analise o conteúdo do vídeo viral de referência abaixo (transcrição do áudio com timestamps e contexto do vídeo original).
-Identifique o tema central, o gatilho psicológico de curiosidade e a estrutura de retenção.
+Analise criticamente o vídeo viral de referência abaixo (transcrição do áudio com timestamps e contexto do vídeo original).
+Identifique o tema central, a dor invisível ou equívoco comum abordado, e o gatilho psicológico de curiosidade.
 Depois, escreva um roteiro 100% ORIGINAL (sem copiar nenhuma frase do vídeo de referência) sobre o mesmo tema,
-pensado para formato reaction e fala natural de um homem confiante.
+pensado para o formato reaction e narração falada fluida por uma voz masculina firme.
 
-Regras obrigatórias de estrutura:
-- hook: gancho de altíssima retenção para os primeiros 0–3 segundos (máximo ~10 palavras, corte seco e impactante).
-- body: desenvolvimento fluido e convincente para o intervalo de 4–45 segundos (aprox. 70–110 palavras, prático e transformador).
-- cta: chamada para ação final curta e persuasiva (ex: seguir, salvar, compartilhar).
-- estimated_duration_seconds: duração estimada da narração entre 15 e 60 segundos.
+Diretrizes obrigatórias de estrutura editorial:
+- hook: gancho cortante e magnético para os primeiros 0–3 segundos (máximo ~10 palavras, corte seco e provocativo).
+  Proibido iniciar com saudações ('Oi', 'Fala pessoal') ou introduções mornas.
+- body: desenvolvimento fluido e instigante para o intervalo de 4–45 segundos (aprox. 70–110 palavras),
+  revelando o cerne da ideia com clareza prática e cadência perfeita para áudio.
+- closing_thought: fechamento narrativo e reflexivo obrigatório, que arremata a ideia central com peso e autoridade.
+  (Nota: O conceito 'Você não sabia. Agora sabe.' orienta a essência da revelação, mas use essa frase exata apenas quando fizer sentido editorial genuíno).
+- cta: chamada para ação final estritamente OPCIONAL. Se não houver uma chamada genuinamente contextual e relevante,
+  deixe como null. Não force chavões genéricos ('curte e compartilha') desnecessários.
+- estimated_duration_seconds: duração estimada realista da narração falada entre 15 e 60 segundos.
+- factual_claims: lista de afirmações factuais (dados, estudos, nomes de autores ou conceitos específicos)
+  mencionadas no roteiro e embasadas estritamente na transcrição de referência.
+  Para cada claim:
+  * claim: afirmação factual sintetizada.
+  * source_reference: autor/livro/estudo mencionado na transcrição (ou null se não citado).
+  * source_excerpt: trecho correspondente da transcrição original.
+  * timestamp: marcação temporal na transcrição (ex: '00:15'), se presente, ou null.
+  * verification_status: use 'extracted_from_transcript' ou 'unverified_source_claim'.
+  ATENÇÃO RIGOROSA: NUNCA invente fontes, links, pesquisas ou evidências que não constem na transcrição de referência.
 
 {context_block}
 
@@ -42,16 +59,34 @@ Transcrição de referência:
 """
 
 
+class FactualClaim(BaseModel):
+    claim: str = Field(description="Afirmação factual feita no roteiro")
+    source_reference: str | None = Field(default=None, description="Referência ou origem mencionada")
+    source_excerpt: str | None = Field(default=None, description="Trecho da transcrição original correspondente")
+    timestamp: str | None = Field(default=None, description="Timestamp aproximado na transcrição original")
+    verification_status: str = Field(
+        default="unverified_source_claim",
+        description="Status de verificação do claim (sem presumir veracidade externa)",
+    )
+
+
 class GeneratedScriptSchema(BaseModel):
     theme: str = ""
     hook: str = Field(min_length=3)
     body: str = Field(min_length=20)
-    cta: str = Field(min_length=3)
+    closing_thought: str = Field(default="", description="Fechamento narrativo reflexivo")
+    cta: str | None = Field(default=None, description="Chamada para ação opcional")
     estimated_duration_seconds: float = Field(ge=10, le=75)
+    factual_claims: list[FactualClaim] = Field(default_factory=list)
 
     @property
     def full_text(self) -> str:
-        return f"{self.hook}\n\n{self.body}\n\n{self.cta}"
+        parts = [self.hook.strip(), self.body.strip()]
+        if self.closing_thought and self.closing_thought.strip():
+            parts.append(self.closing_thought.strip())
+        if self.cta and self.cta.strip():
+            parts.append(self.cta.strip())
+        return "\n\n".join(parts)
 
 
 RESPONSE_SCHEMA = {
@@ -60,10 +95,25 @@ RESPONSE_SCHEMA = {
         "theme": {"type": "STRING"},
         "hook": {"type": "STRING"},
         "body": {"type": "STRING"},
-        "cta": {"type": "STRING"},
+        "closing_thought": {"type": "STRING"},
+        "cta": {"type": "STRING", "nullable": True},
         "estimated_duration_seconds": {"type": "NUMBER"},
+        "factual_claims": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "claim": {"type": "STRING"},
+                    "source_reference": {"type": "STRING", "nullable": True},
+                    "source_excerpt": {"type": "STRING", "nullable": True},
+                    "timestamp": {"type": "STRING", "nullable": True},
+                    "verification_status": {"type": "STRING"},
+                },
+                "required": ["claim", "verification_status"],
+            },
+        },
     },
-    "required": ["hook", "body", "cta", "estimated_duration_seconds"],
+    "required": ["hook", "body", "closing_thought", "estimated_duration_seconds"],
 }
 
 
@@ -194,10 +244,14 @@ class GroqScriptWriter(ScriptWriter):
             f"{PERSONA}\n\n"
             "Você DEVE retornar OBRIGATORIAMENTE um objeto JSON válido contendo exatamente as chaves:\n"
             "- \"theme\": string com o tema central\n"
-            "- \"hook\": string com o gancho falado em 0-3 segundos (máximo ~10 palavras)\n"
+            "- \"hook\": string com o gancho falado em 0-3 segundos (máximo ~10 palavras, cortante e provocativo)\n"
             "- \"body\": string com o desenvolvimento fluido (aprox 70-110 palavras)\n"
-            "- \"cta\": string com chamada para ação final curta\n"
+            "- \"closing_thought\": string com o fechamento narrativo e reflexivo\n"
+            "- \"cta\": string com chamada para ação final curta OU null caso não haja chamada contextual\n"
             "- \"estimated_duration_seconds\": número entre 15 e 60\n"
+            "- \"factual_claims\": lista de objetos contendo \"claim\", \"source_reference\" (ou null), "
+            "\"source_excerpt\" (ou null), \"timestamp\" (ou null), \"verification_status\" (ex: 'extracted_from_transcript'). "
+            "Nunca invente fatos ou fontes fora da transcrição.\n"
             "Não retorne markdown ou texto fora do JSON."
         )
 
@@ -345,6 +399,16 @@ class MockGeminiScriptWriter(ScriptWriter):
                 "nunca falhar dois dias seguidos. Quando o hábito vira identidade, a força de vontade "
                 "deixa de ser necessária. Comece hoje com algo ridículo de tão pequeno."
             ),
+            closing_thought="Quem domina a própria rotina não precisa de sorte.",
             cta="Salva esse vídeo e me segue para mais.",
             estimated_duration_seconds=35,
+            factual_claims=[
+                FactualClaim(
+                    claim="Pessoas de alta performance dependem de sistemas, não de inspiração diária.",
+                    source_reference="Hábitos Atômicos / James Clear",
+                    source_excerpt="quando o hábito vira identidade a força de vontade deixa de ser necessária",
+                    timestamp="00:15",
+                    verification_status="extracted_from_transcript",
+                )
+            ],
         )

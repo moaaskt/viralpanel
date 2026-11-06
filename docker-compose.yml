@@ -39,7 +39,11 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       HF_HOME: /app/storage/cache/huggingface
-    volumes:
+    volumes: &app_volumes
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./assets:/app/assets
+      - ./cookies:/app/cookies
       - ./storage:/app/storage
     depends_on:
       postgres: {condition: service_healthy}
@@ -51,6 +55,7 @@ services:
     command: celery -A viralpanel.celery_app beat --loglevel=info
     env_file: .env
     environment: *app_env
+    volumes: *app_volumes
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}

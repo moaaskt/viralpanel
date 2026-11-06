@@ -12,8 +12,8 @@ COPY pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
-# Instalação do Playwright Chromium e dependências necessárias de sistema para headless scraping
-RUN playwright install --with-deps chromium
+# Instalação do Playwright/Patchright Chromium e dependências necessárias de sistema para headless scraping
+RUN playwright install --with-deps chromium && (patchright install chromium || true)
 
 FROM deps AS runtime
 COPY . .

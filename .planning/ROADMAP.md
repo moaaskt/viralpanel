@@ -1,182 +1,125 @@
 # Roadmap: ViralPanel
 
-## Overview
+## Milestones
 
-O ViralPanel é construído através de uma abordagem Vertical MVP, dividida em 7 fases progressivas. O projeto começa estruturando a fundação de containers e persistência, avança para o motor de discovery e scoring no TikTok, implementa o pipeline de análise e roteirização com Gemini 2.5 Flash, integra a produção de voz clonada e avatar reaction com FFmpeg, estabelece o fluxo de supervisão humana via Telegram, ativa a publicação automatizada nas APIs oficiais das três redes e coroa o ecossistema com um painel de controle moderno em React + Chakra UI.
+- 🏁 **v1.0 ViralPanel MVP** — Phases 1–7 (Completed 2026-11-05, archived to [.planning/milestones/v1.0-ROADMAP.md](file:///.planning/milestones/v1.0-ROADMAP.md))
+- 🚧 **v1.1 ZUNTO! Visual Engine** — Phases 8–13 (In progress)
 
 ## Phases
 
-**Phase Numbering:**
+### Milestone v1.1 — ZUNTO! Visual Engine
 
-- Integer phases (1, 2, 3...): Planned milestone work
-- Decimal phases (e.g. 2.1): Urgent insertions (marked with INSERTED)
-
-- [x] **Phase 1: Fundação & Orquestração Base** - Ambiente Docker Compose, PostgreSQL com migrations, Redis e Celery assíncrono (completed 2026-11-05)
-- [x] **Phase 2: Discovery & Scoring no TikTok** - Scraper próprio (Playwright + yt-dlp) com algoritmo de ranking configurável via YAML (completed 2026-11-05)
-- [x] **Phase 3: Análise, Transcrição & Roteiro Gemini** - Download, transcrição com Whisper e criação de roteiros estruturados via Gemini 2.5 Flash (completed 2026-11-05)
-- [x] **Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)** - Clonagem de voz com XTTS, avatar virtual e montagem 9:16 com legendas via FFmpeg (completed 2026-11-05)
-- [x] **Phase 5: Observabilidade & Bot Telegram Supervisionado** - Notificações em tempo real e modo supervisionado com preview de vídeo e aprovação (completed 2026-11-05)
-- [x] **Phase 6: Publicação Direta nas APIs Oficiais** - Integração direta com TikTok Content Posting API, Meta Graph API e YouTube Data API v3 (completed 2026-11-05)
-- [x] **Phase 7: Painel Web de Controle** - Interface React + Chakra UI (sem neon) para monitoramento de filas, histórico e métricas (completed 2026-11-05)
+- [x] **Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz** - Investigação técnica das causas de duplicação de legendas, artefatos do avatar e mapeamento rigoroso dos contratos entre subtitles.py, renderer.py e tasks Celery (completed 2026-11-06)
+- [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** - Refinamento de prompts no Gemini 2.5 Flash para retenção, rastreabilidade de fontes factuais, CTA contextual e identidade visual ZUNTO! (completed 2026-11-06)
+- [ ] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO!
+- [ ] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16
+- [ ] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing
+- [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
 
 ## Phase Details
 
-### Phase 1: Fundação & Orquestração Base
+### Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz
 
-**Goal**: Subir a infraestrutura Docker Compose completa com PostgreSQL, Redis, Celery Worker/Beat e modelos de banco de dados
-**Mode:** mvp
-**Depends on**: Nothing (primeira fase)
-**Requirements**: SCHED-01, SCHED-02, SCHED-03, DATA-01, DATA-02
+**Goal**: Identificar com precisão técnica a causa raiz de duplicações de legendas, problemas de formato/recorte do avatar reaction e gargalos nos filtros FFmpeg, além de mapear integralmente contratos e interfaces atuais antes de qualquer refatoração de código.
+**Depends on**: Nothing (primeira fase do milestone v1.1)
+**Requirements**: SUB-01, AVTR-01, COMP-01
 **Success Criteria** (what must be TRUE):
 
-  1. Docker Compose sobe PostgreSQL, Redis, Celery Worker e Celery Beat sem falhas de conexão
-  2. Modelos relacionais (`source_videos`, `scripts`, `assets`, `publications`, `runs`) aplicados no PostgreSQL via migrações
-  3. Job de teste executado de forma assíncrona pelo Celery com log e status gravados no banco
+  1. Relatório técnico documentando o ponto exato no fluxo (`subtitles.py` vs `renderer.py` vs Celery task) onde ocorre a duplicação ou conflito de renderização de legendas.
+  2. Diagnóstico conclusivo do formato real dos assets de avatar (canais alfa/chroma, codecs, dimensões) definindo a técnica nativa de recorte e transparência mais adequada sem assumir máscaras a priori.
+  3. Mapeamento exaustivo dos contratos e interfaces atuais entre `subtitles.py`, `renderer.py`, geração de avatar e tasks Celery, documentando entradas, saídas, responsabilidades e dependências para blindar contra regressões.
+  4. Mapeamento completo do grafo de filtros FFmpeg atual com identificação de filtros redundantes, reencodificações intermediárias ou passes desnecessários.
+
+**Plans**: 2/2 plans executed
+Plans:
+
+- [x] 08-01-PLAN.md — Mapeamento de Contratos & Interfaces e Análise dos Passes e Grafo FFmpeg
+- [x] 08-02-PLAN.md — Diagnóstico de Causa Raiz (Legendas Duplicadas e Formato de Avatar) e Consolidação do Relatório Final AUDIT-REPORT.md
+
+### Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!
+
+**Goal**: Elevar a qualidade editorial dos roteiros gerados pelo Gemini 2.5 Flash para máxima retenção, garantindo rastreabilidade de fatos/fontes, CTAs contextuais sem repetições artificiais e alinhamento à identidade da marca ZUNTO!.
+**Depends on**: Phase 8
+**Requirements**: BRND-01, BRND-02, SCRP-01, SCRP-02
+**Success Criteria** (what must be TRUE):
+
+  1. Prompts do Gemini 2.5 Flash geram roteiros com ganchos magnéticos nos primeiros 3 segundos, ritmo dinâmico e frases fluidas e naturais para sintetização TTS.
+  2. Fechamentos e CTAs tornam-se contextuais e opcionais conforme a narrativa do vídeo, orientados pela essência da marca ZUNTO! sem repetição mecânica forçada do slogan em todos os episódios.
+  3. Mecanismo de rastreabilidade e preservação de referências/fontes utilizado na elaboração dos roteiros, assegurando precisão factual sem dependência cega exclusiva da LLM.
+  4. Diretrizes oficiais de identidade visual ZUNTO! (paleta preto profundo, amarelo de impacto e branco puro) e guia de safe zones (TikTok, Reels, Shorts) especificadas para balizar overlays e legendas.
+
+**Plans**: 2/2 plans executed
+
+Plans:
+- [x] 09-01-PLAN.md — Módulo Central de Identidade Visual `branding.py` e Suíte de Testes (BRND-01, BRND-02)
+- [x] 09-02-PLAN.md — Roteirista Gemini Editorial, Schemas (closing_thought + cta opcional), Rastreabilidade de Claims e Persistência de Metadados (SCRP-01, SCRP-02)
+**UI hint**: yes
+
+### Phase 10: Motor de Legendas ZUNTO! e Desacoplamento
+
+**Goal**: Desacoplar a geração e estilização de legendas do renderer FFmpeg, eliminar qualquer duplicidade e entregar legendas no padrão ZUNTO! com sincronia temporal precisa.
+**Depends on**: Phase 9
+**Requirements**: SUB-01, SUB-02, SUB-03, BRND-01
+**Success Criteria** (what must be TRUE):
+
+  1. `subtitles.py` desacoplado de `renderer.py`, atuando estritamente como formatador e construtor de legendas (ASS/SRT) com tipografia marcante, quebras de linha responsivas para mobile e alto contraste ZUNTO!.
+  2. Execução da esteira de composição sem qualquer duplicidade de legenda na tela (burn-in único garantido).
+  3. Sincronização temporal milimétrica entre a locução gerada e a cadência de exibição das palavras, com suporte a realce/destaque dinâmico de palavras-chave.
+
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
+- [ ] 10-02-PLAN.md — Integração em `StudioService.produce` e `ReactionVideoRenderer`, Cobertura de Hard-Subs com `MarginV=640`, Camada Única e Validação de Regressão da Suíte Completa (SUB-01, SUB-02, SUB-03, BRND-01)
+**UI hint**: yes
+
+### Phase 11: Avatar Reaction e Composição Visual Orgânica
+
+**Goal**: Integrar o avatar virtual de reaction de forma orgânica, sem aspecto de caixa quadrada, utilizando a técnica de recorte identificada na auditoria e respeitando safe zones verticais 9:16.
+**Depends on**: Phase 8, Phase 9
+**Requirements**: AVTR-01, AVTR-02, AVTR-03, BRND-02
+**Success Criteria** (what must be TRUE):
+
+  1. Avatar reaction integrado sem aparência de caixa/imagem quadrada, utilizando a técnica de transparência e recorte nativo validada a partir dos assets reais na Phase 8.
+  2. Posicionamento e dimensionamento calibrados estritamente dentro da safe zone vertical 9:16, assegurando que elementos centrais do vídeo e legendas nunca sejam ocluídos.
+  3. Proporção, nitidez, sincronização e qualidade visual preservadas, respeitando a taxa de quadros e conformidade técnica esperada pelo pipeline.
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 12: Refatoração do Video Composer FFmpeg e Integração
+
+**Goal**: Reestruturar o Video Composer em camadas limpas com grafo de filtros integrado em single-pass (evitando reencodificações intermediárias desnecessárias), saída 1080x1920 e preservação rigorosa dos contratos com Celery e publicação.
+**Depends on**: Phase 10, Phase 11
+**Requirements**: COMP-01, COMP-02, COMP-03, BRND-01, BRND-02
+**Success Criteria** (what must be TRUE):
+
+  1. Composição audiovisual realizada em grafo de filtros integrado em um único passe com codificação final única sempre que tecnicamente viável, eliminando reencodificações intermediárias desnecessárias.
+  2. Saída do vídeo rigorosamente padronizada em 1080x1920 (9:16 vertical Full HD) com sincronia perfeita entre áudio e vídeo e ordenação clara de camadas (fundo, avatar, legendas, branding).
+  3. Contratos de interface com as tasks Celery preservados, assegurando que as integrações de publicação permaneçam funcionais e desacopladas da refatoração.
 
 **Plans**: TBD
 
-Plans:
-**Wave 1**
+### Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E
 
-- [x] 01-01: Setup do repositório, Docker Compose, PostgreSQL, Redis e configurações de ambiente
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 01-02: Modelagem do banco de dados (SQLAlchemy / Alembic) e persistência de runs
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 01-03: Configuração da fila Celery com retry, idempotência e Celery Beat agendado para 01:00
-
-### Phase 2: Discovery & Scoring no TikTok
-
-**Goal**: Coletar os 30 vídeos virais mais relevantes no nicho de desenvolvimento pessoal e ranquear o melhor candidato via fórmula YAML
-**Mode:** mvp
-**Depends on**: Phase 1
-**Requirements**: DISC-01, DISC-02, DISC-03, SCOR-01, SCOR-02
+**Goal**: Validar rigorosamente o pipeline através de inspeções técnicas automatizadas de integridade de mídia complementadas obrigatoriamente por inspeção visual humana de vídeos reais renderizados.
+**Depends on**: Phase 12
+**Requirements**: QUAL-01, QUAL-02
 **Success Criteria** (what must be TRUE):
 
-  1. Scraper autônomo baseado em Playwright + yt-dlp busca e extrai metadados dos 30 vídeos do nicho sem quebrar
-  2. Fórmula matemática parametrizada via arquivo YAML calcula score de viralidade considerando views, likes/views ratio e velocidade em 24h
-  3. O melhor candidato não processado é selecionado e persistido no banco com status pendente de análise
+  1. Validador técnico automatizado inspeciona o vídeo gerado verificando resolução exata (1080x1920), aspect ratio (9:16), duração, taxa de quadros, integridade de streams A/V e integridade do arquivo.
+  2. Geração de vídeos de teste completos a partir de dados reais com inspeção visual humana explícita, comprovando ausência de legendas duplicadas, ausência de artefatos no avatar, enquadramento correto em safe zones e sincronia labial (quando o avatar possuir fala/movimento de boca) e harmonia narrativa.
+  3. Aprovação formal do milestone condicionada cumulativamente aos testes automatizados verdes e à validação perceptual positiva dos vídeos gerados.
 
 **Plans**: TBD
-
-Plans:
-
-- [x] 02-01: Implementação da interface e módulo de scraping próprio (Playwright + yt-dlp) para coleta dos 30 vídeos
-- [x] 02-02: Módulo de cálculo de viralidade baseado em regras YAML e rotina de seleção e deduplicação no banco
-
-### Phase 3: Análise, Transcrição & Roteiro Gemini
-
-**Goal**: Baixar o vídeo candidato, extrair áudio, transcrever com Whisper e produzir um roteiro original e persuasivo via Gemini 2.5 Flash
-**Mode:** mvp
-**Depends on**: Phase 2
-**Requirements**: MEDIA-01, MEDIA-02, SCRP-01, SCRP-02
-**Success Criteria** (what must be TRUE):
-
-  1. Download do vídeo e extração de áudio isolado executados com sucesso via yt-dlp e FFmpeg
-  2. Áudio transcrito com precisão incluindo marcações de tempo (timestamps) pelo Whisper / faster-whisper
-  3. Gemini 2.5 Flash analisa a estrutura e gera roteiro original rigorosamente com gancho (0–3s), desenvolvimento (4–45s) e CTA final
-
-**Plans**: TBD
-
-Plans:
-
-- [x] 03-01: Pipeline de download de mídia e extração de áudio com persistência de assets
-- [x] 03-02: Módulo de transcrição com Whisper e formatação de timestamps
-- [x] 03-03: Integração com Gemini 2.5 Flash para geração de roteiros originais e ganchos estruturados
-
-### Phase 4: Produção Studio (Voz, Avatar & Vídeo Reaction)
-
-**Goal**: Gerar narração clonada com XTTS, animar avatar do criador e renderizar o vídeo vertical 9:16 final com legendas via FFmpeg
-**Mode:** mvp
-**Depends on**: Phase 3
-**Requirements**: PROD-01, PROD-02, PROD-03
-**Success Criteria** (what must be TRUE):
-
-  1. Interface modular de voz sintetiza o roteiro gerado utilizando a voz clonada do criador (XTTS / Voice Studio)
-  2. Módulo de avatar gera vídeo do criador reagindo ou apresentando em sincronia labial com a narração
-  3. FFmpeg realiza a composição final em formato 9:16 vertical (vídeo de referência, avatar do criador em overlay e legendas animadas sincronizadas)
-
-**Plans**: TBD
-
-Plans:
-
-- [x] 04-01: Módulo modular de síntese de voz (TTS) com suporte a XTTS v2
-- [x] 04-02: Módulo de geração e animação do avatar virtual sincronizado
-- [x] 04-03: Pipeline de renderização FFmpeg para layout reaction 9:16 e burning de legendas sincronizadas
-
-### Phase 5: Observabilidade & Bot Telegram Supervisionado
-
-**Goal**: Configurar bot do Telegram com monitoramento em tempo real e modo supervisionado interativo para aprovação/rejeição do vídeo antes da publicação
-**Mode:** mvp
-**Depends on**: Phase 4
-**Requirements**: TELE-01, TELE-02, TELE-03
-**Success Criteria** (what must be TRUE):
-
-  1. Bot do Telegram envia notificações detalhadas de sucesso, erros e status de cada etapa da pipeline
-  2. Bot envia arquivo ou streaming de preview do vídeo final montado com botões de callback "Aprovar" e "Rejeitar"
-  3. O pipeline aguarda a resposta humana no Telegram antes de liberar o agendamento de publicação quando o modo supervisionado estiver ligado
-
-**Plans**: TBD
-
-Plans:
-
-- [x] 05-01: Setup do Telegram Bot com mensageria assíncrona e logs estruturados
-- [x] 05-02: Implementação do fluxo interativo de aprovação humana com envio de preview de vídeo e handlers de Aprovar/Rejeitar
-
-### Phase 6: Publicação Direta nas APIs Oficiais
-
-**Goal**: Realizar a postagem e agendamento automático nas três plataformas oficiais (TikTok, Instagram Reels e YouTube Shorts)
-**Mode:** mvp
-**Depends on**: Phase 5
-**Requirements**: PUBL-01, PUBL-02, PUBL-03, PUBL-04
-**Success Criteria** (what must be TRUE):
-
-  1. Integração com TikTok Content Posting API autentica e agenda a postagem do vídeo
-  2. Integração com Meta Graph API publica vídeo vertical no Instagram Reels com legendas e hashtags
-  3. Integração com YouTube Data API v3 publica vídeo como Shorts e registra o ID e URL no banco
-
-**Plans**: TBD
-
-Plans:
-
-- [x] 06-01: Módulo de autenticação OAuth2 e gerenciamento de tokens das três plataformas
-- [x] 06-02: Publicador TikTok Content Posting API
-- [x] 06-03: Publicador Meta Graph API (Instagram Reels) e YouTube Data API v3 (Shorts) com geração de metadados
-
-### Phase 7: Painel Web de Controle
-
-**Goal**: Criar o painel web minimalista e profissional em React + Chakra UI para monitorar a esteira diária, filas Celery, histórico de vídeos e métricas
-**Mode:** mvp
-**Depends on**: Phase 6
-**Requirements**: DASH-01, DASH-02, DASH-03
-**Success Criteria** (what must be TRUE):
-
-  1. Frontend React construído com Chakra UI com design sóbrio, limpo e profissional (sem cores neon)
-  2. Painel exibe visão em tempo real da fila Celery, jobs ativos e agendamento da próxima execução
-  3. Seção de histórico permite navegar pelos vídeos gerados, roteiros, logs de execução e links publicados
-
-**Plans**: TBD
-
-Plans:
-
-- [x] 07-01: Setup do frontend React com Chakra UI e integração de API com o backend
-- [x] 07-02: Telas de monitoramento de fila Celery, status dos jobs e disparo manual
-- [x] 07-03: Tela de histórico de publicações, biblioteca de roteiros/assets e visualização de métricas
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
-
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Fundação & Orquestração Base | 3/3 | Complete    | 2026-11-05 |
-| 2. Discovery & Scoring no TikTok | 2/2 | Complete    | 2026-11-05 |
-| 3. Análise, Transcrição & Roteiro Gemini | 3/3 | Complete    | 2026-11-05 |
-| 4. Produção Studio (Voz, Avatar & Vídeo Reaction) | 3/3 | Complete    | 2026-11-05 |
-| 5. Observabilidade & Bot Telegram Supervisionado | 2/2 | Complete    | 2026-11-05 |
-| 6. Publicação Direta nas APIs Oficiais | 3/3 | Complete    | 2026-11-05 |
-| 7. Painel Web de Controle | 3/3 | Complete    | 2026-11-05 |
+| Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
+| Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
+| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 0/2 | Not started | - |
+| Phase 11: Avatar Reaction e Composição Visual Orgânica | 0/0 | Not started | - |
+| Phase 12: Refatoração do Video Composer FFmpeg e Integração | 0/0 | Not started | - |
+| Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |

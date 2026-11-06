@@ -40,6 +40,7 @@ class Script(Base):
     hook: Mapped[str | None] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    metadata_json: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
     source_video: Mapped["SourceVideo"] = relationship(back_populates="scripts")
     assets: Mapped[list["Asset"]] = relationship(back_populates="script")

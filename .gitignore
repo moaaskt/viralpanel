@@ -11,3 +11,7 @@ venv/
 frontend/node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+
+# Cookies sensíveis
+cookies/*.txt
+cookies/*.json

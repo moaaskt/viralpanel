@@ -8,6 +8,18 @@ ViralPanel é um pipeline autônomo de geração e publicação de conteúdo vir
 
 Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos curtos de alta qualidade com consistência diária (meta de 6 vídeos por dia) e controle de qualidade supervisionado via Telegram, liberando o criador solo da rotina de produção manual.
 
+## Current Milestone: v1.1 ZUNTO! Visual Engine
+
+**Goal:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.
+
+**Target features:**
+- Motor de legendas com sincronização refinada, sem duplicação e visual ZUNTO!
+- Composição e recorte orgânico de avatar reaction sem aspecto de imagem quadrada
+- Refatoração do Video Composer em camadas limpas com validação de saída 1080x1920
+- Identidade visual e branding ZUNTO! (preto, amarelo de impacto e branco)
+- Aprimoramento editorial dos roteiros no Gemini (ganchos provocativos, retenção alta)
+- Validação automatizada de integridade e qualidade audiovisual do vídeo final
+
 ## Business Context
 
 - **Customer**: Criador de conteúdo solo focado em desenvolvimento pessoal, produtividade e motivação
@@ -35,7 +47,12 @@ Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos cu
 
 ### Active
 
-(None currently active — Milestone v1.0 complete)
+- [ ] Motor de legendas com sincronização precisa e sem duplicações (identidade ZUNTO!)
+- [ ] Composição aprimorada do avatar (recorte, proporção 9:16 sem bordas quadradas)
+- [ ] Refatoração do Video Composer (camadas estruturadas, sem sobreposição de filtros/legendas)
+- [ ] Identidade visual ZUNTO! integrada (paleta preto/amarelo/branco, slogan "Você não sabia. Agora sabe.")
+- [ ] Prompts do roteirista Gemini aprimorados (ganchos fortes 0-3s, narrativa provocativa e dinâmica)
+- [ ] Suite de validação de qualidade audiovisual do vídeo final gerado
 
 ### Out of Scope
 
@@ -87,5 +104,5 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-04 after initialization*
+*Last updated: 2026-11-06 for Milestone v1.1 ZUNTO! Visual Engine*
 
