@@ -49,3 +49,4 @@
 | Adicionar ao config.py ou YAML | Mistura configuração e identidade | |
 
 **User's choice:** Criar `src/viralpanel/branding.py` como fonte única da verdade para cores (#0A0A0A, #FACC15, #FFFFFF), tipografia, safe zones 9:16 e conversão de cores Hex para ASS BGR.
+
