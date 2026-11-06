@@ -66,7 +66,11 @@ Plans:
   2. Execução da esteira de composição sem qualquer duplicidade de legenda na tela (burn-in único garantido).
   3. Sincronização temporal milimétrica entre a locução gerada e a cadência de exibição das palavras, com suporte a realce/destaque dinâmico de palavras-chave.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
+- [ ] 10-02-PLAN.md — Integração em `StudioService.produce` e `ReactionVideoRenderer`, Cobertura de Hard-Subs com `MarginV=640`, Camada Única e Validação de Regressão da Suíte Completa (SUB-01, SUB-02, SUB-03, BRND-01)
 **UI hint**: yes
 
 ### Phase 11: Avatar Reaction e Composição Visual Orgânica
@@ -115,7 +119,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
 | Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
-| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 0/0 | Not started | - |
+| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 0/2 | Not started | - |
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 0/0 | Not started | - |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 0/0 | Not started | - |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
