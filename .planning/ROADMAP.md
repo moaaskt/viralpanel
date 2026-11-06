@@ -27,7 +27,10 @@
   2. Diagnóstico conclusivo do formato real dos assets de avatar (canais alfa/chroma, codecs, dimensões) definindo a técnica nativa de recorte e transparência mais adequada sem assumir máscaras a priori.
   3. Mapeamento exaustivo dos contratos e interfaces atuais entre `subtitles.py`, `renderer.py`, geração de avatar e tasks Celery, documentando entradas, saídas, responsabilidades e dependências para blindar contra regressões.
   4. Mapeamento completo do grafo de filtros FFmpeg atual com identificação de filtros redundantes, reencodificações intermediárias ou passes desnecessários.
-**Plans**: TBD
+**Plans**: 1/2 plans executed
+Plans:
+- [x] 08-01-PLAN.md — Mapeamento de Contratos & Interfaces e Análise dos Passes e Grafo FFmpeg
+- [ ] 08-02-PLAN.md — Diagnóstico de Causa Raiz (Legendas Duplicadas e Formato de Avatar) e Consolidação do Relatório Final AUDIT-REPORT.md
 
 ### Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!
 **Goal**: Elevar a qualidade editorial dos roteiros gerados pelo Gemini 2.5 Flash para máxima retenção, garantindo rastreabilidade de fatos/fontes, CTAs contextuais sem repetições artificiais e alinhamento à identidade da marca ZUNTO!.
