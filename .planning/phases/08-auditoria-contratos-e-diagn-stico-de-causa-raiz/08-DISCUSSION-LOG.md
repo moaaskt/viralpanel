@@ -71,3 +71,4 @@ Nenhuma área deixada para arbítrio genérico. Todas as diretrizes foram rigoro
 - Implementação de recorte/transparência orgânica do avatar → Phase 11
 - Refatoração do Video Composer em single-pass → Phase 12
 - Validação técnica e visual E2E → Phase 13
+
