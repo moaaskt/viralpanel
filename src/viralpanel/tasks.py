@@ -14,11 +14,11 @@ from viralpanel.media.transcriber import MockTranscriber, WhisperTranscriber
 from viralpanel.models import PipelineRun
 from viralpanel.publishing.base import MockPublisher
 from viralpanel.publishing.service import PublishingService
-from viralpanel.scripting.gemini import GeminiScriptWriter, MockGeminiScriptWriter
+from viralpanel.scripting.gemini import FallbackScriptWriter, MockGeminiScriptWriter
 from viralpanel.scripting.service import ScriptingService
-from viralpanel.studio.avatar import MockAvatarAnimator
+from viralpanel.studio.avatar import AudioReactiveAvatarAnimator, MockAvatarAnimator
 from viralpanel.studio.service import StudioService
-from viralpanel.studio.voice import MockVoiceSynthesizer
+from viralpanel.studio.voice import FallbackVoiceSynthesizer, MockVoiceSynthesizer
 from viralpanel.telegram.client import MockTelegramClient, TelegramClient
 from viralpanel.telegram.service import SupervisionService
 
@@ -28,10 +28,6 @@ def build_default_services(
 ) -> tuple[DiscoveryService, ScriptingService, StudioService, SupervisionService, PublishingService]:
     settings = get_settings()
     mock = settings.pipeline_mock_mode if mock is None else mock
-    studio = StudioService(
-        voice_synthesizer=MockVoiceSynthesizer(),
-        avatar_animator=MockAvatarAnimator(),
-    )
     if mock or not settings.telegram_bot_token:
         tg_client = MockTelegramClient()
     else:
@@ -45,6 +41,10 @@ def build_default_services(
     )
 
     if mock:
+        studio = StudioService(
+            voice_synthesizer=MockVoiceSynthesizer(),
+            avatar_animator=MockAvatarAnimator(),
+        )
         publishing = PublishingService(
             publishers={
                 "tiktok": MockPublisher("tiktok"),
@@ -61,13 +61,17 @@ def build_default_services(
             publishing,
         )
 
+    studio = StudioService(
+        voice_synthesizer=FallbackVoiceSynthesizer(),
+        avatar_animator=AudioReactiveAvatarAnimator(),
+    )
     publishing = PublishingService(notifier=supervision.notifier)
     return (
         DiscoveryService(scraper=TikTokDiscoveryScraper(use_fallback=False)),
         ScriptingService(
             MediaDownloader(),
             WhisperTranscriber(model_size=settings.whisper_model),
-            GeminiScriptWriter(),
+            FallbackScriptWriter(),
         ),
         studio,
         supervision,

@@ -8,9 +8,16 @@ from sqlalchemy.pool import StaticPool
 
 from viralpanel.database import Base
 from viralpanel.media.downloader import MockMediaDownloader
-from viralpanel.media.transcriber import MockTranscriber
+from viralpanel.media.transcriber import MockTranscriber, TranscriptionResult
 from viralpanel.models import Asset, Script, SourceVideo
-from viralpanel.scripting.gemini import GeminiScriptWriter, GeneratedScriptSchema, MockGeminiScriptWriter
+from viralpanel.scripting.gemini import (
+    FallbackScriptWriter,
+    GeminiScriptWriter,
+    GeneratedScriptSchema,
+    GroqScriptWriter,
+    MockGeminiScriptWriter,
+    ScriptWriter,
+)
 from viralpanel.scripting.service import ScriptingService
 from viralpanel.storage import StorageManager
 
@@ -51,7 +58,7 @@ def test_gemini_writer_parses_structured_json(monkeypatch):
     monkeypatch.setattr(writer, "_call", fake_call)
     out = writer.generate(MockTranscriber().transcribe(None))
     assert out.hook == payload["hook"]
-    assert "0–3s" in captured["prompt"] and "[000.00-003.00]" in captured["prompt"]
+    assert ("[000.00-003.00]" in captured["prompt"]) and ("0–3" in captured["prompt"] or "0-3" in captured["prompt"])
 
 
 def test_scripting_service_persists_script_and_asset(tmp_path):
@@ -75,4 +82,63 @@ def test_scripting_service_persists_script_and_asset(tmp_path):
         assert "source_video" in asset_types
         assert "source_audio" in asset_types
         assert len(db.scalars(select(Script)).all()) == 1
+
+
+def test_groq_writer_raises_when_no_key_available(monkeypatch):
+    from viralpanel.config import Settings
+    monkeypatch.setattr("viralpanel.scripting.gemini.get_settings", lambda: Settings(groq_api_key=None, _env_file=None))
+    with pytest.raises(ValueError, match="GROQ_API_KEY ausente"):
+        GroqScriptWriter(api_key=None)
+
+
+def test_groq_writer_parses_structured_json(monkeypatch):
+    writer = GroqScriptWriter(api_key="fake-groq-key")
+    payload = {
+        "theme": "foco e dopamina",
+        "hook": "Seu cérebro está sendo hackeado.",
+        "body": "A dopamina barata destrói sua disciplina diária.",
+        "cta": "Me segue para blindar sua mente.",
+        "estimated_duration_seconds": 35.0,
+    }
+
+    def fake_call(prompt):
+        return json.dumps(payload)
+
+    monkeypatch.setattr(writer, "_call", fake_call)
+    out = writer.generate(TranscriptionResult(text="foco e disciplina", language="pt", segments=[]))
+    assert out.theme == payload["theme"]
+    assert out.hook == payload["hook"]
+    assert out.estimated_duration_seconds == 35.0
+
+
+def test_fallback_script_writer_advances_on_error():
+    class FailingWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            raise RuntimeError("Primary API 503 Unavailable")
+
+    class SuccessfulWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            return GeneratedScriptSchema(
+                theme="Fallback Success",
+                hook="Funcionou pelo fallback!",
+                body="Conteúdo gerado com sucesso.",
+                cta="Siga o canal.",
+                estimated_duration_seconds=30.0,
+            )
+
+    writer = FallbackScriptWriter(writers=[FailingWriter(), SuccessfulWriter()])
+    res = writer.generate(TranscriptionResult(text="teste", language="pt", segments=[]))
+    assert res.theme == "Fallback Success"
+    assert res.hook == "Funcionou pelo fallback!"
+
+
+def test_fallback_script_writer_raises_when_all_fail():
+    class FailingWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            raise RuntimeError("API Unavailable")
+
+    writer = FallbackScriptWriter(writers=[FailingWriter(), FailingWriter()])
+    with pytest.raises(RuntimeError, match="Todos os provedores da cadeia de IA falharam"):
+        writer.generate(TranscriptionResult(text="teste", language="pt", segments=[]))
+
 

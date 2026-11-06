@@ -36,7 +36,7 @@ class MediaDownloader:
         target = self.source_dir(run_id) / "source.mp4"
         cmd = [
             "yt-dlp",
-            "-f", "mp4/best[ext=mp4]/best",
+            "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bestvideo+bestaudio/best",
             "-o", str(target),
             "--no-playlist",
             "--geo-bypass",

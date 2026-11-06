@@ -12,22 +12,28 @@ from viralpanel.media.transcriber import TranscriptionResult
 
 logger = logging.getLogger(__name__)
 
+# Diretriz de persona masculina/neutra: voz firme de mentor/criador solo (nunca feminina)
 PERSONA = (
-    "Você é um roteirista de vídeos curtos virais (TikTok/Reels/Shorts) no nicho de "
-    "desenvolvimento pessoal e motivação, em português do Brasil. Tom direto, humano e confiante."
+    "Você é um roteirista profissional de vídeos virais curtos (TikTok, Reels, Shorts) "
+    "no nicho de desenvolvimento pessoal, alta performance, foco e mentalidade de sucesso. "
+    "Voz e postura: Criador solo masculino/neutro, tom direto, maduro, confiante, firme e sem enrolação. "
+    "IMPORTANTE: Sempre escreva na primeira ou segunda pessoa com concordância masculina ou neutra "
+    "(exemplo: 'focado', 'determinado', 'preparado'). Nunca assuma gênero feminino, mesmo que o vídeo original "
+    "de referência tenha sido gravado por uma mulher."
 )
 
 PROMPT_TEMPLATE = """{persona}
 
 Analise o conteúdo do vídeo viral de referência abaixo (transcrição do áudio com timestamps e contexto do vídeo original).
-Identifique o tema central, o gatilho do gancho e a estrutura de retenção.
-Depois escreva um roteiro 100% ORIGINAL (sem copiar frases) sobre o mesmo tema, para narração em formato reaction.
+Identifique o tema central, o gatilho psicológico de curiosidade e a estrutura de retenção.
+Depois, escreva um roteiro 100% ORIGINAL (sem copiar nenhuma frase do vídeo de referência) sobre o mesmo tema,
+pensado para formato reaction e fala natural de um homem confiante.
 
-Regras obrigatórias:
-- hook: gancho de alta retenção falado em 0–3s (máx. ~10 palavras, impacto imediato).
-- body: desenvolvimento fluido falado entre 4–45s (aprox. 70–110 palavras, persuasivo e prático).
-- cta: chamada para ação final curta.
-- estimated_duration_seconds entre 15 e 60.
+Regras obrigatórias de estrutura:
+- hook: gancho de altíssima retenção para os primeiros 0–3 segundos (máximo ~10 palavras, corte seco e impactante).
+- body: desenvolvimento fluido e convincente para o intervalo de 4–45 segundos (aprox. 70–110 palavras, prático e transformador).
+- cta: chamada para ação final curta e persuasiva (ex: seguir, salvar, compartilhar).
+- estimated_duration_seconds: duração estimada da narração entre 15 e 60 segundos.
 
 {context_block}
 
@@ -70,6 +76,9 @@ class ScriptWriter(ABC):
     ) -> GeneratedScriptSchema: ...
 
 
+# =============================================================================
+# 1. Provedor Google Gemini (Gemini 3.5 Flash / Gemini 3.5 Flash Lite)
+# =============================================================================
 class GeminiScriptWriter(ScriptWriter):
     ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -77,7 +86,7 @@ class GeminiScriptWriter(ScriptWriter):
         self,
         api_key: str | None = None,
         model: str | None = None,
-        timeout: int = 60,
+        timeout: int = 45,
         max_retries: int = 3,
     ):
         settings = get_settings()
@@ -116,7 +125,11 @@ class GeminiScriptWriter(ScriptWriter):
         }
 
         url = self.ENDPOINT.format(model=self.model)
-        headers = {"Content-Type": "application/json", "x-goog-api-key": self.api_key}
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self.api_key,
+            "User-Agent": "ViralPanel/1.0",
+        }
         data_bytes = json.dumps(payload).encode()
 
         last_error = None
@@ -129,21 +142,21 @@ class GeminiScriptWriter(ScriptWriter):
             except urllib.error.HTTPError as exc:
                 err_body = exc.read().decode() if exc.fp else "sem corpo de resposta"
                 logger.warning(
-                    "Gemini API HTTP %d (Tentativa %d/%d): %s",
-                    exc.code, attempt, self.max_retries, err_body,
+                    "Gemini API (%s) HTTP %d (Tentativa %d/%d): %s",
+                    self.model, exc.code, attempt, self.max_retries, err_body,
                 )
-                last_error = RuntimeError(f"Gemini API erro {exc.code}: {err_body}")
+                last_error = RuntimeError(f"Gemini API erro {exc.code} ({self.model}): {err_body}")
                 if exc.code in (429, 500, 503):
                     time.sleep(2 ** attempt)
                     continue
                 raise last_error from exc
             except (urllib.error.URLError, TimeoutError) as exc:
-                logger.warning("Falha de rede na chamada Gemini (Tentativa %d/%d): %s", attempt, self.max_retries, exc)
+                logger.warning("Falha de rede na chamada Gemini (%s, Tentativa %d/%d): %s", self.model, attempt, self.max_retries, exc)
                 last_error = exc
                 time.sleep(2 ** attempt)
                 continue
 
-        raise RuntimeError(f"Falha na API Gemini após {self.max_retries} tentativas: {last_error}")
+        raise RuntimeError(f"Falha na API Gemini ({self.model}) após {self.max_retries} tentativas: {last_error}")
 
     def generate(
         self,
@@ -153,6 +166,168 @@ class GeminiScriptWriter(ScriptWriter):
         prompt = self.build_prompt(transcription, fallback_context=fallback_context)
         raw_json = self._call(prompt)
         return GeneratedScriptSchema.model_validate_json(raw_json)
+
+
+# =============================================================================
+# 2. Provedor Groq Cloud (Llama 3.3 70B Versatile)
+# =============================================================================
+class GroqScriptWriter(ScriptWriter):
+    ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: int = 45,
+        max_retries: int = 3,
+    ):
+        settings = get_settings()
+        self.api_key = api_key or settings.groq_api_key
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY ausente. Defina a variável no ambiente/.env ou passe api_key.")
+        self.model = model or settings.groq_model or "llama-3.3-70b-versatile"
+        self.timeout = timeout
+        self.max_retries = max_retries
+
+    def build_system_message(self) -> str:
+        return (
+            f"{PERSONA}\n\n"
+            "Você DEVE retornar OBRIGATORIAMENTE um objeto JSON válido contendo exatamente as chaves:\n"
+            "- \"theme\": string com o tema central\n"
+            "- \"hook\": string com o gancho falado em 0-3 segundos (máximo ~10 palavras)\n"
+            "- \"body\": string com o desenvolvimento fluido (aprox 70-110 palavras)\n"
+            "- \"cta\": string com chamada para ação final curta\n"
+            "- \"estimated_duration_seconds\": número entre 15 e 60\n"
+            "Não retorne markdown ou texto fora do JSON."
+        )
+
+    def build_user_prompt(self, transcription: TranscriptionResult, fallback_context: str = "") -> str:
+        transcript_text = transcription.to_timestamped_text().strip()
+        if not transcript_text:
+            transcript_text = "(Áudio sem fala identificada ou apenas trilha sonora de fundo)"
+
+        context_block = ""
+        if fallback_context:
+            context_block = f"Contexto do Vídeo (Título/Descrição Original):\n{fallback_context}\n"
+
+        return f"{context_block}\nTranscrição de referência:\n{transcript_text}\n"
+
+    def _call(self, prompt: str) -> str:
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self.build_system_message()},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.8,
+        }
+
+        # Atenção crítica: User-Agent personalizado obrigatório para evitar bloqueio Cloudflare (Error 1010)
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+            "User-Agent": "ViralPanel/1.0",
+        }
+        data_bytes = json.dumps(payload).encode()
+
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            req = urllib.request.Request(self.ENDPOINT, data=data_bytes, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    resp_data = json.loads(resp.read().decode())
+                return resp_data["choices"][0]["message"]["content"]
+            except urllib.error.HTTPError as exc:
+                err_body = exc.read().decode() if exc.fp else "sem corpo"
+                logger.warning(
+                    "Groq API (%s) HTTP %d (Tentativa %d/%d): %s",
+                    self.model, exc.code, attempt, self.max_retries, err_body,
+                )
+                last_error = RuntimeError(f"Groq API erro {exc.code} ({self.model}): {err_body}")
+                if exc.code in (429, 500, 503):
+                    time.sleep(2 ** attempt)
+                    continue
+                raise last_error from exc
+            except (urllib.error.URLError, TimeoutError) as exc:
+                logger.warning("Falha de rede na chamada Groq (%s, Tentativa %d/%d): %s", self.model, attempt, self.max_retries, exc)
+                last_error = exc
+                time.sleep(2 ** attempt)
+                continue
+
+        raise RuntimeError(f"Falha na API Groq ({self.model}) após {self.max_retries} tentativas: {last_error}")
+
+    def generate(
+        self,
+        transcription: TranscriptionResult,
+        fallback_context: str = "",
+    ) -> GeneratedScriptSchema:
+        prompt = self.build_user_prompt(transcription, fallback_context=fallback_context)
+        raw_json = self._call(prompt)
+        return GeneratedScriptSchema.model_validate_json(raw_json)
+
+
+# =============================================================================
+# 3. Cadeia de Fallback Multi-IA (Gemini Flash -> Gemini Flash Lite -> Groq Llama)
+# =============================================================================
+class FallbackScriptWriter(ScriptWriter):
+    """Encadeador resiliente de provedores de IA:
+
+    1. Gemini 3.5 Flash (Principal, alta qualidade e velocidade)
+    2. Gemini 3.5 Flash Lite (Fallback imediato de cota/demanda)
+    3. Groq Llama 3.3 70B (Provedor independente gratuito de altíssima velocidade)
+    """
+
+    def __init__(self, writers: list[ScriptWriter] | None = None):
+        if writers is not None:
+            self.writers = writers
+        else:
+            settings = get_settings()
+            self.writers = []
+
+            # 1. Gemini Primário
+            if settings.gemini_api_key:
+                try:
+                    self.writers.append(GeminiScriptWriter(model=settings.gemini_model))
+                except Exception as e:
+                    logger.warning("Não foi possível inicializar Gemini Primário: %s", e)
+
+            # 2. Gemini Fallback Lite
+            if settings.gemini_api_key and settings.gemini_fallback_model:
+                try:
+                    self.writers.append(GeminiScriptWriter(model=settings.gemini_fallback_model))
+                except Exception as e:
+                    logger.warning("Não foi possível inicializar Gemini Fallback: %s", e)
+
+            # 3. Groq Llama 3.3 70B
+            if settings.groq_api_key:
+                try:
+                    self.writers.append(GroqScriptWriter(model=settings.groq_model))
+                except Exception as e:
+                    logger.warning("Não foi possível inicializar Groq Fallback: %s", e)
+
+        if not self.writers:
+            logger.warning("Nenhum provedor de IA real configurado. FallbackScriptWriter usará MockGeminiScriptWriter.")
+            self.writers.append(MockGeminiScriptWriter())
+
+    def generate(
+        self,
+        transcription: TranscriptionResult,
+        fallback_context: str = "",
+    ) -> GeneratedScriptSchema:
+        errors = []
+        for writer in self.writers:
+            writer_name = f"{writer.__class__.__name__}({getattr(writer, 'model', 'default')})"
+            try:
+                logger.info("Tentando geração de roteiro com: %s", writer_name)
+                result = writer.generate(transcription, fallback_context=fallback_context)
+                logger.info("Roteiro gerado com sucesso via %s!", writer_name)
+                return result
+            except Exception as exc:
+                logger.warning("Falha no provedor %s: %s. Tentando próximo da cadeia...", writer_name, exc)
+                errors.append(f"{writer_name}: {exc}")
+
+        raise RuntimeError(f"Todos os provedores da cadeia de IA falharam: {'; '.join(errors)}")
 
 
 class MockGeminiScriptWriter(ScriptWriter):
