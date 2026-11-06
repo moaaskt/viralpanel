@@ -83,3 +83,4 @@
 ## Deferred Ideas
 
 - Nenhuma ideia adiada nesta fase.
+
