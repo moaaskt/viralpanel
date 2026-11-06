@@ -48,7 +48,11 @@ Plans:
   3. Mecanismo de rastreabilidade e preservação de referências/fontes utilizado na elaboração dos roteiros, assegurando precisão factual sem dependência cega exclusiva da LLM.
   4. Diretrizes oficiais de identidade visual ZUNTO! (paleta preto profundo, amarelo de impacto e branco puro) e guia de safe zones (TikTok, Reels, Shorts) especificadas para balizar overlays e legendas.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Módulo Central de Identidade Visual `branding.py` e Suíte de Testes (BRND-01, BRND-02)
+- [ ] 09-02-PLAN.md — Roteirista Gemini Editorial, Schemas (closing_thought + cta opcional), Rastreabilidade de Claims e Persistência de Metadados (SCRP-01, SCRP-02)
 **UI hint**: yes
 
 ### Phase 10: Motor de Legendas ZUNTO! e Desacoplamento
