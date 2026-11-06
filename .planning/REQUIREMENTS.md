@@ -1,111 +1,51 @@
-# Requirements: ViralPanel
+# Requirements: Milestone v1.1 — ZUNTO! Visual Engine
 
-**Defined:** 2026-11-04  
-**Core Value:** Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos curtos de alta qualidade com consistência diária (meta de 6 vídeos por dia) e controle de qualidade supervisionado via Telegram, liberando o criador solo da rotina de produção manual.
+Refatoração e aprimoramento do pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual da marca ZUNTO!. Prioridade absoluta para qualidade visual, legibilidade, retenção e consistência editorial sem sacrificar a estabilidade das integrações existentes.
 
-## v1 Requirements
+## Requirements
 
-### Orquestração & Agendamento (SCHED)
-- [x] **SCHED-01**: Sistema executa trigger diário programado às 01:00 (America/Sao_Paulo) via Celery Beat ou cron
-- [x] **SCHED-02**: Sistema orquestra a fila assíncrona de processamento com Celery + Redis, garantindo retries com backoff exponencial
-- [x] **SCHED-03**: Sistema garante idempotência das etapas, impedindo processamento duplicado de vídeos ou postagens repetidas
+### Motor de Legendas (SUB)
+- [ ] **SUB-01**: Eliminação definitiva de qualquer duplicação de legendas e unificação clara de responsabilidades entre transcrição, formatação de legenda e renderizador.
+- [ ] **SUB-02**: Sincronização temporal milimétrica com a locução gerada (XTTS/Voice), garantindo que as palavras acompanhem a cadência do áudio.
+- [ ] **SUB-03**: Estilização visual no padrão ZUNTO! com tipografia marcante de alta legibilidade para mobile, quebra inteligente de linhas e destaque de palavras-chave.
 
-### Discovery & Coleta (DISC)
-- [x] **DISC-01**: Sistema busca automaticamente os 30 vídeos mais virais no TikTok dentro do nicho de desenvolvimento pessoal e hashtags configuráveis
-- [x] **DISC-02**: Módulo de scraping próprio baseado em Playwright + yt-dlp extrai metadados completos (views, likes, comentários, shares, data de postagem) de cada vídeo coletado
-- [x] **DISC-03**: Sistema isola a interface de coleta permitindo evolução ou troca de estratégia sem quebrar o pipeline
+### Composição do Avatar (AVTR)
+- [ ] **AVTR-01**: Eliminação da aparência de "imagem quadrada" no avatar reaction, tratando recorte, canal alfa/transparência ou formato de integração de forma nativa e orgânica.
+- [ ] **AVTR-02**: Calibração precisa de posicionamento e dimensionamento no layout vertical 9:16 para evitar que o avatar cubra pontos focais ou legendas essenciais.
+- [ ] **AVTR-03**: Preservação estrita de resolução, proporção e nitidez na sobreposição do avatar durante a transcodificação FFmpeg.
 
-### Scoring & Seleção (SCOR)
-- [x] **SCOR-01**: Sistema calcula score de viralidade a partir de fórmula matemática parametrizável via YAML (considerando views, ratio de engajamento e velocidade de crescimento em 24h)
-- [x] **SCOR-02**: Sistema ranqueia os 30 vídeos candidatos e seleciona o melhor candidato não processado para a esteira do dia
+### Refatoração do Renderer (COMP)
+- [ ] **COMP-01**: Arquitetura modular de renderização FFmpeg em camadas explícitas (vídeo de fundo, avatar, legendas, branding) com grafo de filtros otimizado (single-pass, sem sobreposição duplicada).
+- [ ] **COMP-02**: Padronização estrita de saída vertical 9:16 em 1080x1920 (Full HD vertical) com sincronização labial e A/V perfeita.
+- [ ] **COMP-03**: Compatibilidade integral com os contratos de interface do Celery, tasks assíncronas e esteira E2E do ViralPanel.
 
-### Download & Transcrição de Mídia (MEDIA)
-- [x] **MEDIA-01**: Sistema realiza download do vídeo de referência selecionado e extrai faixa de áudio limpa via yt-dlp e FFmpeg
-- [x] **MEDIA-02**: Sistema transcreve o áudio com marcações de tempo (timestamps) usando Whisper / faster-whisper
+### Identidade Visual ZUNTO! (BRND)
+- [ ] **BRND-01**: Aplicação da paleta de cores ZUNTO! (preto profundo, amarelo de alto impacto e branco puro) nos elementos de composição e lettering.
+- [ ] **BRND-02**: Inclusão de elementos de marca e slogan ("Você não sabia. Agora sabe.") adaptados para as zonas seguras (safe zones) de TikTok, Instagram Reels e YouTube Shorts.
 
-### Roteirização com IA (SCRP)
-- [x] **SCRP-01**: Sistema envia a transcrição e diretrizes de persona ao Gemini 2.5 Flash para análise estrutural de ganchos e retenção
-- [x] **SCRP-02**: Gemini 2.5 Flash gera roteiro 100% original estruturado obrigatoriamente em: gancho de alta retenção (0–3s), desenvolvimento fluido (4–45s) e chamada para ação (CTA final)
+### Roteirista Editorial (SCRP)
+- [ ] **SCRP-01**: Refinamento do prompt e diretrizes do Gemini 2.5 Flash para construção de ganchos irresistíveis (0–3s), narrativa provocativa e ritmo dinâmico que estimule retenção.
+- [ ] **SCRP-02**: Garantia de precisão factual rigorosa (sem alucinações), frases naturais para síntese de voz (TTS) e fechamento/CTA memorável.
 
-### Produção de Áudio & Vídeo (PROD)
-- [x] **PROD-01**: Módulo de síntese de voz (TTS) gera áudio narrado com voz clonada do criador utilizando XTTS v2 / Voice Studio através de interface modular
-- [x] **PROD-02**: Módulo gerador de avatar sincroniza movimentos do avatar virtual do criador com o áudio narrado gerado
-- [x] **PROD-03**: Módulo de composição via FFmpeg gera o vídeo final vertical 9:16 em formato reaction (vídeo base no centro/fundo, avatar do criador em miniatura na tela, legendas sincronizadas)
+### Validação de Qualidade & Integridade (QUAL)
+- [ ] **QUAL-01**: Validador automatizado pós-renderização que inspeciona dimensões exatas (1080x1920), aspect ratio (9:16), integridade dos streams de áudio e vídeo e taxa de quadros.
+- [ ] **QUAL-02**: Testes de regressão audiovisual ponta a ponta que garantem ausência de legendas sobrepostas/duplicadas e geram vídeos reais inspecionáveis antes do encerramento.
 
-### Observabilidade & Supervisão no Telegram (TELE)
-- [x] **TELE-01**: Bot do Telegram envia alerta estruturado a cada conclusão de etapa, início de pipeline e falha técnica
-- [x] **TELE-02**: Modo supervisionado envia preview do vídeo 9:16 renderizado com botões interativos "Aprovar" e "Rejeitar"
-- [x] **TELE-03**: Sistema só avança para agendamento e postagem pública após aprovação explícita no Telegram (quando o modo supervisionado estiver ativo)
+## Processo & Restrições de Engenharia
+- **Investigação Prévia Obrigatória**: Identificar a causa raiz exata dos bugs visuais antes de qualquer implementação (não aplicar patches cosméticos).
+- **Sem Máscaras Arbitrárias**: Avaliar o formato real dos assets de avatar e escolher a técnica de recorte/transparência ideal baseada em evidências.
+- **Divisão Clara de Responsabilidades**: Desacoplar `subtitles.py` (responsável pelo arquivo/estrutura de legenda) e `renderer.py` (responsável pelo pipeline FFmpeg).
+- **Zero Regressão**: Manter intactos os pipelines de discovery, scoring, banco PostgreSQL, bot do Telegram e publicação nas APIs oficiais.
+- **Validação com Mídia Real**: Testar com vídeos e áudios gerados em ambiente de teste para validação perceptual completa.
 
-### Publicação & Agendamento Oficial (PUBL)
-- [x] **PUBL-01**: Sistema agenda e publica o vídeo aprovado no TikTok através da TikTok Content Posting API oficial
-- [x] **PUBL-02**: Sistema agenda e publica o vídeo aprovado no Instagram Reels via Meta Graph API oficial
-- [x] **PUBL-03**: Sistema agenda e publica o vídeo aprovado no YouTube Shorts via YouTube Data API v3 oficial
-- [x] **PUBL-04**: Sistema gera título, descrição e hashtags otimizadas para cada plataforma conforme o roteiro aprovado
-
-### Persistência & Dados (DATA)
-- [x] **DATA-01**: Banco de dados PostgreSQL armazena todo o histórico nos modelos `source_videos`, `scripts`, `assets`, `publications` e `runs`
-- [x] **DATA-02**: Sistema gerencia arquivos locais gerados (áudios, vídeos intermediários e renderizações finais) com retenção e limpeza configurável
-
-### Painel Web de Controle (DASH)
-- [x] **DASH-01**: Frontend em React + Chakra UI exibe status da fila de jobs Celery e estado atual da esteira diária
-- [x] **DASH-02**: Frontend exibe histórico de vídeos produzidos, roteiros gerados, métricas e links das publicações realizadas
-- [x] **DASH-03**: Interface com design limpo, moderno e profissional, sem cores neon
-
-## v2 Requirements
-
-### Otimizações & Escala
-- **FEED-01**: Coleta automatizada de métricas pós-publicação (views, likes, retenção) após 24h e 7 dias para retroalimentar o algoritmo de scoring
-- **AB-01**: Teste A/B automatizado de múltiplos ganchos iniciais para o mesmo tema
-- **MULTI-01**: Suporte a múltiplos nichos e múltiplas contas de redes sociais simultâneas
-- **THUMB-01**: Geração automática de capas/thumbnails personalizadas para YouTube Shorts e Instagram Reels
+## Future Requirements
+- Geração procedural de miniaturas/covers dinâmicas com identidade ZUNTO!.
+- Suporte a múltiplos apresentadores/vozes no mesmo vídeo.
 
 ## Out of Scope
-
-| Feature | Reason |
-|---------|--------|
-| API de Pesquisa Oficial do TikTok no v1 | Burocracia extrema de aprovação e limitações de acesso; priorizado scraper próprio Playwright + yt-dlp |
-| Agregadores terceiros pagos (Buffer, Ayrshare) | Evitar custos recorrentes por postagem e eliminar intermediários externos de risco |
-| Cores e temas neon no Painel | Diretriz explícita de manter visual limpo, corporativo e sóbrio com Chakra UI |
-| Painel Web antes do pipeline | Prioridade estratégica de validar a geração de conteúdo e postagem antes do dashboard administrativo |
+- Alterações nos módulos de coleta (Playwright/TikTok scraper) e publicação oficial (APIs TikTok/Meta/YouTube).
+- Modificações na interface web Chakra UI no milestone v1.1.
+- Mudança na stack base (Python 3.12, Celery, Redis, FFmpeg, PostgreSQL).
 
 ## Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| SCHED-01 | Phase 1 | Complete |
-| SCHED-02 | Phase 1 | Complete |
-| SCHED-03 | Phase 1 | Complete |
-| DISC-01 | Phase 2 | Complete |
-| DISC-02 | Phase 2 | Complete |
-| DISC-03 | Phase 2 | Complete |
-| SCOR-01 | Phase 2 | Complete |
-| SCOR-02 | Phase 2 | Complete |
-| MEDIA-01 | Phase 3 | Complete |
-| MEDIA-02 | Phase 3 | Complete |
-| SCRP-01 | Phase 3 | Complete |
-| SCRP-02 | Phase 3 | Complete |
-| PROD-01 | Phase 4 | Complete |
-| PROD-02 | Phase 4 | Complete |
-| PROD-03 | Phase 4 | Complete |
-| TELE-01 | Phase 5 | Complete |
-| TELE-02 | Phase 5 | Complete |
-| TELE-03 | Phase 5 | Complete |
-| PUBL-01 | Phase 6 | Complete |
-| PUBL-02 | Phase 6 | Complete |
-| PUBL-03 | Phase 6 | Complete |
-| PUBL-04 | Phase 6 | Complete |
-| DATA-01 | Phase 1 | Complete |
-| DATA-02 | Phase 1 | Complete |
-| DASH-01 | Phase 7 | Complete |
-| DASH-02 | Phase 7 | Complete |
-| DASH-03 | Phase 7 | Complete |
-
-**Coverage:**
-- v1 requirements: 27 total
-- Mapped to phases: 27
-- Unmapped: 0 ✓
-
----
-*Requirements defined: 2026-11-04*
-*Last updated: 2026-11-04 after initial definition*
+*(To be populated by ROADMAP.md)*
