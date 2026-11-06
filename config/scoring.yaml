@@ -22,4 +22,13 @@ discovery:
     - "mentalidade"
     - "disciplina"
     - "produtividade"
-
+  seed_accounts:
+    - "eslen.delanogare"
+    - "reservatorio.de.dopamina"
+    - "wendellcarvalho"
+    - "flavioaugustodasilva"
+    - "joeljota"
+  search_queries:
+    - "desenvolvimento pessoal"
+    - "como ter foco e disciplina"
+    - "mentalidade de sucesso"

@@ -63,7 +63,7 @@ def build_default_services(
 
     publishing = PublishingService(notifier=supervision.notifier)
     return (
-        DiscoveryService(scraper=TikTokDiscoveryScraper()),
+        DiscoveryService(scraper=TikTokDiscoveryScraper(use_fallback=False)),
         ScriptingService(
             MediaDownloader(),
             WhisperTranscriber(model_size=settings.whisper_model),

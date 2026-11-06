@@ -34,6 +34,8 @@ class BaseScraper(ABC):
         self,
         hashtags: list[str] | None = None,
         limit: int = 30,
+        seed_accounts: list[str] | None = None,
+        search_queries: list[str] | None = None,
     ) -> list[ScrapedVideoMetadata]:
         """Coleta os vídeos candidatos do nicho especificado."""
         raise NotImplementedError

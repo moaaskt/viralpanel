@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
     telegram_supervised_mode: bool = True
+    tiktok_cookies_path: str | None = None
     tiktok_access_token: str | None = None
     instagram_access_token: str | None = None
     instagram_account_id: str | None = None
