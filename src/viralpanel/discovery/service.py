@@ -26,9 +26,14 @@ class DiscoveryService:
     ) -> list[SourceVideo]:
         target_limit = limit or self.scoring_config.discovery.default_limit
         hashtags = self.scoring_config.discovery.hashtags
+        seed_accounts = self.scoring_config.discovery.seed_accounts
+        search_queries = self.scoring_config.discovery.search_queries
+
         scraped_items: list[ScrapedVideoMetadata] = self.scraper.discover_trending(
             hashtags=hashtags,
             limit=target_limit,
+            seed_accounts=seed_accounts,
+            search_queries=search_queries,
         )
 
         ref_now = now or datetime.now(timezone.utc)

@@ -69,6 +69,10 @@ def test_scripting_service_persists_script_and_asset(tmp_path):
         assert script.version == 1
         assert script.hook and "Salva" in script.script_text
         assert src.status == "scripted"
-        assert db.scalars(select(Asset)).one().asset_type == "source_audio"
+        assets = list(db.scalars(select(Asset)).all())
+        assert len(assets) == 2
+        asset_types = {a.asset_type for a in assets}
+        assert "source_video" in asset_types
+        assert "source_audio" in asset_types
         assert len(db.scalars(select(Script)).all()) == 1
 

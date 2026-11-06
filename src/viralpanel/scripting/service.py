@@ -16,9 +16,18 @@ class ScriptingService:
         source.status = "analyzing"
         db.commit()
         try:
-            _video, audio = self.downloader.fetch(run_id, source.url)
+            video, audio = self.downloader.fetch(run_id, source.url)
             transcription = self.transcriber.transcribe(audio)
-            generated = self.writer.generate(transcription)
+
+            # Contexto complementar a partir dos metadados do vídeo fonte (título, autor, tags)
+            fallback_context = ""
+            if source.metrics and isinstance(source.metrics, dict):
+                title = source.metrics.get("title", "")
+                author = source.author or ""
+                tags = " ".join(f"#{t}" for t in source.metrics.get("hashtags", []))
+                fallback_context = f"Título/Descrição: {title} | Criador: @{author} | Tags: {tags}".strip()
+
+            generated = self.writer.generate(transcription, fallback_context=fallback_context)
 
             last_version = max((s.version for s in source.scripts), default=0)
             script = Script(
@@ -30,7 +39,11 @@ class ScriptingService:
             )
             db.add(script)
             db.flush()
+
+            # Registra tanto o vídeo quanto o áudio como assets essenciais para a etapa de Studio (reaction 9:16)
+            db.add(Asset(script_id=script.id, asset_type="source_video", file_path=str(video)))
             db.add(Asset(script_id=script.id, asset_type="source_audio", file_path=str(audio)))
+
             source.status = "scripted"
             db.commit()
             db.refresh(script)
@@ -40,4 +53,3 @@ class ScriptingService:
             source.status = "failed"
             db.commit()
             raise
-

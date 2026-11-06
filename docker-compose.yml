@@ -38,6 +38,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      HF_HOME: /app/storage/cache/huggingface
     volumes:
       - ./storage:/app/storage
     depends_on:

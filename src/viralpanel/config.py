@@ -12,12 +12,13 @@ class Settings(BaseSettings):
     timezone: str = "America/Sao_Paulo"
     log_level: str = "INFO"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
     whisper_model: str = "small"
     pipeline_mock_mode: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
     telegram_supervised_mode: bool = True
+    tiktok_cookies_path: str | None = None
     tiktok_access_token: str | None = None
     instagram_access_token: str | None = None
     instagram_account_id: str | None = None

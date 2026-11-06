@@ -36,6 +36,22 @@ class DiscoverySettings(BaseModel):
             "produtividade",
         ]
     )
+    seed_accounts: list[str] = Field(
+        default_factory=lambda: [
+            "eslen.delanogare",
+            "reservatorio.de.dopamina",
+            "wendellcarvalho",
+            "flavioaugustodasilva",
+            "joeljota",
+        ]
+    )
+    search_queries: list[str] = Field(
+        default_factory=lambda: [
+            "desenvolvimento pessoal",
+            "como ter foco e disciplina",
+            "mentalidade de sucesso",
+        ]
+    )
 
 
 class ScoringConfig(BaseModel):
