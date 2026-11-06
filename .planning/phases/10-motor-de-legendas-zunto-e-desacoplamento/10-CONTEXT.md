@@ -25,8 +25,7 @@ Fora de escopo: alteração no grafo do Video Composer FFmpeg (Phase 12), anima�
   - **Reversibility:** costly — define a estética padrão das legendas para todo o ecossistema e mascara legendas nativas do TikTok sem custo adicional de renderização.
   - A caixa deve cobrir visualmente a região onde as legendas preexistentes aparecem (`Y ≈ 1080–1280px`).
   - Consumir as Safe Zones de `src/viralpanel/branding.py` como referência primária.
-  - Evitar altura excessiva da tarja para não poluir o vídeo nem cobrir elementos anatômicos ou gráficos relevantes do apresentador original.
-  - A solução deve permitir customização de posicionamento e dimensões via configuração (`SubtitleJobConfig`).
+  - **Posicionamento e dimensões totalmente configuráveis:** A caixa opaca não pode cobrir cegamente uma faixa fixa estática; `SubtitleJobConfig` deve expor parâmetros de ajuste fino (`margin_v`, `box_padding`/`outline`, `font_size`) para permitir calibrar a altura e a posição da faixa sem cobrir elementos visuais importantes da cena original.
   - Caso o vídeo original possua legendas em posição não padrão que exija máscara excessiva que degrade o conteúdo, o sistema deve registrar a limitação nos logs/metadados em vez de aplicar máscaras indiscriminadas.
 
 ### 2. Temporização e Quebra dos Cues
@@ -34,19 +33,19 @@ Fora de escopo: alteração no grafo do Video Composer FFmpeg (Phase 12), anima�
   - **Reversibility:** reversible — lógica isolada dentro de `subtitles.py`.
   - Priorizar quebras em sinais de pontuação (`.`, `,`, `!`, `?`) e fronteiras sintáticas naturais.
   - Distribuir a duração de cada cue de forma proporcional ao número de caracteres e peso das palavras em relação à duração total da locução (`voice_duration`).
+  - **Reconhecimento formal da limitação de sincronia:** A ponderação por caracteres é estritamente uma estimativa heurística proporcional, não sincronização fonética milimétrica. O sistema e o modelo devem reconhecer essa limitação nos logs/metadados (`timing_mode="proportional_character_estimate"` vs `"word_timestamp_aligned"`), priorizando o alinhamento com timestamps explícitos por palavra (Whisper ou TTS word boundaries) sempre que disponíveis.
   - Tratar a recomendação de 3 a 5 palavras por cue como diretriz editorial de cadência para mobile/retenção, e não como regra rígida que obrigue a cortar termos semanticamente inseparáveis.
   - Evitar que palavras fiquem isoladas em cues órfãos de frações mínimas de segundo.
   - Garantir intervalos sequenciais estritos: `cue[i].end <= cue[i+1].start`, eliminando qualquer sobreposição acidental de texto na tela.
-  - Preservar alinhamento com timestamps explícitos da locução (Whisper ou TTS word boundaries) sempre que disponíveis.
 
-### 3. Destaque Amarelo ZUNTO!
-- **D-03:** Aplicar destaque com tags ASS inline (`{\c&H0015CCFA&}`) para a palavra-chave ou primeira palavra relevante de cada bloco.
+### 3. Destaque Amarelo ZUNTO! e Sanitização ASS
+- **D-03:** Aplicar destaque com tags ASS inline (`{\c&H0015CCFA&}`) para a palavra-chave ou primeira palavra relevante de cada bloco, com sanitização e escape blindados.
   - **Reversibility:** reversible — formatador de diálogo ASS interno.
   - Utilizar a cor oficial `ZuntoPalette.IMPACT_YELLOW` (`#FACC15`), obrigatoriamente convertida via `hex_to_ass_color` de `src/viralpanel/branding.py`.
   - Manter as demais palavras em branco puro `&H00FFFFFF&`.
   - Tags inline não devem introduzir espaçamentos extras, desalinhamentos ou deformações no bounding box do estilo ASS.
   - Evitar destacar palavras vazias/artigos/preposições sem peso de retenção.
-  - Garantir escape correto de caracteres especiais (`{`, `}`, `\N`) e fechamento estrito das tags ASS para evitar quebras no parser do libass.
+  - **Blindagem e testes específicos de escape ASS:** Escape rigoroso de caracteres `{`, `}` no texto do usuário para não colidir com o delimitador de tags de controle do ASS (`{...}`); escape ou normalização de quebras de linha para `\N`; e fechamento explícito de qualquer tag de override de cor (`{\c&H00FFFFFF&}`) no final da palavra destacada para impedir terminantemente o vazamento de estilos (`leakage`) entre palavras ou entre cues subsequentes. Implementar suíte de testes unitários dedicada exclusivamente a essa sanitização.
 
 ### 4. Calibração da Margem Vertical e Safe Zones
 - **D-04:** Adotar `MarginV=640` como valor padrão inicial, consumindo `SafeZones9x16.SUBTITLE_MARGIN_V` de `branding.py` e expondo o campo em `SubtitleJobConfig`.
@@ -88,3 +87,4 @@ Fora de escopo: alteração no grafo do Video Composer FFmpeg (Phase 12), anima�
 - `tests/test_studio_renderer.py` — Testes unitários e de integração de legendas ASS e composição.
 
 </canonical_refs>
+
