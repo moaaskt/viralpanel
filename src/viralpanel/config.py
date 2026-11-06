@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     timezone: str = "America/Sao_Paulo"
     log_level: str = "INFO"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.5-flash"
     whisper_model: str = "small"
     pipeline_mock_mode: bool = False
     telegram_bot_token: str | None = None
