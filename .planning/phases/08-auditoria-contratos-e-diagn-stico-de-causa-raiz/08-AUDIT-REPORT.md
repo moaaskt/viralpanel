@@ -246,7 +246,209 @@ class StudioRenderRequest:
 
 ## 4. Grafo e Passes FFmpeg & Proposta Single-Pass (COMP-01)
 
-*(Seção em elaboração na Task 2 do Plano 08-01)*
+Esta seção mapeia exaustivamente todas as invocações dos binários `ffmpeg` e `ffprobe` no pipeline audiovisual atual (conforme diretrizes **D-12** e **D-13**), identifica os gargalos de I/O, compressão cumulativa e perda de canal alfa, e especifica a arquitetura de composição integrada **single-pass** (conforme **D-14**) para implementação na Phase 12.
+
+---
+
+### 4.1 Inventário Completo de Subprocessos FFmpeg e FFprobe Atuais
+
+Durante uma única chamada de `StudioService.produce(db, run_id, script)`, o sistema dispara até **5 processos `ffmpeg`** e **5 processos `ffprobe`** sequenciais:
+
+| Ordem | Módulo / Método | Binário | Condição de Disparo | Inputs | Outputs | Codec Vídeo / PixFmt / Preset | Codec Áudio | Timeout |
+|-------|-----------------|---------|---------------------|--------|---------|-------------------------------|-------------|---------|
+| **P-Voz** | `studio/voice.py` (`EdgeTTSVoiceSynthesizer.synthesize`, L161-178) | `ffmpeg` | Produção padrão (Edge-TTS) | `narration.edge.temp.mp3` | `narration.wav` | — (somente áudio, `-af loudnorm=I=-16:TP=-1.5:LRA=11`) | PCM (`-ac 1 -ar 24000`) | 60s |
+| **Pr-1** | `studio/voice.py` (`probe_duration`, L182) | `ffprobe` | Sempre após síntese de voz | `narration.wav` | `stdout` (JSON `format.duration`) | — | — | Sem timeout explícito |
+| **Pr-2** | `studio/avatar.py` (`generate_avatar_video`, L90) | `ffprobe` | Sempre ao iniciar avatar | `narration.wav` | `stdout` (re-leitura redundante de `format.duration`) | — | — | Sem timeout explícito |
+| **P-Img** | `studio/avatar.py` (`ensure_default_avatar_image`, L22-46) | `ffmpeg` | Apenas se `assets/creator_avatar.png` não existir | `lavfi: color=c=#0f172a:s=512x512:d=0.1` + `drawbox` | `assets/creator_avatar.png` | PNG (`rgb24`, 1 frame, **sem canal alfa**) | — | 15s |
+| **Passe 1 (Avatar)** | `studio/avatar.py` (`AudioReactiveAvatarAnimator.generate_avatar_video`, L100-126) | `ffmpeg` | Sempre em modo produção | `[0]` `-loop 1 -i creator_avatar.png`<br>`[1]` `-i narration.wav` | `runs/<id>/assets/avatar.mp4` | `libx264` / `yuv420p` / `ultrafast` (`360x360`, 24 fps) | `aac` (bitrate padrão) | 90s |
+| **Pr-3** | `studio/avatar.py` (`generate_avatar_video`, L127) | `ffprobe` | Sempre após gerar `avatar.mp4` | `avatar.mp4` | `stdout` (`format.duration`) | — | — | Sem timeout explícito |
+| **Pr-4** | `studio/service.py` (`_ensure_source_video`, L34) | `ffprobe` | Sempre antes do renderer (`has_video_stream`) | `runs/<id>/source/source.mp4` | `stdout` (`stream=codec_type`) | — | — | Sem timeout explícito |
+| **Passe 0a (Source Fallback)** | `studio/service.py` (`_ensure_source_video`, L38-62) | `ffmpeg` | Se `source.mp4` não existir ou não tiver vídeo | `lavfi: color=c=#334155:s=360x640:r=24:d={duration}` + `sine=220` | `runs/<id>/source/source.mp4` | `libx264` / `yuv420p` / preset padrão (`medium`) | `aac` | 60s |
+| **Pr-5** | `studio/renderer.py` (`ReactionVideoRenderer.render`, L89) | `ffprobe` | Sempre ao iniciar `render()` | `narration.wav` | `stdout` (3ª leitura redundante de `narration.wav`!) | — | — | Sem timeout explícito |
+| **Pr-6** | `studio/renderer.py` (`ReactionVideoRenderer.render`, L96) | `ffprobe` | Sempre ao iniciar `render()` (`has_video_stream`) | `source.mp4` | `stdout` (2ª verificação redundante de stream de vídeo!) | — | — | Sem timeout explícito |
+| **Passe 0b (Renderer Fallback)** | `studio/renderer.py` (`ReactionVideoRenderer.render`, L102-119) | `ffmpeg` | Se `source_video_path` não tiver stream de vídeo | `lavfi: color=c=#0f172a:s=1080x1920:r=24:d={duration}` | `source_visual_bg.mp4` | `libx264` / `yuv420p` / preset padrão (`medium`) | Sem áudio | 30s |
+| **Passe 2 (Render Final)** | `studio/renderer.py` (`ReactionVideoRenderer.render`, L133-169) | `ffmpeg` | Sempre (composição 9:16 final) | `[0]` `-stream_loop -1 -i source.mp4`<br>`[1]` `-stream_loop -1 -i avatar.mp4`<br>`[2]` `-i narration.wav` | `final_reaction_9x16.mp4` | `libx264` / `yuv420p` / `ultrafast` (`1080x1920`) | `aac` (`192k`) | 300s |
+| **Pr-7** | `studio/renderer.py` (`ReactionVideoRenderer.render`, L175) | `ffprobe` | Sempre após gerar `final_reaction_9x16.mp4` | `final_reaction_9x16.mp4` | `stdout` (`format.duration`) | — | — | Sem timeout explícito |
+
+---
+
+### 4.2 Análise Detalhada dos 3 Passes de Vídeo e de seus Grafos de Filtros
+
+#### A. Passe 0 (`source_visual_bg.mp4` em `renderer.py:101-119` e `source.mp4` em `service.py:38-62`)
+- **Comando em `renderer.py` (linhas 102-119):**
+  ```python
+  [
+      "ffmpeg", "-y",
+      "-f", "lavfi", "-i", f"color=c=#0f172a:s={self.width}x{self.height}:r=24:d={duration}",
+      "-c:v", "libx264", "-pix_fmt", "yuv420p",
+      str(actual_source_path),  # source_visual_bg.mp4
+  ]
+  ```
+- **Análise Crítica:**
+  1. **Duplicidade de Fallback:** Tanto `StudioService._ensure_source_video` (que gera um vídeo `360x640` cor `#334155`) quanto `ReactionVideoRenderer.render` (que gera um vídeo `1080x1920` cor `#0f172a`) implementam lógica de criação de vídeo sintético via `lavfi` em disco.
+  2. **Desperdício de I/O e CPU:** Gerar um arquivo MP4 H.264 inteiro no disco (`source_visual_bg.mp4`) apenas para alimentar uma cor sólida no passe seguinte é totalmente desnecessário — o gerador virtual `-f lavfi -i color=c=#0f172a:s=1080x1920:r=24:d={duration}` pode ser passado diretamente como Input `[0]` do comando FFmpeg final em memória, com custo zero de disco e zero codificação intermediária.
+
+#### B. Passe 1 (`avatar.mp4` em `AudioReactiveAvatarAnimator.generate_avatar_video`, `avatar.py:94-126`)
+- **Grafo `filter_complex` atual (`avatar.py:94-99`):**
+  ```text
+  [0:v]scale=360:360:force_original_aspect_ratio=increase,crop=360:360,format=yuv420p[base_avatar];
+  [1:a]showwaves=s=360x64:mode=line:colors=#38bdf8@0.85:rate=24,format=yuva420p[wave];
+  [base_avatar][wave]overlay=0:H-h-8:shortest=1[vout]
+  ```
+- **Comando de Codificação (`avatar.py:100-125`):**
+  - Inputs: `-loop 1 -i assets/creator_avatar.png` (`[0:v]`) e `-i narration.wav` (`[1:a]`).
+  - Codec de saída: `-c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -shortest avatar.mp4`.
+- **Análise Crítica:**
+  1. **Destruição Irreversível de Transparência (Canal Alfa):** A conversão explícita para `format=yuv420p` no filtro e `-pix_fmt yuv420p` no container `.mp4` (`libx264`) elimina qualquer possibilidade de canal alfa. O vídeo resultante `avatar.mp4` é obrigatoriamente um bloco retangular opaco de `360x360`.
+  2. **Re-escala Dupla e Perda de Nitidez:** O avatar é escalado de `512x512` para `360x360` no Passe 1, comprimido com perda em `libx264 -preset ultrafast` (que utiliza quantização grosseira e desativa subpixel motion estimation/CABAC otimizado), e em seguida decodificado no Passe 2 para ser **novamente reescalado** de `360x360` para `340x340` (`self.avatar_size`).
+  3. **Codificação de Áudio Descartada:** O Passe 1 codifica o áudio `narration.wav` em `aac` dentro de `avatar.mp4` (`-map 1:a -c:a aac`), mas o Passe 2 **ignora completamente** a faixa de áudio de `avatar.mp4` (mapeando `-map 2:a` diretamente de `narration.wav`). Ou seja, a codificação AAC no Passe 1 é 100% trabalho descartado.
+
+#### C. Passe 2 (`final_reaction_9x16.mp4` em `ReactionVideoRenderer.render`, `renderer.py:124-169`)
+- **Grafo `filter_complex` atual (`renderer.py:124-131`):**
+  ```text
+  [0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];
+  [1:v]scale=340:340:force_original_aspect_ratio=decrease,pad=352:352:6:6:color=white[pip];
+  [bg][pip]overlay=W-w-48:H-h-120:shortest=1[composed];
+  [composed]ass='{escaped_ass}'[vout]
+  ```
+- **Mapeamento de Streams e Flags (`renderer.py:133-166`):**
+  - Input `[0]`: `-stream_loop -1 -i actual_source_path`
+  - Input `[1]`: `-stream_loop -1 -i avatar_video_path`
+  - Input `[2]`: `-i voice_audio_path`
+  - Limite temporal: `-t {duration}` e `-shortest`
+  - Mapas: `-map [vout]` (vídeo composto) e `-map 2:a` (áudio exclusivo da locução; o áudio original do vídeo fonte `[0:a]` é descartado sem `amix`).
+  - Codificação: `-c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -b:a 192k`.
+- **Análise Crítica da Cadeia de Filtros:**
+  1. **Camada `[bg]` (`scale` + `crop` + `setsar=1`):** Converte qualquer vídeo fonte para `1080x1920` (9:16) preenchendo a tela inteira sem barras pretas. Contudo, não normaliza a taxa de quadros (`fps=24`), herdando o framerate variável (VFR) do vídeo baixado do TikTok.
+  2. **Camada `[pip]` (`scale=340:340` + `pad=352:352:6:6:color=white`):** Recebe `avatar.mp4` (`360x360`), reduz para `340x340` e adiciona uma moldura retangular sólida branca de 6px em cada lado (`352x352`), causando diretamente o defeito visual de "caixa quadrada" (AVTR-01).
+  3. **Camada `[composed]` (`overlay=W-w-48:H-h-120:shortest=1`):** Posiciona o PIP de `352x352` nas coordenadas `X = 1080 - 352 - 48 = 680` e `Y = 1920 - 352 - 120 = 1448`. Como a legenda ASS tem `MarginV=480` (altura `Y ≈ 1440`), a borda superior do avatar (`Y = 1448`) tangencia/invade a zona de renderização das legendas e fica exatamente na área inferior direita onde ícones e descrições da interface do TikTok/Reels/Shorts se sobrepõem!
+  4. **Ordem de Camadas (`overlay` antes de `ass`):** Atualmente o filtro `ass` é aplicado **depois** do `overlay` do avatar (`[bg][pip]overlay...[composed]; [composed]ass...[vout]`). Isso faz com que o texto da legenda passe por cima do avatar caso haja colisão espacial, ou vice-versa se invertido, evidenciando a necessidade de separação estrita por *safe zones* verticais.
+
+---
+
+### 4.3 Síntese de Gargalos e Ineficiências (D-13)
+
+1. **Tripla / Dupla Codificação H.264 (`libx264`) por Run:**
+   - Em vez de 1 única codificação H.264 ao final, o pipeline codifica `avatar.mp4` em H.264 (Passe 1) e depois decodifica `avatar.mp4` quadro a quadro para recodificá-lo em H.264 dentro de `final_reaction_9x16.mp4` (Passe 2). Quando o fallback de vídeo é acionado, ocorre uma 3ª codificação H.264 (Passe 0).
+2. **Gargalo de I/O e Poluição de Storage:**
+   - Para cada run, o arquivo `avatar.mp4` (e eventualmente `source_visual_bg.mp4`) é gravado em disco e lido em seguida. Em meta de 6 vídeos/dia (ou dezenas em testes), isso multiplica escritas desnecessárias em SSD da VPS.
+3. **Excesso de Invocações de Subprocessos `ffprobe`:**
+   - `narration.wav` sofre `ffprobe` **3 vezes** na mesma execução (`voice.py:182`, `avatar.py:90`, `renderer.py:89`).
+   - `source.mp4` sofre `ffprobe` (`has_video_stream`) **2 vezes** (`service.py:34`, `renderer.py:96`).
+4. **Incompatibilidade de Canal Alfa no Pipeline Multi-Pass:**
+   - O container `.mp4` com `libx264` (`yuv420p`) no Passe 1 é incapaz de transportar canal alfa (`yuva420p` / `rgba`). Manter um passe intermediário exigiria usar formatos pesados como `.mov` (`prores_ks -profile:v 4444` ou `qtrle`) ou `.webm` (`libvpx-vp9` com alpha, lento para codificar). A **eliminação do passe intermediário (Single-Pass)** resolve tanto a performance quanto a transparência nativa!
+
+---
+
+### 4.4 Proposta de Arquitetura Single-Pass para a Phase 12 (D-14)
+
+Para atender ao requisito **COMP-01** e à decisão **D-14**, propõe-se unificar a animação reativa do avatar (`showwaves` + recorte orgânico em canal alfa `yuva420p`) e a composição de camadas (vídeo base 9:16 + avatar PIP + legendas ASS ZUNTO!) em **um único comando FFmpeg e um único grafo `filter_complex`**.
+
+#### Diagrama do Grafo de Filtros Single-Pass Proposto
+
+```mermaid
+flowchart LR
+    subgraph Inputs["Entradas do Comando FFmpeg Único"]
+        I0["Input 0: source.mp4\n(ou lavfi color=#0f172a direto)"]
+        I1["Input 1: creator_avatar.png\n(-loop 1, RGB/RGBA 512x512)"]
+        I2["Input 2: narration.wav\n(24kHz mono loudnorm)"]
+        ASS[("captions.ass\n(Estilo ZUNTO!)")]
+    end
+
+    subgraph FilterComplex["Grafo Integrado filter_complex (Em Memória, Sem MP4 Intermediário)"]
+        BG["[0:v] scale=1080:1920:force_original_aspect_ratio=increase,\ncrop=1080:1920,setsar=1,fps=24 [bg]"]
+        ASPLIT["[2:a] asplit=2 [a_wave][a_out]"]
+        WAVE["[a_wave] showwaves=s=340x60:mode=line:\ncolors=#FACC15@0.90:rate=24,format=yuva420p [wave]"]
+        AV_ALPHA["[1:v] scale=340:340,format=yuva420p,\ngeq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':\na='if(lte(hypot(X-W/2,Y-H/2),W/2-4),255,0)' [avatar_round]"]
+        AV_COMP["[avatar_round][wave] overlay=0:H-h-10:format=auto [pip_alpha]"]
+        OVL["[bg][pip_alpha] overlay=W-w-48:H-h-380:shortest=1 [v_pip]"]
+        SUB["[v_pip] ass='captions.ass' [vout]"]
+    end
+
+    subgraph Output["Codificação Final Única"]
+        OUT["final_reaction_9x16.mp4\n(1080x1920, libx264, yuv420p, aac 192k)"]
+    end
+
+    I0 --> BG
+    I1 --> AV_ALPHA
+    I2 --> ASPLIT
+    ASPLIT --> WAVE
+    AV_ALPHA --> AV_COMP
+    WAVE --> AV_COMP
+    BG --> OVL
+    AV_COMP --> OVL
+    OVL --> SUB
+    ASS -.-> SUB
+    SUB --> OUT
+    ASPLIT -- "[a_out]" --> OUT
+```
+
+#### Especificação Técnica do Comando FFmpeg Single-Pass (Alvo para Phase 12)
+
+```python
+# Construção proposta do comando único em ReactionVideoRenderer (Phase 12)
+# Caso source_video_path tenha vídeo válido:
+source_input_args = ["-stream_loop", "-1", "-i", str(source_video_path)]
+# Caso contrário (fallback direto via lavfi sem criar source_visual_bg.mp4 em disco!):
+# source_input_args = ["-f", "lavfi", "-i", f"color=c=#0f172a:s={width}x{height}:r=24:d={duration}"]
+
+filter_complex = (
+    # 1. Camada de Fundo 9:16 (1080x1920 @ 24fps constante)
+    f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
+    f"crop={width}:{height},setsar=1,fps=24[bg];"
+    # 2. Divisão do stream de áudio da narração (1 para onda reativa, 1 para saída final)
+    f"[2:a]asplit=2[a_wave][a_out];"
+    # 3. Avatar com máscara circular orgânica em canal alfa (yuva420p) sem pad branco quadrado
+    f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=increase,"
+    f"crop={avatar_size}:{avatar_size},format=yuva420p,"
+    f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"
+    f"a='if(lte(hypot(X-W/2,Y-H/2),(W/2)-2),255,0)'[avatar_alpha];"
+    # 4. Espectro de onda reativo na paleta ZUNTO! (#FACC15)
+    f"[a_wave]showwaves=s={avatar_size}x60:mode=line:colors=#FACC15@0.90:rate=24,"
+    f"format=yuva420p[wave];"
+    # 5. Fusão do avatar circular com a onda sonora preservando canal alfa
+    f"[avatar_alpha][wave]overlay=0:H-h-12:shortest=1,format=yuva420p[pip];"
+    # 6. Overlay do PIP transparente sobre o fundo 9:16 em safe zone calibrada
+    f"[bg][pip]overlay=W-w-48:H-h-380:shortest=1[composed];"
+    # 7. Queima única de legendas ASS ZUNTO!
+    f"[composed]ass='{escaped_ass}'[vout]"
+)
+
+cmd = [
+    "ffmpeg", "-y",
+    *source_input_args,
+    "-loop", "1", "-t", str(duration), "-i", str(avatar_image_path),
+    "-i", str(voice_audio_path),
+    "-t", str(duration),
+    "-filter_complex", filter_complex,
+    "-map", "[vout]",
+    "-map", "[a_out]",
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac",
+    "-b:a", "192k",
+    "-shortest",
+    str(output_path),
+]
+```
+
+#### Comparativo Arquitetural: Multi-Pass Atual vs. Single-Pass Proposto
+
+| Métrica / Aspecto Técnico | Arquitetura Atual (v1.0 Multi-Pass) | Arquitetura Proposta (v1.1 Single-Pass — Phase 12) | Ganho / Impacto |
+|---------------------------|-------------------------------------|----------------------------------------------------|-----------------|
+| **Subprocessos `ffmpeg` de vídeo** | 2 a 3 (`source_visual_bg.mp4` + `avatar.mp4` + `final_reaction_9x16.mp4`) | **1 único processo `ffmpeg`** | Redução de 50% a 66% em spawns e overhead de inicialização de encoders |
+| **Subprocessos `ffprobe` por run** | 5 a 6 chamadas (múltiplas leituras de `narration.wav` e `source.mp4`) | **2 chamadas** (1 pós-TTS para medir `voice_duration`, 1 pós-render final para validação) | Eliminação de 3 a 4 chamadas bloqueantes de I/O |
+| **Arquivos de vídeo temporários em disco** | `avatar.mp4` + `source_visual_bg.mp4` | **Zero arquivos MP4 intermediários** (`lavfi` e `creator_avatar.png` lidos direto no grafo) | Economia de I/O e armazenamento por run |
+| **Transparência / Canal Alfa do Avatar** | Perdida no Passe 1 (`avatar.mp4` forçado para `yuv420p`) + `pad=color=white` no Passe 2 | **Preservada nativamente em memória (`yuva420p`)** até o `overlay` sobre `[bg]` | Elimina 100% a caixa quadrada sem precisar de codecs intermediários pesados (WebM/ProRes) |
+| **Qualidade Visual do Avatar** | Dupla compressão (`scale 360` -> H.264 `ultrafast` -> `scale 340` -> H.264 `ultrafast`) | **Escala única (`512` -> `340`) e compressão única** no encode final | Nitidez superior e zero artefatos de dupla quantização |
+| **Sincronia A/V e Resolução** | `1080x1920`, porém FPS variável herdado do source e áudio codificado 2x | **`1080x1920` @ `24fps` fixo (`setsar=1,fps=24`)**, áudio dividido via `asplit` em memória | Sincronia milimétrica entre onda sonora do avatar, locução e legendas ASS |
+
+#### Compatibilidade com `Asset` de Avatar no Banco de Dados (Salvaguarda para Phase 12)
+- Como documentado na Seção 1.1, `StudioService.produce` atualmente grava um registro `Asset(asset_type="avatar", file_path=str(avatar_path), duration_seconds=avatar_duration)`.
+- Na Phase 12, ao adotar o Single-Pass:
+  - `StudioService.produce` continuará persistindo o registro `Asset(asset_type="avatar", ...)` apontando para o asset de imagem/configuração do avatar utilizado (ou mantendo `BaseAvatarAnimator` como provedor de configuração/preparação de asset) com `duration_seconds=voice_duration`, garantindo **zero quebra** em testes ou consultas que contam os 3 `Asset`s gerados por run.
+
 
 ---
 
