@@ -24,8 +24,8 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 ### Identidade Visual ZUNTO! (BRND)
 
-- [ ] **BRND-01**: Aplicação da paleta de cores ZUNTO! (preto profundo, amarelo de alto impacto e branco puro) nos elementos de composição e lettering.
-- [ ] **BRND-02**: Inclusão de elementos de marca e slogan orientando a narrativa sem imposição de repetições forçadas, adaptados para safe zones de TikTok, Reels e Shorts.
+- [x] **BRND-01**: Aplicação da paleta de cores ZUNTO! (preto profundo, amarelo de alto impacto e branco puro) nos elementos de composição e lettering.
+- [x] **BRND-02**: Inclusão de elementos de marca e slogan orientando a narrativa sem imposição de repetições forçadas, adaptados para safe zones de TikTok, Reels e Shorts.
 
 ### Roteirista Editorial (SCRP)
 
@@ -69,8 +69,8 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | COMP-01 | Phase 8, Phase 12 | Mapped |
 | COMP-02 | Phase 12 | Mapped |
 | COMP-03 | Phase 12 | Mapped |
-| BRND-01 | Phase 9, Phase 10, Phase 12 | Mapped |
-| BRND-02 | Phase 9, Phase 11, Phase 12 | Mapped |
+| BRND-01 | Phase 9, Phase 10, Phase 12 | Complete |
+| BRND-02 | Phase 9, Phase 11, Phase 12 | Complete |
 | SCRP-01 | Phase 9 | Mapped |
 | SCRP-02 | Phase 9 | Mapped |
 | QUAL-01 | Phase 13 | Mapped |
