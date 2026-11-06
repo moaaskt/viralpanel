@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
     whisper_model: str = "small"
+    tts_provider: str = "edge"
+    edge_tts_voice: str = "pt-BR-AntonioNeural"
+    edge_tts_rate: str = "+8%"
+    speaker_wav_path: str | None = "assets/creator_voice.wav"
+    avatar_image_path: str = "assets/creator_avatar.png"
     pipeline_mock_mode: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None

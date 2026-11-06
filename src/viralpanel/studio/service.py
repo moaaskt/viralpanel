@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from viralpanel.models import Asset, Script
 from viralpanel.storage import StorageManager
 from viralpanel.studio.avatar import BaseAvatarAnimator
-from viralpanel.studio.renderer import ReactionVideoRenderer
+from viralpanel.studio.renderer import ReactionVideoRenderer, has_video_stream
 from viralpanel.studio.subtitles import build_cues_from_script, write_ass_subtitles
 from viralpanel.studio.voice import BaseVoiceSynthesizer
 
@@ -31,7 +31,7 @@ class StudioService:
         source_dir = self.storage._safe(self.storage.get_run_dir(run_id).parent / "source")
         source_dir.mkdir(parents=True, exist_ok=True)
         video_path = source_dir / "source.mp4"
-        if video_path.exists():
+        if video_path.exists() and has_video_stream(video_path):
             return video_path
 
         if shutil.which("ffmpeg"):
