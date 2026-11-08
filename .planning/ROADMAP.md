@@ -66,10 +66,10 @@ Plans:
   2. Execução da esteira de composição sem qualquer duplicidade de legenda na tela (burn-in único garantido).
   3. Sincronização temporal milimétrica entre a locução gerada e a cadência de exibição das palavras, com suporte a realce/destaque dinâmico de palavras-chave.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
+- [x] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
 - [ ] 10-02-PLAN.md — Integração em `StudioService.produce` e `ReactionVideoRenderer`, Cobertura de Hard-Subs com `MarginV=640`, Camada Única e Validação de Regressão da Suíte Completa (SUB-01, SUB-02, SUB-03, BRND-01)
 **UI hint**: yes
 
