@@ -11,7 +11,10 @@ venv/
 frontend/node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+frontend-chakra-backup/
 
 # Cookies sensíveis
 cookies/*.txt
 cookies/*.json
+
+shadcn-admin-v1.0.0
