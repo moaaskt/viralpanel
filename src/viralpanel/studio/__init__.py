@@ -1,7 +1,14 @@
 from viralpanel.studio.avatar import BaseAvatarAnimator, MockAvatarAnimator
 from viralpanel.studio.renderer import ReactionVideoRenderer, probe_video_dimensions
 from viralpanel.studio.service import StudioService
-from viralpanel.studio.subtitles import SubtitleCue, build_cues_from_script, write_ass_subtitles
+from viralpanel.studio.subtitles import (
+    SubtitleCue,
+    SubtitleJobConfig,
+    build_ass_header,
+    build_cues_from_script,
+    generate_subtitles,
+    write_ass_subtitles,
+)
 from viralpanel.studio.voice import BaseVoiceSynthesizer, MockVoiceSynthesizer, XTTSVoiceSynthesizer, probe_duration
 
 __all__ = [
@@ -12,8 +19,11 @@ __all__ = [
     "ReactionVideoRenderer",
     "StudioService",
     "SubtitleCue",
+    "SubtitleJobConfig",
     "XTTSVoiceSynthesizer",
+    "build_ass_header",
     "build_cues_from_script",
+    "generate_subtitles",
     "probe_duration",
     "probe_video_dimensions",
     "write_ass_subtitles",
