@@ -102,7 +102,11 @@ Plans:
   2. Saída do vídeo rigorosamente padronizada em 1080x1920 (9:16 vertical Full HD) com sincronia perfeita entre áudio e vídeo e ordenação clara de camadas (fundo, avatar, legendas, branding).
   3. Contratos de interface com as tasks Celery preservados, assegurando que as integrações de publicação permaneçam funcionais e desacopladas da refatoração.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Núcleo do Video Composer Single-Pass, DTOs ReactionCompositionSpec e StudioRenderRequest, Lavfi Inline Fallback e Flags de Encoding (COMP-01, COMP-02, BRND-01, BRND-02)
+- [ ] 12-02-PLAN.md — Integração do StudioService, Preservação de Contratos Celery, Persistência Atômica de Assets e Regressão E2E (COMP-03, COMP-01, COMP-02, BRND-01, BRND-02)
 
 ### Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E
 
