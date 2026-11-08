@@ -15,6 +15,18 @@ from viralpanel.branding import (
 
 logger = logging.getLogger(__name__)
 
+# Stopwords comuns em português para heurística de palavras de impacto
+_PORTUGUESE_STOPWORDS: Final[set[str]] = {
+    "o", "a", "os", "as", "um", "uma", "uns", "umas",
+    "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+    "por", "pelo", "pela", "pelos", "pelas", "com", "para", "pra", "pro",
+    "sem", "sob", "sobre", "ate", "até", "ao", "aos",
+    "e", "ou", "mas", "se", "que", "como", "porque", "pois", "nem",
+    "eu", "tu", "ele", "ela", "nos", "nós", "eles", "elas", "me", "te", "lhe",
+    "isso", "isto", "aquilo", "seu", "sua", "seus", "suas",
+    "é", "foi", "ser", "sao", "são", "tem", "vai", "ter",
+}
+
 
 class SubtitleCue(BaseModel):
     """Unidade temporal de legenda compatível com a v1.0 e enriquecida para ZUNTO!."""
@@ -102,6 +114,52 @@ def _format_ass_timestamp(seconds: float) -> str:
     return f"{hours}:{mins:02d}:{secs:02d}.{cs:02d}"
 
 
+def sanitize_ass_text(text: str) -> str:
+    """Sanitiza o texto eliminando colisões com delimitadores de controle ASS.
+
+    Substitui '{' por '(' e '}' por ')' para impedir injeção acidental no libass.
+    Normaliza quebras de linha para '\\N'.
+    """
+    safe = text.replace("{", "(").replace("}", ")")
+    safe = safe.replace("\r\n", "\\N").replace("\n", "\\N").replace("\r", "\\N")
+    return safe
+
+
+def select_highlight_word(words: list[str]) -> str | None:
+    """Heurística para seleção da palavra de destaque de maior impacto semântico."""
+    clean_words = [re.sub(r"[^\wáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ]", "", w) for w in words]
+    candidates = [
+        w for w in clean_words
+        if len(w) >= 4 and w.lower() not in _PORTUGUESE_STOPWORDS
+    ]
+    if candidates:
+        return candidates[0]
+    valid = [w for w in clean_words if w]
+    return max(valid, key=len) if valid else None
+
+
+def format_ass_dialogue_line(cue: SubtitleCue) -> str:
+    """Formata a linha Dialogue com escape blindado e destaque amarelo com fechamento explícito."""
+    sanitized = sanitize_ass_text(cue.text)
+    start_str = _format_ass_timestamp(cue.start)
+    end_str = _format_ass_timestamp(cue.end)
+
+    yellow_ass = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)  # &H0015CCFA&
+    white_ass = hex_to_ass_color(ZuntoPalette.PURE_WHITE)      # &H00FFFFFF&
+
+    highlight = cue.highlight_word or select_highlight_word(sanitized.split())
+
+    if highlight and highlight.lower() in sanitized.lower():
+        pattern = re.compile(rf"\b({re.escape(highlight)})\b", re.IGNORECASE)
+        formatted_text = pattern.sub(
+            rf"{{\\c{yellow_ass}}}\1{{\\c{white_ass}}}", sanitized, count=1
+        )
+    else:
+        formatted_text = sanitized
+
+    return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{formatted_text}"
+
+
 def split_script_into_cues(
     script_text: str,
     total_duration: float,
@@ -162,7 +220,6 @@ def split_script_into_cues(
 
     if current_chunk:
         if len(current_chunk) < min_words and chunks:
-            # Mescla com o chunk anterior caso o resíduo seja muito curto
             if len(chunks[-1]) + len(current_chunk) <= max_words + 2:
                 chunks[-1].extend(current_chunk)
             else:
@@ -273,14 +330,12 @@ def build_cues_from_script(
 
 
 def write_ass_subtitles(cues: list[SubtitleCue], output_path: Path) -> Path:
+    """Grava arquivo ASS v4+ estruturado segundo o branding ZUNTO!."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     header = build_ass_header()
     lines = [header.rstrip()]
     for cue in cues:
-        start_str = _format_ass_timestamp(cue.start)
-        end_str = _format_ass_timestamp(cue.end)
-        clean_text = cue.text.replace("\n", "\\N").replace("{", "(").replace("}", ")")
-        lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}")
+        lines.append(format_ass_dialogue_line(cue))
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
 
@@ -298,9 +353,6 @@ def generate_subtitles(config: SubtitleJobConfig) -> Path:
     header = build_ass_header(config)
     lines = [header.rstrip()]
     for cue in cues:
-        start_str = _format_ass_timestamp(cue.start)
-        end_str = _format_ass_timestamp(cue.end)
-        clean_text = cue.text.replace("\n", "\\N").replace("{", "(").replace("}", ")")
-        lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}")
+        lines.append(format_ass_dialogue_line(cue))
     config.output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config.output_path

@@ -12,7 +12,10 @@ from viralpanel.studio.subtitles import (
     SubtitleJobConfig,
     build_ass_header,
     build_cues_from_script,
+    format_ass_dialogue_line,
     generate_subtitles,
+    sanitize_ass_text,
+    select_highlight_word,
     split_script_into_cues,
     write_ass_subtitles,
 )
@@ -207,4 +210,74 @@ def test_build_cues_from_script_backwards_compatibility():
     assert all(isinstance(c, SubtitleCue) for c in cues)
     assert cues[0].start == 0.0
     assert cues[-1].end == pytest.approx(4.5, abs=0.05)
+
+
+def test_ass_sanitization_brackets_and_newlines():
+    """Valida substituição estrita de {} por () e normalização de quebras para \\N."""
+    raw = "Atenção {chave_perigosa} e mais {outra}\nNova linha aqui\r\nTerceira linha"
+    sanitized = sanitize_ass_text(raw)
+
+    assert "{" not in sanitized
+    assert "}" not in sanitized
+    assert "(chave_perigosa)" in sanitized
+    assert "(outra)" in sanitized
+    assert "\r" not in sanitized
+    assert "\n" not in sanitized
+    assert "\\N" in sanitized
+
+
+def test_select_highlight_word_heuristics():
+    """Valida que stopwords em português e palavras curtas não são selecionadas para destaque."""
+    words = ["e", "para", "o", "com", "disciplina", "diária"]
+    chosen = select_highlight_word(words)
+    assert chosen == "disciplina"
+
+    # Caso com apenas stopwords/palavras curtas: escolhe a mais longa disponível
+    fallback_words = ["o", "de", "que"]
+    chosen_fallback = select_highlight_word(fallback_words)
+    assert chosen_fallback == "que"
+
+
+def test_format_ass_dialogue_line_highlight_and_explicit_closure():
+    """Valida destaque amarelo ZUNTO! com fechamento compulsório em branco puro."""
+    cue = SubtitleCue(
+        start=1.25,
+        end=3.50,
+        text="Pare de procrastinar agora.",
+        highlight_word="Pare",
+    )
+    line = format_ass_dialogue_line(cue)
+
+    assert line.startswith("Dialogue: 0,0:00:01.25,0:00:03.50,Default,,0,0,0,,")
+    # Tag amarela ZUNTO!
+    assert r"{\c&H0015CCFA&}Pare{\c&H00FFFFFF&}" in line
+    # Sem vazamento para as palavras seguintes
+    assert line.endswith(r"{\c&H0015CCFA&}Pare{\c&H00FFFFFF&} de procrastinar agora.")
+
+
+def test_no_style_leakage_between_cues_and_words(tmp_path: Path):
+    """Valida que toda abertura de cor tem fechamento imediato para evitar style leakage."""
+    cues = [
+        SubtitleCue(start=0.0, end=2.0, text="FOCO absoluto no objetivo."),
+        SubtitleCue(start=2.0, end=4.0, text="Execute sem desculpas hoje."),
+    ]
+    ass_path = tmp_path / "leakage_test.ass"
+    write_ass_subtitles(cues, ass_path)
+
+    content = ass_path.read_text(encoding="utf-8")
+    dialogue_lines = [l for l in content.splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogue_lines) == 2
+
+    for line in dialogue_lines:
+        text_part = line.split(",,", 1)[1]
+        # Quantidade de aberturas de amarelo deve ser igual a fechamentos em branco
+        yellow_opens = text_part.count(r"{\c&H0015CCFA&}")
+        white_closes = text_part.count(r"{\c&H00FFFFFF&}")
+        assert yellow_opens == white_closes, f"Style leakage detectado na linha: {line}"
+        if yellow_opens > 0:
+            # Fechamento deve ocorrer antes de qualquer palavra subsequente
+            pos_yellow = text_part.find(r"{\c&H0015CCFA&}")
+            pos_white = text_part.find(r"{\c&H00FFFFFF&}")
+            assert pos_white > pos_yellow
+
 

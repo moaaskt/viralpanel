@@ -6,7 +6,10 @@ from viralpanel.studio.subtitles import (
     SubtitleJobConfig,
     build_ass_header,
     build_cues_from_script,
+    format_ass_dialogue_line,
     generate_subtitles,
+    sanitize_ass_text,
+    select_highlight_word,
     split_script_into_cues,
     write_ass_subtitles,
 )
@@ -24,9 +27,12 @@ __all__ = [
     "XTTSVoiceSynthesizer",
     "build_ass_header",
     "build_cues_from_script",
+    "format_ass_dialogue_line",
     "generate_subtitles",
     "probe_duration",
     "probe_video_dimensions",
+    "sanitize_ass_text",
+    "select_highlight_word",
     "split_script_into_cues",
     "write_ass_subtitles",
 ]
