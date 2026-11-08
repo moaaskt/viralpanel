@@ -7,8 +7,13 @@ from sqlalchemy.orm import Session
 from viralpanel.branding import SafeZones9x16
 from viralpanel.models import Asset, Script
 from viralpanel.storage import StorageManager
-from viralpanel.studio.avatar import BaseAvatarAnimator
-from viralpanel.studio.renderer import ReactionVideoRenderer, has_video_stream
+from viralpanel.studio.avatar import AvatarConfig, BaseAvatarAnimator
+from viralpanel.studio.renderer import (
+    ReactionCompositionSpec,
+    ReactionVideoRenderer,
+    StudioRenderRequest,
+    has_video_stream,
+)
 from viralpanel.studio.subtitles import SubtitleJobConfig, generate_subtitles
 from viralpanel.studio.voice import BaseVoiceSynthesizer
 
@@ -22,11 +27,15 @@ class StudioService:
         avatar_animator: BaseAvatarAnimator,
         renderer: ReactionVideoRenderer | None = None,
         storage: StorageManager | None = None,
+        avatar_config: AvatarConfig | None = None,
+        composition: ReactionCompositionSpec | None = None,
     ):
         self.voice_synthesizer = voice_synthesizer
         self.avatar_animator = avatar_animator
         self.renderer = renderer or ReactionVideoRenderer()
         self.storage = storage or StorageManager()
+        self.avatar_config = avatar_config or getattr(avatar_animator, "config", None)
+        self.composition = composition or ReactionCompositionSpec()
 
     def _ensure_source_video(self, run_id: str, duration: float = 2.0) -> Path:
         source_dir = self.storage._safe(self.storage.get_run_dir(run_id).parent / "source")
@@ -106,13 +115,28 @@ class StudioService:
         # 4. Composição 9:16 Reaction via FFmpeg
         source_video_path = self._ensure_source_video(run_id, duration=max(voice_duration, 2.0))
         final_video_path = assets_dir / "final_reaction_9x16.mp4"
-        final_video_path, final_duration = self.renderer.render(
+        render_request = StudioRenderRequest(
+            run_id=run_id,
             source_video_path=source_video_path,
             avatar_video_path=avatar_path,
             voice_audio_path=voice_path,
             ass_subtitle_path=subtitles_path,
             output_path=final_video_path,
+            voice_duration=voice_duration,
+            avatar_config=self.avatar_config,
+            composition=self.composition,
         )
+
+        if hasattr(self.renderer, "render_from_request"):
+            final_video_path, final_duration = self.renderer.render_from_request(render_request)
+        else:
+            final_video_path, final_duration = self.renderer.render(
+                source_video_path=source_video_path,
+                avatar_video_path=avatar_path,
+                voice_audio_path=voice_path,
+                ass_subtitle_path=subtitles_path,
+                output_path=final_video_path,
+            )
 
         final_asset = Asset(
             script_id=script.id,

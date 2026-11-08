@@ -1,13 +1,65 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 import json
 import logging
+from pathlib import Path
 import shutil
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
+import uuid
 
 from viralpanel.branding import SafeZones9x16
 from viralpanel.studio.voice import probe_duration
 
+if TYPE_CHECKING:
+    from viralpanel.studio.avatar import AvatarConfig
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReactionCompositionSpec:
+    """Especificações técnicas da composição FFmpeg."""
+
+    target_width: int = SafeZones9x16.WIDTH
+    target_height: int = SafeZones9x16.HEIGHT
+    fps: int = 24
+    video_codec: str = "libx264"
+    preset: str = "veryfast"
+    crf: int = 20
+    pix_fmt: str = "yuv420p"
+    audio_codec: str = "aac"
+    audio_bitrate: str = "192k"
+    single_pass: bool = True
+    timeout_seconds: int = 180
+
+
+@dataclass(frozen=True)
+class StudioRenderRequest:
+    """Insumos estruturados para renderização de vídeo reaction."""
+
+    run_id: str | uuid.UUID
+    source_video_path: Path
+    avatar_video_path: Path
+    voice_audio_path: Path
+    ass_subtitle_path: Path
+    output_path: Path
+    voice_duration: float | None = None
+    avatar_config: AvatarConfig | None = None
+    composition: ReactionCompositionSpec = field(default_factory=ReactionCompositionSpec)
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "source_video_path",
+            "avatar_video_path",
+            "voice_audio_path",
+            "ass_subtitle_path",
+            "output_path",
+        ):
+            val = getattr(self, field_name)
+            if val is not None and not isinstance(val, Path):
+                object.__setattr__(self, field_name, Path(val))
 
 
 def probe_video_dimensions(video_path: Path) -> tuple[int, int]:
@@ -68,64 +120,57 @@ class ReactionVideoRenderer:
 
     def __init__(
         self,
-        width: int = 1080,
-        height: int = 1920,
+        width: int = SafeZones9x16.WIDTH,
+        height: int = SafeZones9x16.HEIGHT,
         avatar_size: int = SafeZones9x16.AVATAR_SIZE,
-        timeout_seconds: int = 300,
+        preset: str = "veryfast",
+        crf: int = 20,
+        timeout_seconds: int = 180,
     ):
         self.width = width
         self.height = height
         self.avatar_size = avatar_size
+        self.preset = preset
+        self.crf = crf
         self.timeout_seconds = timeout_seconds
 
-    def render(
-        self,
-        source_video_path: Path,
-        avatar_video_path: Path,
-        voice_audio_path: Path,
-        ass_subtitle_path: Path,
-        output_path: Path,
-    ) -> tuple[Path, float]:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        duration = max(probe_duration(voice_audio_path), 1.5)
+    def render_from_request(self, request: StudioRenderRequest) -> tuple[Path, float]:
+        """Executa renderização FFmpeg em passagem única a partir de StudioRenderRequest."""
+        request.output_path.parent.mkdir(parents=True, exist_ok=True)
+        duration = (
+            max(request.voice_duration, 1.5)
+            if request.voice_duration and request.voice_duration > 0
+            else max(probe_duration(request.voice_audio_path), 1.5)
+        )
 
         if shutil.which("ffmpeg") is None:
-            output_path.write_bytes(b"MOCKFINALMP4")
-            return output_path, duration
+            request.output_path.write_bytes(b"MOCKFINALMP4")
+            return request.output_path, duration
 
-        actual_source_path = source_video_path
-        if not has_video_stream(source_video_path):
-            logger.warning(
-                "Arquivo source %s não contém stream de vídeo. Gerando fundo visual 9:16 de fallback...",
-                source_video_path,
+        composition = request.composition
+
+        if has_video_stream(request.source_video_path):
+            source_inputs = ["-stream_loop", "-1", "-i", str(request.source_video_path)]
+        else:
+            logger.info(
+                "Source %s sem stream de vídeo. Injetando lavfi inline 9:16 diretamente em [0:v].",
+                request.source_video_path,
             )
-            actual_source_path = source_video_path.parent / "source_visual_bg.mp4"
-            subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-f",
-                    "lavfi",
-                    "-i",
-                    f"color=c=#0f172a:s={self.width}x{self.height}:r=24:d={duration}",
-                    "-c:v",
-                    "libx264",
-                    "-pix_fmt",
-                    "yuv420p",
-                    str(actual_source_path),
-                ],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
+            source_inputs = [
+                "-f",
+                "lavfi",
+                "-i",
+                f"color=c=#0f172a:s={composition.target_width}x{composition.target_height}:r={composition.fps}:d={duration}",
+            ]
 
         # Escapa o caminho do arquivo ASS para o filtro do FFmpeg
-        escaped_ass = str(ass_subtitle_path.resolve()).replace("\\", "/").replace(":", "\\:")
+        escaped_ass = str(request.ass_subtitle_path.resolve()).replace("\\", "/").replace(":", "\\:")
+        avatar_size = request.avatar_config.size if request.avatar_config else self.avatar_size
 
         filter_complex = (
-            f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
-            f"crop={self.width}:{self.height},setsar=1[bg];"
-            f"[1:v]scale={self.avatar_size}:{self.avatar_size}:force_original_aspect_ratio=decrease[pip];"
+            f"[0:v]scale={composition.target_width}:{composition.target_height}:force_original_aspect_ratio=increase,"
+            f"crop={composition.target_width}:{composition.target_height},setsar=1[bg];"
+            f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=decrease[pip];"
             f"[bg][pip]overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:shortest=1[composed];"
             f"[composed]ass='{escaped_ass}'[vout]"
         )
@@ -133,16 +178,13 @@ class ReactionVideoRenderer:
         cmd = [
             "ffmpeg",
             "-y",
+            *source_inputs,
             "-stream_loop",
             "-1",
             "-i",
-            str(actual_source_path),
-            "-stream_loop",
-            "-1",
+            str(request.avatar_video_path),
             "-i",
-            str(avatar_video_path),
-            "-i",
-            str(voice_audio_path),
+            str(request.voice_audio_path),
             "-t",
             str(duration),
             "-filter_complex",
@@ -152,26 +194,83 @@ class ReactionVideoRenderer:
             "-map",
             "2:a",
             "-c:v",
-            "libx264",
+            composition.video_codec,
             "-preset",
-            "ultrafast",
+            composition.preset,
+            "-crf",
+            str(composition.crf),
             "-pix_fmt",
-            "yuv420p",
+            composition.pix_fmt,
             "-c:a",
-            "aac",
+            composition.audio_codec,
             "-b:a",
-            "192k",
+            composition.audio_bitrate,
             "-shortest",
-            str(output_path),
+            str(request.output_path),
         ]
 
         try:
-            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=self.timeout_seconds)
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=composition.timeout_seconds,
+            )
         except subprocess.CalledProcessError as exc:
             stderr_msg = exc.stderr.strip() if exc.stderr else "sem detalhes de stderr"
             logger.error("Falha na renderização de vídeo final FFmpeg: %s", stderr_msg)
             raise RuntimeError(f"Erro ao renderizar vídeo com FFmpeg: {stderr_msg}") from exc
 
-        actual_duration = probe_duration(output_path) or duration
-        return output_path, round(actual_duration, 2)
+        actual_duration = probe_duration(request.output_path) or duration
+        return request.output_path, round(actual_duration, 2)
+
+    def render(
+        self,
+        source_video_path: Path | StudioRenderRequest,
+        avatar_video_path: Path | None = None,
+        voice_audio_path: Path | None = None,
+        ass_subtitle_path: Path | None = None,
+        output_path: Path | None = None,
+        **kwargs,
+    ) -> tuple[Path, float]:
+        if isinstance(source_video_path, StudioRenderRequest):
+            return self.render_from_request(source_video_path)
+
+        if (
+            avatar_video_path is None
+            or voice_audio_path is None
+            or ass_subtitle_path is None
+            or output_path is None
+        ):
+            raise ValueError(
+                "avatar_video_path, voice_audio_path, ass_subtitle_path e output_path são obrigatórios quando StudioRenderRequest não é utilizado."
+            )
+
+        run_id = kwargs.get("run_id", "legacy_run")
+        voice_duration = kwargs.get("voice_duration")
+        avatar_config = kwargs.get("avatar_config")
+        composition = kwargs.get(
+            "composition",
+            ReactionCompositionSpec(
+                target_width=self.width,
+                target_height=self.height,
+                preset=self.preset,
+                crf=self.crf,
+                timeout_seconds=self.timeout_seconds,
+            ),
+        )
+
+        request = StudioRenderRequest(
+            run_id=run_id,
+            source_video_path=source_video_path,
+            avatar_video_path=avatar_video_path,
+            voice_audio_path=voice_audio_path,
+            ass_subtitle_path=ass_subtitle_path,
+            output_path=output_path,
+            voice_duration=voice_duration,
+            avatar_config=avatar_config,
+            composition=composition,
+        )
+        return self.render_from_request(request)
 

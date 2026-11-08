@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,7 +17,13 @@ from viralpanel.studio.avatar import (
     MockAvatarAnimator,
     ensure_default_avatar_image,
 )
-from viralpanel.studio.renderer import ReactionVideoRenderer, probe_video_dimensions
+from viralpanel.studio.renderer import (
+    ReactionCompositionSpec,
+    ReactionVideoRenderer,
+    StudioRenderRequest,
+    has_video_stream,
+    probe_video_dimensions,
+)
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.subtitles import (
     SubtitleJobConfig,
@@ -25,6 +32,51 @@ from viralpanel.studio.subtitles import (
     write_ass_subtitles,
 )
 from viralpanel.studio.voice import MockVoiceSynthesizer
+
+
+def test_studio_render_request_dto():
+    """Valida DTOs imutáveis ReactionCompositionSpec e StudioRenderRequest (D-03, D-04)."""
+    spec = ReactionCompositionSpec()
+    assert spec.target_width == 1080
+    assert spec.target_height == 1920
+    assert spec.fps == 24
+    assert spec.video_codec == "libx264"
+    assert spec.preset == "veryfast"
+    assert spec.crf == 20
+    assert spec.pix_fmt == "yuv420p"
+    assert spec.audio_codec == "aac"
+    assert spec.audio_bitrate == "192k"
+    assert spec.single_pass is True
+    assert spec.timeout_seconds == 180
+
+    with pytest.raises(FrozenInstanceError):
+        spec.preset = "slow"  # type: ignore
+
+    req = StudioRenderRequest(
+        run_id="run-123",
+        source_video_path="/tmp/source.mp4",  # type: ignore
+        avatar_video_path="/tmp/avatar.mp4",  # type: ignore
+        voice_audio_path="/tmp/voice.wav",  # type: ignore
+        ass_subtitle_path="/tmp/subs.ass",  # type: ignore
+        output_path="/tmp/out.mp4",  # type: ignore
+    )
+
+    assert isinstance(req.source_video_path, Path)
+    assert req.source_video_path == Path("/tmp/source.mp4")
+    assert isinstance(req.avatar_video_path, Path)
+    assert req.avatar_video_path == Path("/tmp/avatar.mp4")
+    assert isinstance(req.voice_audio_path, Path)
+    assert req.voice_audio_path == Path("/tmp/voice.wav")
+    assert isinstance(req.ass_subtitle_path, Path)
+    assert req.ass_subtitle_path == Path("/tmp/subs.ass")
+    assert isinstance(req.output_path, Path)
+    assert req.output_path == Path("/tmp/out.mp4")
+    assert req.composition == spec
+    assert req.voice_duration is None
+    assert req.avatar_config is None
+
+    with pytest.raises(FrozenInstanceError):
+        req.run_id = "run-999"  # type: ignore
 
 
 def test_ass_subtitles_generation(tmp_path):
@@ -90,6 +142,69 @@ def test_studio_service_renders_vertical_9x16_reaction_video(tmp_path):
         deep_black_ass = hex_to_ass_color(ZuntoPalette.DEEP_BLACK)  # &H000A0A0A&
         assert deep_black_ass in ass_content, f"Cor da caixa opaca {deep_black_ass} deve estar no cabeçalho ASS"
         assert "Dialogue: 0," in ass_content, "Eventos de diálogo devem estar presentes no arquivo ASS"
+
+
+def test_studio_service_produce_encapsulates_studio_render_request(tmp_path):
+    """Valida que StudioService.produce instancia e delega via StudioRenderRequest (D-04, COMP-03)."""
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+
+    received_requests: list[StudioRenderRequest] = []
+
+    class SpyRenderer:
+        def render_from_request(self, request: StudioRenderRequest) -> tuple[Path, float]:
+            received_requests.append(request)
+            request.output_path.parent.mkdir(parents=True, exist_ok=True)
+            request.output_path.write_bytes(b"SPY_OUTPUT_VIDEO")
+            return request.output_path, 3.5
+
+    spy_renderer = SpyRenderer()
+    service = StudioService(
+        voice_synthesizer=MockVoiceSynthesizer(min_duration=2.0, max_duration=2.0),
+        avatar_animator=MockAvatarAnimator(width=240, height=240),
+        renderer=spy_renderer,  # type: ignore
+        storage=StorageManager(tmp_path),
+    )
+
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@creator/video/101", author="creator", score=90.0)
+        db.add(src)
+        db.flush()
+        script = Script(
+            source_video_id=src.id,
+            hook="Hook de teste",
+            script_text="Texto do script de teste para validar o DTO tipado StudioRenderRequest.",
+            version=1,
+        )
+        db.add(script)
+        db.commit()
+
+        final_asset = service.produce(db=db, run_id="run-spy-dto", script=script)
+
+        # 1. Validação da delegação ao DTO StudioRenderRequest
+        assert len(received_requests) == 1
+        req = received_requests[0]
+        assert isinstance(req, StudioRenderRequest)
+        assert req.run_id == "run-spy-dto"
+        assert req.source_video_path.name == "source.mp4"
+        assert req.avatar_video_path.name == "avatar.mp4"
+        assert req.voice_audio_path.name == "narration.wav"
+        assert req.ass_subtitle_path.name == "captions.ass"
+        assert req.output_path.name == "final_reaction_9x16.mp4"
+        assert req.voice_duration == 2.0
+        assert req.avatar_config == service.avatar_config
+        assert req.composition == service.composition
+
+        # 2. Validação dos contratos e persistência atômica
+        assert final_asset.asset_type == "final_video"
+        assert final_asset.duration_seconds == 3.5
+        assert src.status == "produced"
+
+        assets = db.scalars(select(Asset).where(Asset.script_id == script.id)).all()
+        assert len(assets) == 3
+        types = {a.asset_type for a in assets}
+        assert types == {"audio", "avatar", "final_video"}
 
 
 def test_reaction_renderer_single_ass_layer_and_path_escape(tmp_path, monkeypatch):
@@ -378,6 +493,145 @@ def test_avatar_reaction_overlay_pixel_transparency_and_no_white_box(tmp_path):
     assert not (cr > 200 and cg < 30 and cb > 200), (
         f"Centro do avatar não deve ser magenta puro. Obtido: RGB({cr}, {cg}, {cb})"
     )
+
+
+def test_single_pass_composition_no_disk_fallback(tmp_path):
+    """Garante que a composição single-pass não cria source_visual_bg.mp4 em disco (COMP-01, D-02)."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg não disponível")
+
+    # 1. Cria áudio de voz sintético
+    voice_path = tmp_path / "voice_sample.wav"
+    MockVoiceSynthesizer(min_duration=1.5, max_duration=2.0).synthesize("Teste single pass.", voice_path)
+
+    # 2. Cria avatar circular sintético rápido
+    avatar_video_path = tmp_path / "avatar_simple.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", "color=c=yellow:s=240x240:r=24:d=1.5",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            str(avatar_video_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    # 3. Legendas ASS
+    ass_path = tmp_path / "subtitles.ass"
+    job_cfg = SubtitleJobConfig(
+        script_text="Teste single pass.",
+        total_duration=1.5,
+        output_path=ass_path,
+        margin_v=SafeZones9x16.SUBTITLE_MARGIN_V,
+    )
+    generate_subtitles(job_cfg)
+
+    # 4. Source video sem stream de vídeo (arquivo vazio de áudio / sem vídeo)
+    source_video = tmp_path / "source_no_video.mp4"
+    source_video.write_bytes(b"DUMMY_AUDIO_ONLY_NO_VIDEO")
+    assert not has_video_stream(source_video)
+
+    out_file = tmp_path / "output_single_pass.mp4"
+    request = StudioRenderRequest(
+        run_id="run-sp-1",
+        source_video_path=source_video,
+        avatar_video_path=avatar_video_path,
+        voice_audio_path=voice_path,
+        ass_subtitle_path=ass_path,
+        output_path=out_file,
+    )
+
+    renderer = ReactionVideoRenderer()
+    rendered_path, dur = renderer.render_from_request(request)
+
+    assert rendered_path == out_file
+    assert out_file.exists()
+    assert dur >= 1.4
+
+    # Assegurar explicitamente que nenhum arquivo source_visual_bg.mp4 foi criado em disco
+    assert not (source_video.parent / "source_visual_bg.mp4").exists()
+    assert not (tmp_path / "source_visual_bg.mp4").exists()
+
+
+def test_reaction_renderer_output_specs_and_encoding_flags(tmp_path, monkeypatch):
+    """Valida argumentos de codificação de alta fidelidade e mapeamento FFmpeg (COMP-02, D-03)."""
+    captured_commands = []
+
+    def mock_run(cmd, *args, **kwargs):
+        captured_commands.append(cmd)
+        if cmd[0] == "ffprobe":
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout='{"streams":[{"width":1080,"height":1920}]}', stderr=""
+            )
+        out_file = Path(cmd[-1])
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file.write_bytes(b"MOCKRENDER")
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", lambda x: "/usr/bin/" + x)
+
+    source_vid = tmp_path / "source_audio.mp4"
+    source_vid.write_bytes(b"NO_VIDEO")
+    avatar_vid = tmp_path / "avatar.mp4"
+    avatar_vid.write_bytes(b"AVATAR")
+    audio_file = tmp_path / "audio.wav"
+    audio_file.write_bytes(b"AUDIO")
+    ass_file = tmp_path / "subs.ass"
+    ass_file.write_text("[Script Info]\n", encoding="utf-8")
+    output_vid = tmp_path / "output.mp4"
+
+    monkeypatch.setattr("viralpanel.studio.renderer.probe_duration", lambda p: 2.5)
+    monkeypatch.setattr("viralpanel.studio.renderer.has_video_stream", lambda p: False)
+
+    req = StudioRenderRequest(
+        run_id="run-enc-test",
+        source_video_path=source_vid,
+        avatar_video_path=avatar_vid,
+        voice_audio_path=audio_file,
+        ass_subtitle_path=ass_file,
+        output_path=output_vid,
+        composition=ReactionCompositionSpec(
+            preset="veryfast",
+            crf=20,
+            pix_fmt="yuv420p",
+            video_codec="libx264",
+            audio_codec="aac",
+            audio_bitrate="192k",
+        ),
+    )
+
+    renderer = ReactionVideoRenderer()
+    renderer.render_from_request(req)
+
+    # Encontrar comando do ffmpeg com filter_complex
+    ffmpeg_cmds = [c for c in captured_commands if c[0] == "ffmpeg" and "-filter_complex" in c]
+    assert len(ffmpeg_cmds) == 1, "Deve haver exatamente 1 execução de FFmpeg"
+    cmd = ffmpeg_cmds[0]
+
+    # Flags de codificação obrigatórias
+    assert "-preset" in cmd and cmd[cmd.index("-preset") + 1] == "veryfast"
+    assert "-crf" in cmd and cmd[cmd.index("-crf") + 1] == "20"
+    assert "-pix_fmt" in cmd and cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+    assert "-c:v" in cmd and cmd[cmd.index("-c:v") + 1] == "libx264"
+    assert "-c:a" in cmd and cmd[cmd.index("-c:a") + 1] == "aac"
+    assert "-b:a" in cmd and cmd[cmd.index("-b:a") + 1] == "192k"
+    assert "-shortest" in cmd
+
+    # Mapeamento audiovisual
+    vout_idx = cmd.index("-map")
+    assert cmd[vout_idx + 1] == "[vout]"
+    a2_idx = cmd.index("-map", vout_idx + 2)
+    assert cmd[a2_idx + 1] == "2:a"
+
+    # lavfi inline quando has_video_stream é False
+    assert "-f" in cmd and cmd[cmd.index("-f") + 1] == "lavfi"
+    lavfi_input = cmd[cmd.index("-f") + 3]
+    assert lavfi_input.startswith("color=c=#0f172a:s=1080x1920:r=24:d=2.5")
+
 
 
 
