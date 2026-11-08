@@ -2,12 +2,30 @@ import logging
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
+from viralpanel.branding import SafeZones9x16, ZuntoPalette
 from viralpanel.config import get_settings
 from viralpanel.studio.voice import probe_duration
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AvatarConfig:
+    """Configuração geométrica e visual do avatar reaction circular ZUNTO!."""
+
+    avatar_image_path: Path | str | None = None
+    size: int = SafeZones9x16.AVATAR_SIZE
+    crop_mode: Literal["circle_alpha", "native_rgba"] = "circle_alpha"
+    border_color: str = ZuntoPalette.IMPACT_YELLOW
+    border_width: int = 4
+    overlay_x_expr: str = "W-w-54"
+    overlay_y_expr: str = "H-h-320"
+    enable_waveform: bool = True
+    waveform_color: str = "#FACC15@0.85"
 
 
 def ensure_default_avatar_image(avatar_path: Path | str | None = None) -> Path:

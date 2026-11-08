@@ -49,10 +49,10 @@ class SafeZones9x16:
     SUBTITLE_MARGIN_V: Final[int] = 640
 
     # Avatar Reaction: Canto inferior direito acima da barra do TikTok
-    # Posicionado em Y ≈ 1320px a 1660px, X ≈ 692px a 1032px (size=340px)
-    AVATAR_SIZE: Final[int] = 340
-    AVATAR_MARGIN_RIGHT: Final[int] = 48
-    AVATAR_MARGIN_BOTTOM: Final[int] = 260
+    # Posicionado em Y ≈ 1300px a 1600px, X ≈ 726px a 1026px (size=300px, margin_right=54, margin_bottom=320)
+    AVATAR_SIZE: Final[int] = 300
+    AVATAR_MARGIN_RIGHT: Final[int] = 54
+    AVATAR_MARGIN_BOTTOM: Final[int] = 320
 
 
 @dataclass(frozen=True)
