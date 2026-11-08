@@ -14,7 +14,7 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 - [x] **AVTR-01**: Eliminação da aparência de "imagem quadrada" no avatar reaction, tratando recorte e transparência a partir de diagnóstico dos assets reais de forma orgânica.
 - [ ] **AVTR-02**: Calibração precisa de posicionamento e dimensionamento no layout vertical 9:16 para evitar que o avatar cubra pontos focais ou legendas essenciais.
-- [ ] **AVTR-03**: Preservação de proporção, nitidez, sincronização e qualidade visual na sobreposição do avatar, respeitando a taxa de quadros esperada pelo pipeline.
+- [x] **AVTR-03**: Preservação de proporção, nitidez, sincronização e qualidade visual na sobreposição do avatar, respeitando a taxa de quadros esperada pelo pipeline.
 
 ### Refatoração do Renderer (COMP)
 
@@ -63,9 +63,9 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | SUB-01 | Phase 8, Phase 10 | Complete |
 | SUB-02 | Phase 10 | Complete |
 | SUB-03 | Phase 10 | Complete |
-| AVTR-01 | Phase 8, Phase 11 | Mapped |
+| AVTR-01 | Phase 8, Phase 11 | Complete |
 | AVTR-02 | Phase 11 | Mapped |
-| AVTR-03 | Phase 11 | Mapped |
+| AVTR-03 | Phase 11 | Complete |
 | COMP-01 | Phase 8, Phase 12 | Mapped |
 | COMP-02 | Phase 12 | Mapped |
 | COMP-03 | Phase 12 | Mapped |
