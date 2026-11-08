@@ -60,9 +60,9 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SUB-01 | Phase 8, Phase 10 | Mapped |
-| SUB-02 | Phase 10 | Mapped |
-| SUB-03 | Phase 10 | Mapped |
+| SUB-01 | Phase 8, Phase 10 | Complete |
+| SUB-02 | Phase 10 | Complete |
+| SUB-03 | Phase 10 | Complete |
 | AVTR-01 | Phase 8, Phase 11 | Mapped |
 | AVTR-02 | Phase 11 | Mapped |
 | AVTR-03 | Phase 11 | Mapped |

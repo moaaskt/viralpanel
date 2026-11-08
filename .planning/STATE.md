@@ -4,19 +4,19 @@ milestone: v1.1
 milestone_name: ZUNTO! Visual Engine
 current_phase: 10
 current_phase_name: Motor de Legendas ZUNTO! e Desacoplamento
-current_plan: 1
+current_plan: 2
 status: ready
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-11-08T00:40:00.000Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-11-08T00:46:26.234Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 10 Plan 01 complete (12/12 checks passed, 79 tests passing)
-state_head: e2d7c9a
+state_head: ecd7b3b38634743bc9be51f7d4ae6e4cf236ba69
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 45
+  completed_plans: 6
+  percent: 33
 ---
 
 # Project State
@@ -31,12 +31,12 @@ See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 ## Current Position
 
 Phase: 10 — Motor de Legendas ZUNTO! e Desacoplamento
-Current Plan: 1
+Current Plan: 2
 Total Plans in Phase: 2
 Status: Ready for 10-02-PLAN.md
 Last activity: 2026-11-08 — Completed 10-01-PLAN.md (Motor de Legendas ZUNTO! em subtitles.py, DTO SubtitleJobConfig, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo)
 
-Progress: [█████░░░░░] 45%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [█████░░░░░] 45%
 | Phase 09 P01 | 4min | 2 tasks | 2 files |
 | Phase 09 P02 | 6m | 3 tasks | 4 files |
 | Phase 10 P01 | 8m | 3 tasks | 3 files |
+| Phase 10 P02 | 4m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,10 @@ Progress: [█████░░░░░] 45%
 - [Phase 10]: Implementar DTO imutável SubtitleJobConfig e desacoplar lógica temporal/estilística de subtitles.py de qualquer dependência direta do FFmpeg
 - [Phase 10]: Implementar segmentação orientada a pausas (. , ! ? ; :) com 3 a 5 palavras por cue e temporização proporcional contígua sem gaps/overlaps
 - [Phase 10]: Sanitização ASS de {} para () e quebras para \N, com destaque amarelo ZUNTO! {\c&H0015CCFA&} e fechamento compulsório em branco {\c&H00FFFFFF&}
+- [Phase 10]: D-01: Integração de SubtitleJobConfig em StudioService.produce preservando contratos de Asset e DB
+- [Phase 10]: D-04: Burn-in de legenda aplicado estritamente em camada única no passe final do ReactionVideoRenderer
+- [Phase 10]: D-05: Posição geométrica nominal de legendas com MarginV=640 e alinhamento inferior central (Alignment=2)
+- [Phase 10]: D-06: Validação de renderização empírica via amostragem de pixels rawvideo e delegação formal da validação visual final de UIs móveis para a Phase 13
 
 ### Pending Todos
 
@@ -87,6 +92,6 @@ None yet.
 
 ## Session
 
-**Last session:** 2026-11-08T00:40:00.000Z
-**Stopped at:** Completed 10-01-PLAN.md
+**Last session:** 2026-11-08T00:46:26.175Z
+**Stopped at:** Completed 10-02-PLAN.md
 **Resume file:** None
