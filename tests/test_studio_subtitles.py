@@ -13,6 +13,7 @@ from viralpanel.studio.subtitles import (
     build_ass_header,
     build_cues_from_script,
     generate_subtitles,
+    split_script_into_cues,
     write_ass_subtitles,
 )
 
@@ -109,3 +110,101 @@ def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
     assert "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV" in content
     assert ",3,16,0,2,80,80,640,1" in content
     assert "Dialogue: 0," in content
+
+
+def test_cue_chunking_punctuation_aware():
+    """Valida segmentação sensível a pontuação e limites de retenção mobile (3-5 palavras)."""
+    script = "Pare de esperar o momento ideal. Comece agora, mesmo sem motivação, e veja o resultado!"
+    cues = split_script_into_cues(script, total_duration=8.0, min_words=3, max_words=5)
+
+    assert len(cues) >= 3
+    for cue in cues:
+        word_count = len(cue.text.split())
+        # Cada cue deve respeitar a cadência entre 2 e 6 palavras (meta de 3 a 5 palavras sem quebras artificiais)
+        assert 2 <= word_count <= 6, f"Cue fora do intervalo rítmico: {cue.text!r}"
+
+    # O texto concatenado deve conter todo o roteiro original
+    reconstructed = " ".join(c.text for c in cues)
+    for word in ["esperar", "ideal.", "Comece", "motivação,", "resultado!"]:
+        assert word in reconstructed
+
+
+def test_proportional_timing_allocation():
+    """Valida alocação de tempo proporcional ao peso de caracteres e pausas."""
+    # Frase 1: curta (10 chars, 1 ponto)
+    # Frase 2: longa (58 chars, 1 vírgula, 1 ponto)
+    script = "Comece já. A disciplina diária supera a motivação temporária de qualquer pessoa."
+    cues = split_script_into_cues(script, total_duration=7.0, min_words=2, max_words=6)
+
+    assert len(cues) >= 2
+    # O primeiro cue é curto ("Comece já.")
+    # Os cues subsequentes são mais longos
+    cue_first = cues[0]
+    cue_last = cues[-1]
+
+    dur_first = cue_first.end - cue_first.start
+    dur_last = cue_last.end - cue_last.start
+
+    assert dur_first >= 0.8  # Piso mínimo
+    assert dur_last > dur_first, f"Cue mais longo deve ter mais tempo: {dur_last} vs {dur_first}"
+
+
+def test_temporal_contiguity_and_no_overlaps():
+    """Valida contiguidade temporal estrita sem sobreposições e sem gaps."""
+    script = (
+        "Você não precisa de mais tempo. Precisa de foco implacável. "
+        "A cada minuto perdido, sua concorrência dá mais um passo à frente."
+    )
+    total_duration = 9.4
+    cues = split_script_into_cues(script, total_duration=total_duration, min_words=3, max_words=5)
+
+    assert len(cues) > 1
+    assert cues[0].start == 0.0
+
+    for i in range(len(cues)):
+        assert cues[i].start < cues[i].end, f"Cue {i} inválido: start >= end"
+        if i > 0:
+            # Contiguidade estrita sem gaps nem overlaps
+            assert cues[i].start == pytest.approx(cues[i - 1].end, abs=1e-2)
+            assert cues[i - 1].end <= cues[i].start
+
+    assert cues[-1].end == pytest.approx(total_duration, abs=1e-2)
+
+
+def test_timing_mode_metadata_and_word_timestamps():
+    """Valida metadados de timing_mode com fallback heurístico e word timestamps."""
+    script = "Aja agora mesmo."
+
+    # Cenário 1: Fallback heurístico proporcional
+    cues_heur = split_script_into_cues(script, total_duration=3.0)
+    assert all(c.timing_mode == "proportional_character_estimate" for c in cues_heur)
+
+    # Cenário 2: Word timestamps fornecidos explicitamente
+    w_timestamps = [
+        {"word": "Aja", "start": 0.2, "end": 0.8},
+        {"word": "agora", "start": 0.85, "end": 1.6},
+        {"word": "mesmo.", "start": 1.65, "end": 2.8},
+    ]
+    cues_aligned = split_script_into_cues(
+        script,
+        total_duration=3.0,
+        word_timestamps=w_timestamps,
+    )
+    assert all(c.timing_mode == "word_timestamp_aligned" for c in cues_aligned)
+    assert cues_aligned[0].start == pytest.approx(0.2, abs=0.05)
+    assert cues_aligned[-1].end == pytest.approx(3.0, abs=0.05)
+
+
+def test_build_cues_from_script_backwards_compatibility():
+    """Valida que build_cues_from_script preserva compatibilidade delegando com sucesso."""
+    cues = build_cues_from_script(
+        "Foco diário constrói resultados duradouros.",
+        total_duration=4.5,
+        max_words_per_cue=5,
+    )
+    assert isinstance(cues, list)
+    assert len(cues) >= 1
+    assert all(isinstance(c, SubtitleCue) for c in cues)
+    assert cues[0].start == 0.0
+    assert cues[-1].end == pytest.approx(4.5, abs=0.05)
+
