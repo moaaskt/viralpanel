@@ -440,16 +440,16 @@ def test_avatar_reaction_pixel_transparency_and_yellow_border(tmp_path):
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Atualização das Constantes em `branding.py` (`SafeZones9x16`):**
+1. **RESOLVED: Atualização das Constantes em `branding.py` (`SafeZones9x16`):**
    - *O que sabemos:* Em `src/viralpanel/branding.py:53-55`, as constantes atuais são `AVATAR_SIZE: Final[int] = 340`, `AVATAR_MARGIN_RIGHT: Final[int] = 48` e `AVATAR_MARGIN_BOTTOM: Final[int] = 260`.
    - *O que precisa ser calibrado:* A Phase 11 define formalmente o diâmetro em 300px, margem direita de 54px e margem inferior de 320px (`X=W-w-54`, `Y=H-h-320`).
-   - *Recomendação:* Atualizar `SafeZones9x16` para refletir `AVATAR_SIZE = 300`, `AVATAR_MARGIN_RIGHT = 54` e `AVATAR_MARGIN_BOTTOM = 320`, garantindo que tanto `branding.py` quanto `AvatarConfig` compartilhem os mesmos números exatos.
+   - *Resolução:* Atualizar `SafeZones9x16` na Task 1 do plano 11-01 para refletir `AVATAR_SIZE = 300`, `AVATAR_MARGIN_RIGHT = 54` e `AVATAR_MARGIN_BOTTOM = 320`, garantindo que tanto `branding.py` quanto `AvatarConfig` compartilhem os mesmos números exatos.
 
-2. **Espessura Ideal da Borda Circular (3px vs 4px):**
+2. **RESOLVED: Espessura Ideal da Borda Circular (3px vs 4px):**
    - *O que sabemos:* O CONTEXT.md permite discricionariedade entre 3px e 4px.
-   - *Recomendação:* Adotar **4px** como padrão. Em resolução 1080x1920 exibida em telas móveis com densidade retina (ex.: iPhone/Android com 3x scale factor), 4 pixels físicos equivalem a ~1.33 pontos de densidade independente (dp), garantindo visibilidade clara do anel amarelo `#FACC15` sem ficar pesado.
+   - *Resolução:* Adotar **4px** como padrão oficial da marca ZUNTO!. Em resolução 1080x1920 exibida em telas móveis com densidade retina (ex.: iPhone/Android com 3x scale factor), 4 pixels físicos equivalem a ~1.33 pontos de densidade independente (dp), garantindo visibilidade clara do anel amarelo `#FACC15` sem ficar pesado. Incorporado nas fórmulas do plano 11-01.
 
 ---
 

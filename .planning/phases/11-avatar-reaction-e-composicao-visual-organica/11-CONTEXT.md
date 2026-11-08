@@ -75,3 +75,4 @@ Fora de escopo: unificação de todos os passes no grafo single-pass definitivo 
 - `tests/test_studio_avatar.py` — Suíte de testes existente do avatar.
 
 </canonical_refs>
+
