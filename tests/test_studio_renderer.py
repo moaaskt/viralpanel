@@ -144,6 +144,69 @@ def test_studio_service_renders_vertical_9x16_reaction_video(tmp_path):
         assert "Dialogue: 0," in ass_content, "Eventos de diálogo devem estar presentes no arquivo ASS"
 
 
+def test_studio_service_produce_encapsulates_studio_render_request(tmp_path):
+    """Valida que StudioService.produce instancia e delega via StudioRenderRequest (D-04, COMP-03)."""
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+
+    received_requests: list[StudioRenderRequest] = []
+
+    class SpyRenderer:
+        def render_from_request(self, request: StudioRenderRequest) -> tuple[Path, float]:
+            received_requests.append(request)
+            request.output_path.parent.mkdir(parents=True, exist_ok=True)
+            request.output_path.write_bytes(b"SPY_OUTPUT_VIDEO")
+            return request.output_path, 3.5
+
+    spy_renderer = SpyRenderer()
+    service = StudioService(
+        voice_synthesizer=MockVoiceSynthesizer(min_duration=2.0, max_duration=2.0),
+        avatar_animator=MockAvatarAnimator(width=240, height=240),
+        renderer=spy_renderer,  # type: ignore
+        storage=StorageManager(tmp_path),
+    )
+
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@creator/video/101", author="creator", score=90.0)
+        db.add(src)
+        db.flush()
+        script = Script(
+            source_video_id=src.id,
+            hook="Hook de teste",
+            script_text="Texto do script de teste para validar o DTO tipado StudioRenderRequest.",
+            version=1,
+        )
+        db.add(script)
+        db.commit()
+
+        final_asset = service.produce(db=db, run_id="run-spy-dto", script=script)
+
+        # 1. Validação da delegação ao DTO StudioRenderRequest
+        assert len(received_requests) == 1
+        req = received_requests[0]
+        assert isinstance(req, StudioRenderRequest)
+        assert req.run_id == "run-spy-dto"
+        assert req.source_video_path.name == "source.mp4"
+        assert req.avatar_video_path.name == "avatar.mp4"
+        assert req.voice_audio_path.name == "narration.wav"
+        assert req.ass_subtitle_path.name == "captions.ass"
+        assert req.output_path.name == "final_reaction_9x16.mp4"
+        assert req.voice_duration == 2.0
+        assert req.avatar_config == service.avatar_config
+        assert req.composition == service.composition
+
+        # 2. Validação dos contratos e persistência atômica
+        assert final_asset.asset_type == "final_video"
+        assert final_asset.duration_seconds == 3.5
+        assert src.status == "produced"
+
+        assets = db.scalars(select(Asset).where(Asset.script_id == script.id)).all()
+        assert len(assets) == 3
+        types = {a.asset_type for a in assets}
+        assert types == {"audio", "avatar", "final_video"}
+
+
 def test_reaction_renderer_single_ass_layer_and_path_escape(tmp_path, monkeypatch):
     """Garante camada única de legenda e escape blindado de caminhos no FFmpeg (T-10-04, SUB-02)."""
     captured_commands = []

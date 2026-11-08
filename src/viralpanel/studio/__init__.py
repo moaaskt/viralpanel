@@ -1,5 +1,10 @@
-from viralpanel.studio.avatar import BaseAvatarAnimator, MockAvatarAnimator
-from viralpanel.studio.renderer import ReactionVideoRenderer, probe_video_dimensions
+from viralpanel.studio.avatar import AvatarConfig, BaseAvatarAnimator, MockAvatarAnimator
+from viralpanel.studio.renderer import (
+    ReactionCompositionSpec,
+    ReactionVideoRenderer,
+    StudioRenderRequest,
+    probe_video_dimensions,
+)
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.subtitles import (
     SubtitleCue,
@@ -16,11 +21,14 @@ from viralpanel.studio.subtitles import (
 from viralpanel.studio.voice import BaseVoiceSynthesizer, MockVoiceSynthesizer, XTTSVoiceSynthesizer, probe_duration
 
 __all__ = [
+    "AvatarConfig",
     "BaseAvatarAnimator",
     "BaseVoiceSynthesizer",
     "MockAvatarAnimator",
     "MockVoiceSynthesizer",
+    "ReactionCompositionSpec",
     "ReactionVideoRenderer",
+    "StudioRenderRequest",
     "StudioService",
     "SubtitleCue",
     "SubtitleJobConfig",
