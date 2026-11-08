@@ -84,11 +84,11 @@ Plans:
   2. Posicionamento e dimensionamento calibrados estritamente dentro da safe zone vertical 9:16, assegurando que elementos centrais do vídeo e legendas nunca sejam ocluídos.
   3. Proporção, nitidez, sincronização e qualidade visual preservadas, respeitando a taxa de quadros e conformidade técnica esperada pelo pipeline.
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 - [x] 11-01-PLAN.md — Núcleo do Avatar Reaction em `avatar.py` e `branding.py`, DTO `AvatarConfig`, Recorte Circular com Canal Alfa Suave, Borda Amarela ZUNTO! (#FACC15) e Codec PNG em MP4 (AVTR-01, AVTR-03, BRND-01, BRND-02)
-- [ ] 11-02-PLAN.md — Integração no `ReactionVideoRenderer`, Calibração SafeZone em W-w-54:H-h-320, Remoção da Moldura Branca e Teste Empírico de Composição sem Regressão (AVTR-01, AVTR-02, BRND-01, BRND-02)
+- [x] 11-02-PLAN.md — Integração no `ReactionVideoRenderer`, Calibração SafeZone em W-w-54:H-h-320, Remoção da Moldura Branca e Teste Empírico de Composição sem Regressão (AVTR-01, AVTR-02, BRND-01, BRND-02)
 **UI hint**: yes
 
 ### Phase 12: Refatoração do Video Composer FFmpeg e Integração
@@ -124,6 +124,6 @@ Plans:
 | Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
 | Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
 | Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
-| Phase 11: Avatar Reaction e Composição Visual Orgânica | 0/0 | Not started | - |
+| Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 0/0 | Not started | - |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |

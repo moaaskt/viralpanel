@@ -5,18 +5,18 @@ milestone_name: ZUNTO! Visual Engine
 current_phase: 11
 current_phase_name: Avatar Reaction e Composição Visual Orgânica
 current_plan: 2
-status: in_progress
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-11-08T02:23:41.237Z"
+status: complete
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-11-08T02:30:00.000Z"
 last_activity: 2026-11-08
-last_activity_desc: Phase 10 complete and verified (16/16 checks passed, 81 tests passing)
-state_head: edf8a798e59f2dd4f140b850df81778ac4bdeff3
+last_activity_desc: Phase 11 complete and verified (86 tests passing, avatar reaction organic composition verified)
+state_head: 69d45e5c1d23f88f94a02e1532b0f520ded35ae3
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
-  percent: 50
+  completed_plans: 8
+  percent: 67
 ---
 
 # Project State
@@ -26,17 +26,17 @@ progress:
 See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 
 **Core value:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.  
-**Current focus:** Phase 11 — Avatar Reaction e Composição Visual Orgânica
+**Current focus:** Phase 11 — Avatar Reaction e Composição Visual Orgânica (Complete)
 
 ## Current Position
 
 Phase: 11 — Avatar Reaction e Composição Visual Orgânica
 Current Plan: 2
 Total Plans in Phase: 2
-Status: In Progress
-Last activity: 2026-11-08 — Completed 11-01-PLAN.md (Avatar reaction com canal alfa, borda amarela ZUNTO! e SafeZones)
+Status: Complete
+Last activity: 2026-11-08 — Completed 11-02-PLAN.md (Integração no ReactionVideoRenderer e safe zones)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [█████░░░░░] 50%
 | Phase 10 P01 | 8m | 3 tasks | 3 files |
 | Phase 10 P02 | 4m | 2 tasks | 2 files |
 | Phase 11-avatar-reaction-e-composicao-visual-organica P01 | 7m | 3 tasks | 4 files |
+| Phase 11-avatar-reaction-e-composicao-visual-organica P02 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Progress: [█████░░░░░] 50%
 - [Phase 11-avatar-reaction-e-composicao-visual-organica]: Calibração de SafeZones9x16 com size=300, margin_right=54 e margin_bottom=320 para isolar a zona vertical de legendas (1080..1280px)
 - [Phase 11-avatar-reaction-e-composicao-visual-organica]: Utilização do codec de vídeo png em pix_fmt rgba dentro do container MP4 para transporte sem perdas de canal alfa
 - [Phase 11-avatar-reaction-e-composicao-visual-organica]: Confinamento geométrico de showwaves (#FACC15@0.85) antes da máscara circular geq, prevenindo vazamento e caixas pretas opacas
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Eliminação total do filtro pad de moldura retangular branca em ReactionVideoRenderer (Cenário 3 da auditoria)
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Posicionamento do overlay PIP em W-w-54:H-h-320 (X=726..1026, Y=1300..1600), isolando a zona de legendas (1080..1280px) e desobstruindo a barra inferior mobile (Y>=1600px)
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ None yet.
 
 ## Session
 
-**Last session:** 2026-11-08T02:23:41.144Z
-**Stopped at:** Completed 11-01-PLAN.md
+**Last session:** 2026-11-08T02:30:00.000Z
+**Stopped at:** Completed 11-02-PLAN.md
 **Resume file:** None
