@@ -84,7 +84,11 @@ Plans:
   2. Posicionamento e dimensionamento calibrados estritamente dentro da safe zone vertical 9:16, assegurando que elementos centrais do vídeo e legendas nunca sejam ocluídos.
   3. Proporção, nitidez, sincronização e qualidade visual preservadas, respeitando a taxa de quadros e conformidade técnica esperada pelo pipeline.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Núcleo do Avatar Reaction em `avatar.py` e `branding.py`, DTO `AvatarConfig`, Recorte Circular com Canal Alfa Suave, Borda Amarela ZUNTO! (#FACC15) e Codec PNG em MP4 (AVTR-01, AVTR-03, BRND-01, BRND-02)
+- [ ] 11-02-PLAN.md — Integração no `ReactionVideoRenderer`, Calibração SafeZone em W-w-54:H-h-320, Remoção da Moldura Branca e Teste Empírico de Composição sem Regressão (AVTR-01, AVTR-02, BRND-01, BRND-02)
 **UI hint**: yes
 
 ### Phase 12: Refatoração do Video Composer FFmpeg e Integração
