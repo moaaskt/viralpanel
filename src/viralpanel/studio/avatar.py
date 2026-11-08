@@ -30,7 +30,7 @@ class AvatarConfig:
 
 def ensure_default_avatar_image(avatar_path: Path | str | None = None) -> Path:
     """Garante a existência da imagem base de avatar em assets/, criando uma imagem dark moderna se necessário."""
-    target = Path(avatar_path) if avatar_path else Path("assets/creator_avatar.png")
+    target = Path(avatar_path).resolve() if avatar_path else Path("assets/creator_avatar.png").resolve()
     if target.exists() and target.stat().st_size > 0:
         return target
 
@@ -85,18 +85,34 @@ class BaseAvatarAnimator(ABC):
 
 
 class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
-    """Gera vídeo do avatar (360x360) a partir de foto base com espectro de onda reativo ao áudio."""
+    """Gera vídeo do avatar (300x300) a partir de foto base com recorte circular em canal alfa e espectro reativo."""
 
     def __init__(
         self,
-        width: int = 360,
-        height: int = 360,
+        width: int = SafeZones9x16.AVATAR_SIZE,
+        height: int = SafeZones9x16.AVATAR_SIZE,
         default_avatar_image: Path | str | None = None,
+        config: AvatarConfig | None = None,
     ):
+        settings = get_settings()
         self.width = width
         self.height = height
-        settings = get_settings()
-        self.default_avatar_image = Path(default_avatar_image or settings.avatar_image_path or "assets/creator_avatar.png")
+        raw_avatar_img = (
+            default_avatar_image
+            or (config.avatar_image_path if config else None)
+            or settings.avatar_image_path
+            or "assets/creator_avatar.png"
+        )
+        self.default_avatar_image = Path(raw_avatar_img)
+        if config is not None:
+            self.config = config
+            self.width = config.size
+            self.height = config.size
+        else:
+            self.config = AvatarConfig(
+                size=self.width,
+                avatar_image_path=self.default_avatar_image,
+            )
 
     def generate_avatar_video(
         self,
@@ -104,16 +120,51 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
         output_path: Path,
         avatar_image_path: Path | None = None,
     ) -> tuple[Path, float]:
+        audio_path = Path(audio_path).resolve()
+        output_path = Path(output_path).resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         duration = max(probe_duration(audio_path), 1.5)
-        img_path = ensure_default_avatar_image(avatar_image_path or self.default_avatar_image)
+        raw_img = avatar_image_path or self.config.avatar_image_path or self.default_avatar_image
+        img_path = ensure_default_avatar_image(raw_img)
 
         if shutil.which("ffmpeg") and audio_path.exists() and img_path.exists():
+            size = self.config.size
+            border_width = self.config.border_width
+            r_outer = size / 2.0
+            r_inner = r_outer - border_width
+            cx = size / 2.0
+            cy = size / 2.0
+
+            # Decomposição RGB da cor da borda (#FACC15 -> R=250, G=204, B=21)
+            border_color_clean = self.config.border_color.strip().lstrip("#")
+            if len(border_color_clean) >= 6:
+                r_val = int(border_color_clean[0:2], 16)
+                g_val = int(border_color_clean[2:4], 16)
+                b_val = int(border_color_clean[4:6], 16)
+            else:
+                r_val, g_val, b_val = 250, 204, 21
+
+            showwaves_color = self.config.waveform_color
+            if showwaves_color.startswith("#"):
+                showwaves_color = f"0x{showwaves_color[1:]}"
+
+            if self.config.enable_waveform:
+                wave_filter = (
+                    f"[1:a]showwaves=s={size}x80:mode=line:colors={showwaves_color}:rate=24,format=rgba[wave];"
+                    f"[base][wave]overlay=x=0:y=H-h-20:shortest=1[composed];"
+                )
+            else:
+                wave_filter = "[base]null[composed];"
+
             filter_complex = (
-                f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
-                f"crop={self.width}:{self.height},format=yuv420p[base_avatar];"
-                f"[1:a]showwaves=s={self.width}x64:mode=line:colors=#38bdf8@0.85:rate=24,format=yuva420p[wave];"
-                f"[base_avatar][wave]overlay=0:H-h-8:shortest=1[vout]"
+                f"[0:v]scale={size}:{size}:force_original_aspect_ratio=increase,"
+                f"crop={size}:{size},format=rgba[base];"
+                f"{wave_filter}"
+                f"[composed]geq="
+                f"r='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{r_val},r(X,Y)))':"
+                f"g='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{g_val},g(X,Y)))':"
+                f"b='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{b_val},b(X,Y)))':"
+                f"a='clip(255*({r_outer + 0.5}-hypot(X-{cx},Y-{cy})), 0, 255)'[vout]"
             )
             cmd = [
                 "ffmpeg",
@@ -131,11 +182,9 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
                 "-map",
                 "1:a",
                 "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
+                "png",
                 "-pix_fmt",
-                "yuv420p",
+                "rgba",
                 "-c:a",
                 "aac",
                 "-shortest",
@@ -152,7 +201,11 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
 class MockAvatarAnimator(BaseAvatarAnimator):
     """Gera vídeo sintético do avatar falante sincronizado com a duração exata do áudio de narração."""
 
-    def __init__(self, width: int = 360, height: int = 360):
+    def __init__(
+        self,
+        width: int = SafeZones9x16.AVATAR_SIZE,
+        height: int = SafeZones9x16.AVATAR_SIZE,
+    ):
         self.width = width
         self.height = height
 
