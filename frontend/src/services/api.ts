@@ -62,6 +62,16 @@ export interface Publication {
   status: string;
 }
 
+export interface Asset {
+  id: string;
+  script_id: string;
+  asset_type: string;
+  file_path: string;
+  resolution?: string;
+  duration_seconds?: number;
+  created_at: string;
+}
+
 export interface TriggerResponse {
   task_id: string;
   message: string;
@@ -77,13 +87,13 @@ export const fetchStats = async (): Promise<StatsResponse> => {
   return data;
 };
 
-export const fetchRuns = async (): Promise<PipelineRun[]> => {
-  const { data } = await api.get<PipelineRun[]>('/runs?limit=15');
+export const fetchRuns = async (limit: number = 30): Promise<PipelineRun[]> => {
+  const { data } = await api.get<PipelineRun[]>(`/runs?limit=${limit}`);
   return data;
 };
 
-export const fetchVideos = async (): Promise<SourceVideo[]> => {
-  const { data } = await api.get<SourceVideo[]>('/videos?limit=30');
+export const fetchVideos = async (limit: number = 50): Promise<SourceVideo[]> => {
+  const { data } = await api.get<SourceVideo[]>(`/videos?limit=${limit}`);
   return data;
 };
 
@@ -93,8 +103,14 @@ export const fetchScripts = async (videoId?: string): Promise<Script[]> => {
   return data;
 };
 
-export const fetchPublications = async (): Promise<Publication[]> => {
-  const { data } = await api.get<Publication[]>('/publications?limit=30');
+export const fetchPublications = async (limit: number = 50): Promise<Publication[]> => {
+  const { data } = await api.get<Publication[]>(`/publications?limit=${limit}`);
+  return data;
+};
+
+export const fetchAssets = async (scriptId?: string): Promise<Asset[]> => {
+  const url = scriptId ? `/assets?script_id=${scriptId}` : '/assets';
+  const { data } = await api.get<Asset[]>(url);
   return data;
 };
 
@@ -104,3 +120,4 @@ export const triggerPipeline = async (): Promise<TriggerResponse> => {
 };
 
 export default api;
+
