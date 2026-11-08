@@ -14,13 +14,13 @@
 - **Sincronização SafeZones**: Confirmar que `SafeZones9x16` em `src/viralpanel/branding.py` expõe `AVATAR_SIZE=300`, `AVATAR_MARGIN_RIGHT=54` e `AVATAR_MARGIN_BOTTOM=320`.
 - **Comando automatizado**: `./.venv/bin/pytest tests/test_branding.py tests/test_studio_avatar.py -k "test_safe_zones_9x16_constants or test_avatar_border" -v`
 
-### Dimension 3: Confinamento da Onda Sonora Reativa (`AVTR-01`, `BRND-01`)
-- **Verificação**: A onda sonora gerada pelo `showwaves` deve utilizar a cor ZUNTO! (`#FACC15@0.85`) e estar geometricamente contida no interior do círculo, sem vazar para a área transparente externa.
-- **Comando automatizado**: `./.venv/bin/pytest tests/test_studio_avatar.py -k "test_audio_reactive_avatar_animator" -v`
+### Dimension 3: Confinamento da Onda Sonora Reativa e Transparência de Fundo (`AVTR-01`, `BRND-01`)
+- **Verificação**: A onda sonora gerada pelo `showwaves` deve utilizar a cor ZUNTO! (`#FACC15@0.85`), estar geometricamente contida no interior do círculo e possuir fundo transparente (`A == 0` nos pixels onde não há traço sonoro). Teste empírico sobre imagem-base de cor sólida valida que os pixels ao redor da forma de onda preservam a imagem de fundo sem gerar retângulo opaco/preto.
+- **Comando automatizado**: `./.venv/bin/pytest tests/test_studio_avatar.py -k "test_showwaves_alpha_transparency or test_audio_reactive_avatar_animator" -v`
 
 ### Dimension 4: Composição Visual 9:16 no Renderer (`AVTR-01`, `AVTR-02`)
-- **Verificação**: Remoção de `pad=...:color=white` no `ReactionVideoRenderer`. Sobreposição PIP configurada em `W-w-54:H-h-320` com `size=300` e preservação da transparência sobre o vídeo de fundo.
-- **Asserção de Composição**: Frame composto 1080x1920 sobre fundo magenta contrastante deve manter os cantos do avatar com a cor do fundo de vídeo (magenta) e a borda amarela (#FACC15) nítida.
+- **Verificação**: Remoção de `pad=...:color=white` no `ReactionVideoRenderer`. Sobreposição PIP configurada em `W-w-54:H-h-320` com `size=300`, posicionada na faixa vertical canônica $Y=1300\dots1600\text{px}$ e preservação total da transparência sobre o vídeo de fundo.
+- **Asserção de Composição e Continuidade**: Frame composto 1080x1920 sobre fundo magenta contrastante deve manter os cantos do envelope do avatar com a cor do fundo de vídeo (magenta R=254-255, G=0, B=253-255), continuidade da borda anelar amarela (#FACC15) e ausência de caixa opaca na região da onda.
 - **Comando automatizado**: `./.venv/bin/pytest tests/test_studio_renderer.py -k "test_reaction_renderer_avatar_composition" -v`
 
 ### Dimension 5: Integridade de Regressão e Contratos Legados
