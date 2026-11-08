@@ -11,7 +11,7 @@
 
 - [x] **Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz** - Investigação técnica das causas de duplicação de legendas, artefatos do avatar e mapeamento rigoroso dos contratos entre subtitles.py, renderer.py e tasks Celery (completed 2026-11-06)
 - [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** - Refinamento de prompts no Gemini 2.5 Flash para retenção, rastreabilidade de fontes factuais, CTA contextual e identidade visual ZUNTO! (completed 2026-11-06)
-- [ ] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO!
+- [x] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO! (completed 2026-11-08)
 - [ ] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16
 - [ ] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
@@ -119,7 +119,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
 | Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
-| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 0/2 | Not started | - |
+| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 0/0 | Not started | - |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 0/0 | Not started | - |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
