@@ -129,5 +129,5 @@ Plans:
 | Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
 | Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
-| Phase 12: Refatoração do Video Composer FFmpeg e Integração | 0/0 | Not started | - |
+| Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
