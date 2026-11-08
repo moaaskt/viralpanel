@@ -13,7 +13,7 @@
 - [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** - Refinamento de prompts no Gemini 2.5 Flash para retenção, rastreabilidade de fontes factuais, CTA contextual e identidade visual ZUNTO! (completed 2026-11-06)
 - [x] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO! (completed 2026-11-08)
 - [ ] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16
-- [ ] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing
+- [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
 
 ## Phase Details
@@ -102,11 +102,11 @@ Plans:
   2. Saída do vídeo rigorosamente padronizada em 1080x1920 (9:16 vertical Full HD) com sincronia perfeita entre áudio e vídeo e ordenação clara de camadas (fundo, avatar, legendas, branding).
   3. Contratos de interface com as tasks Celery preservados, assegurando que as integrações de publicação permaneçam funcionais e desacopladas da refatoração.
 
-**Plans**: 2 plans
+**Plans**: 2/2 plans complete
 
 Plans:
-- [ ] 12-01-PLAN.md — Núcleo do Video Composer Single-Pass, DTOs ReactionCompositionSpec e StudioRenderRequest, Lavfi Inline Fallback e Flags de Encoding (COMP-01, COMP-02, BRND-01, BRND-02)
-- [ ] 12-02-PLAN.md — Integração do StudioService, Preservação de Contratos Celery, Persistência Atômica de Assets e Regressão E2E (COMP-03, COMP-01, COMP-02, BRND-01, BRND-02)
+- [x] 12-01-PLAN.md — Núcleo do Video Composer Single-Pass, DTOs ReactionCompositionSpec e StudioRenderRequest, Lavfi Inline Fallback e Flags de Encoding (COMP-01, COMP-02, BRND-01, BRND-02)
+- [x] 12-02-PLAN.md — Integração do StudioService, Preservação de Contratos Celery, Persistência Atômica de Assets e Regressão E2E (COMP-03, COMP-01, COMP-02, BRND-01, BRND-02)
 
 ### Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E
 
