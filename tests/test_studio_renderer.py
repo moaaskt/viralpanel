@@ -21,6 +21,7 @@ from viralpanel.studio.renderer import (
     ReactionCompositionSpec,
     ReactionVideoRenderer,
     StudioRenderRequest,
+    has_video_stream,
     probe_video_dimensions,
 )
 from viralpanel.studio.service import StudioService
@@ -429,6 +430,145 @@ def test_avatar_reaction_overlay_pixel_transparency_and_no_white_box(tmp_path):
     assert not (cr > 200 and cg < 30 and cb > 200), (
         f"Centro do avatar não deve ser magenta puro. Obtido: RGB({cr}, {cg}, {cb})"
     )
+
+
+def test_single_pass_composition_no_disk_fallback(tmp_path):
+    """Garante que a composição single-pass não cria source_visual_bg.mp4 em disco (COMP-01, D-02)."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg não disponível")
+
+    # 1. Cria áudio de voz sintético
+    voice_path = tmp_path / "voice_sample.wav"
+    MockVoiceSynthesizer(min_duration=1.5, max_duration=2.0).synthesize("Teste single pass.", voice_path)
+
+    # 2. Cria avatar circular sintético rápido
+    avatar_video_path = tmp_path / "avatar_simple.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", "color=c=yellow:s=240x240:r=24:d=1.5",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            str(avatar_video_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    # 3. Legendas ASS
+    ass_path = tmp_path / "subtitles.ass"
+    job_cfg = SubtitleJobConfig(
+        script_text="Teste single pass.",
+        total_duration=1.5,
+        output_path=ass_path,
+        margin_v=SafeZones9x16.SUBTITLE_MARGIN_V,
+    )
+    generate_subtitles(job_cfg)
+
+    # 4. Source video sem stream de vídeo (arquivo vazio de áudio / sem vídeo)
+    source_video = tmp_path / "source_no_video.mp4"
+    source_video.write_bytes(b"DUMMY_AUDIO_ONLY_NO_VIDEO")
+    assert not has_video_stream(source_video)
+
+    out_file = tmp_path / "output_single_pass.mp4"
+    request = StudioRenderRequest(
+        run_id="run-sp-1",
+        source_video_path=source_video,
+        avatar_video_path=avatar_video_path,
+        voice_audio_path=voice_path,
+        ass_subtitle_path=ass_path,
+        output_path=out_file,
+    )
+
+    renderer = ReactionVideoRenderer()
+    rendered_path, dur = renderer.render_from_request(request)
+
+    assert rendered_path == out_file
+    assert out_file.exists()
+    assert dur >= 1.4
+
+    # Assegurar explicitamente que nenhum arquivo source_visual_bg.mp4 foi criado em disco
+    assert not (source_video.parent / "source_visual_bg.mp4").exists()
+    assert not (tmp_path / "source_visual_bg.mp4").exists()
+
+
+def test_reaction_renderer_output_specs_and_encoding_flags(tmp_path, monkeypatch):
+    """Valida argumentos de codificação de alta fidelidade e mapeamento FFmpeg (COMP-02, D-03)."""
+    captured_commands = []
+
+    def mock_run(cmd, *args, **kwargs):
+        captured_commands.append(cmd)
+        if cmd[0] == "ffprobe":
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout='{"streams":[{"width":1080,"height":1920}]}', stderr=""
+            )
+        out_file = Path(cmd[-1])
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file.write_bytes(b"MOCKRENDER")
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr(shutil, "which", lambda x: "/usr/bin/" + x)
+
+    source_vid = tmp_path / "source_audio.mp4"
+    source_vid.write_bytes(b"NO_VIDEO")
+    avatar_vid = tmp_path / "avatar.mp4"
+    avatar_vid.write_bytes(b"AVATAR")
+    audio_file = tmp_path / "audio.wav"
+    audio_file.write_bytes(b"AUDIO")
+    ass_file = tmp_path / "subs.ass"
+    ass_file.write_text("[Script Info]\n", encoding="utf-8")
+    output_vid = tmp_path / "output.mp4"
+
+    monkeypatch.setattr("viralpanel.studio.renderer.probe_duration", lambda p: 2.5)
+    monkeypatch.setattr("viralpanel.studio.renderer.has_video_stream", lambda p: False)
+
+    req = StudioRenderRequest(
+        run_id="run-enc-test",
+        source_video_path=source_vid,
+        avatar_video_path=avatar_vid,
+        voice_audio_path=audio_file,
+        ass_subtitle_path=ass_file,
+        output_path=output_vid,
+        composition=ReactionCompositionSpec(
+            preset="veryfast",
+            crf=20,
+            pix_fmt="yuv420p",
+            video_codec="libx264",
+            audio_codec="aac",
+            audio_bitrate="192k",
+        ),
+    )
+
+    renderer = ReactionVideoRenderer()
+    renderer.render_from_request(req)
+
+    # Encontrar comando do ffmpeg com filter_complex
+    ffmpeg_cmds = [c for c in captured_commands if c[0] == "ffmpeg" and "-filter_complex" in c]
+    assert len(ffmpeg_cmds) == 1, "Deve haver exatamente 1 execução de FFmpeg"
+    cmd = ffmpeg_cmds[0]
+
+    # Flags de codificação obrigatórias
+    assert "-preset" in cmd and cmd[cmd.index("-preset") + 1] == "veryfast"
+    assert "-crf" in cmd and cmd[cmd.index("-crf") + 1] == "20"
+    assert "-pix_fmt" in cmd and cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+    assert "-c:v" in cmd and cmd[cmd.index("-c:v") + 1] == "libx264"
+    assert "-c:a" in cmd and cmd[cmd.index("-c:a") + 1] == "aac"
+    assert "-b:a" in cmd and cmd[cmd.index("-b:a") + 1] == "192k"
+    assert "-shortest" in cmd
+
+    # Mapeamento audiovisual
+    vout_idx = cmd.index("-map")
+    assert cmd[vout_idx + 1] == "[vout]"
+    a2_idx = cmd.index("-map", vout_idx + 2)
+    assert cmd[a2_idx + 1] == "2:a"
+
+    # lavfi inline quando has_video_stream é False
+    assert "-f" in cmd and cmd[cmd.index("-f") + 1] == "lavfi"
+    lavfi_input = cmd[cmd.index("-f") + 3]
+    assert lavfi_input.startswith("color=c=#0f172a:s=1080x1920:r=24:d=2.5")
+
 
 
 
