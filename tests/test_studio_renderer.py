@@ -11,7 +11,11 @@ from viralpanel.branding import SafeZones9x16, ZuntoPalette, hex_to_ass_color
 from viralpanel.database import Base
 from viralpanel.models import Asset, Script, SourceVideo
 from viralpanel.storage import StorageManager
-from viralpanel.studio.avatar import MockAvatarAnimator
+from viralpanel.studio.avatar import (
+    AudioReactiveAvatarAnimator,
+    MockAvatarAnimator,
+    ensure_default_avatar_image,
+)
 from viralpanel.studio.renderer import ReactionVideoRenderer, probe_video_dimensions
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.subtitles import (
@@ -158,6 +162,14 @@ def test_reaction_renderer_single_ass_layer_and_path_escape(tmp_path, monkeypatc
         f"Caminho do arquivo ASS deve ser rigidamente escapado. Esperado ass='{escaped_expected}'"
     )
 
+    # Validar remoção do pad retangular branco (Cenário 3 da auditoria) e overlay em safe zone
+    assert "color=white" not in filter_complex_str, (
+        "Filtro pad retangular branco (color=white) deve ser completamente removido de filter_complex"
+    )
+    assert "overlay=W-w-54:H-h-320:shortest=1" in filter_complex_str, (
+        "Overlay do avatar deve estar posicionado na safe zone (W-w-54:H-h-320)"
+    )
+
 
 def test_empirical_reference_frame_ass_rendering(tmp_path):
     """Validação geométrica empírica: renderiza frame 1080x1920 com FFmpeg/libass e analisa pixels da caixa opaca.
@@ -242,5 +254,130 @@ def test_empirical_reference_frame_ass_rendering(tmp_path):
     assert dark_box_pixels > 1000, (
         f"A caixa opaca ZUNTO! (#0A0A0A) deve estar presente na faixa SafeZone Y 1080-1280. Encontrados {dark_box_pixels} pixels."
     )
+
+
+def test_avatar_reaction_overlay_pixel_transparency_and_no_white_box(tmp_path):
+    """Renderiza composição real 1080x1920 sobre fundo magenta e valida transparência e anel amarelo per AVTR-01, AVTR-02 e BRND-01."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg não disponível para teste empírico de composição")
+
+    # 1. Gera áudio de narração mock e avatar com recorte circular em canal alfa
+    voice_path = tmp_path / "voice_sample.wav"
+    MockVoiceSynthesizer(min_duration=1.5, max_duration=2.0).synthesize("Você não sabia. Agora sabe.", voice_path)
+
+    img_path = tmp_path / "creator_avatar.png"
+    ensure_default_avatar_image(img_path)
+
+    avatar_video_path = tmp_path / "avatar_circular.mp4"
+    animator = AudioReactiveAvatarAnimator(default_avatar_image=img_path)
+    animator.generate_avatar_video(voice_path, avatar_video_path)
+    assert avatar_video_path.exists()
+
+    # 2. Gera vídeo base com fundo magenta puro (#FF00FF / RGB: 255, 0, 255)
+    source_video_path = tmp_path / "source_magenta.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f", "lavfi",
+            "-i", "color=c=magenta:s=1080x1920:r=24:d=2.0",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            str(source_video_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    # 3. Gera legenda ASS em safe zone
+    ass_path = tmp_path / "subtitles_zunto.ass"
+    job_cfg = SubtitleJobConfig(
+        script_text="Você não sabia. Agora sabe.",
+        total_duration=2.0,
+        output_path=ass_path,
+        margin_v=SafeZones9x16.SUBTITLE_MARGIN_V,
+    )
+    generate_subtitles(job_cfg)
+
+    # 4. Executa composição com ReactionVideoRenderer
+    final_output_path = tmp_path / "final_reaction_composed.mp4"
+    renderer = ReactionVideoRenderer(width=1080, height=1920)
+    out_file, duration = renderer.render(
+        source_video_path=source_video_path,
+        avatar_video_path=avatar_video_path,
+        voice_audio_path=voice_path,
+        ass_subtitle_path=ass_path,
+        output_path=final_output_path,
+    )
+    assert out_file == final_output_path
+    assert final_output_path.exists()
+
+    # 5. Extrai o primeiro frame do vídeo composto em rawvideo rgb24 (1080x1920)
+    raw_frame_path = tmp_path / "composed_frame_1080x1920.raw"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i", str(final_output_path),
+            "-vframes", "1",
+            "-f", "rawvideo",
+            "-pix_fmt", "rgb24",
+            str(raw_frame_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    assert raw_frame_path.exists()
+
+    raw_bytes = raw_frame_path.read_bytes()
+    expected_size = 1080 * 1920 * 3  # 6.220.800 bytes
+    assert len(raw_bytes) == expected_size, f"Tamanho do raw frame deve ser {expected_size} bytes"
+
+    def get_pixel_rgb(x: int, y: int) -> tuple[int, int, int]:
+        idx = (y * 1080 + x) * 3
+        return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+
+    # Amostragem no quadrante do avatar (X entre 726 e 1026, Y entre 1300 e 1600):
+    # a) Canto superior esquerdo do bounding box do avatar (X=736, Y=1310): DEVE ser magenta puro
+    r, g, b = get_pixel_rgb(736, 1310)
+    assert r > 200 and g < 30 and b > 200, (
+        f"Canto superior esquerdo do avatar deve ser transparente (fundo magenta). Obtido: RGB({r}, {g}, {b})"
+    )
+
+    # b) Canto inferior externo da área do avatar (X=736, Y=1590): DEVE ser magenta puro (sem fundo opaco na onda sonora)
+    r, g, b = get_pixel_rgb(736, 1590)
+    assert r > 200 and g < 30 and b > 200, (
+        f"Canto inferior externo do avatar deve ser transparente (fundo magenta). Obtido: RGB({r}, {g}, {b})"
+    )
+
+    # c) Ponto onde ficava a antiga moldura retangular de 6px (X=726, Y=1300): NÃO deve ser branco puro
+    r, g, b = get_pixel_rgb(726, 1300)
+    assert not (r > 240 and g > 240 and b > 240), (
+        f"Ponto (726, 1300) da antiga moldura não deve ser branco puro. Obtido: RGB({r}, {g}, {b})"
+    )
+    assert r > 200 and g < 30 and b > 200, (
+        f"Ponto (726, 1300) deve ser fundo magenta devido à transparência dos cantos. Obtido: RGB({r}, {g}, {b})"
+    )
+
+    # d) Continuidade do anel circular ZUNTO! (#FACC15): amostragem em 4 pontos cardeais
+    # Topo: (876, 1302), Base: (876, 1598), Lateral esquerda: (728, 1450), Lateral direita: (1024, 1450)
+    border_samples = [
+        (876, 1302, "topo"),
+        (876, 1598, "base"),
+        (728, 1450, "lateral esquerda"),
+        (1024, 1450, "lateral direita"),
+    ]
+    for x, y, desc in border_samples:
+        br, bg, bb = get_pixel_rgb(x, y)
+        assert br > 210 and bg > 170 and bb < 70, (
+            f"Anel amarelo ZUNTO! (#FACC15) no {desc} ({x}, {y}) deve ter amarelo contínuo. Obtido: RGB({br}, {bg}, {bb})"
+        )
+
+    # e) Centro do avatar (X=876, Y=1450): NÃO deve ser magenta puro (exibe a figura do avatar)
+    cr, cg, cb = get_pixel_rgb(876, 1450)
+    assert not (cr > 200 and cg < 30 and cb > 200), (
+        f"Centro do avatar não deve ser magenta puro. Obtido: RGB({cr}, {cg}, {cb})"
+    )
+
 
 

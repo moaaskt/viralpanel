@@ -4,6 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from viralpanel.branding import SafeZones9x16
 from viralpanel.studio.voice import probe_duration
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class ReactionVideoRenderer:
         self,
         width: int = 1080,
         height: int = 1920,
-        avatar_size: int = 340,
+        avatar_size: int = SafeZones9x16.AVATAR_SIZE,
         timeout_seconds: int = 300,
     ):
         self.width = width
@@ -124,9 +125,8 @@ class ReactionVideoRenderer:
         filter_complex = (
             f"[0:v]scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
             f"crop={self.width}:{self.height},setsar=1[bg];"
-            f"[1:v]scale={self.avatar_size}:{self.avatar_size}:force_original_aspect_ratio=decrease,"
-            f"pad={self.avatar_size + 12}:{self.avatar_size + 12}:6:6:color=white[pip];"
-            f"[bg][pip]overlay=W-w-48:H-h-120:shortest=1[composed];"
+            f"[1:v]scale={self.avatar_size}:{self.avatar_size}:force_original_aspect_ratio=decrease[pip];"
+            f"[bg][pip]overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:shortest=1[composed];"
             f"[composed]ass='{escaped_ass}'[vout]"
         )
 

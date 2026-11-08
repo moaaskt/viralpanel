@@ -12,7 +12,7 @@ Ela refatora a preparação e animação do avatar em `src/viralpanel/studio/ava
 Entregas:
 1. Eliminação do fundo retangular opaco: aplicação de máscara circular programática com canal alfa em memória (`yuva420p` / `rgba`), aceitando qualquer imagem fonte (RGB opaco ou RGBA nativo) sem forçar o usuário a ter um PNG pré-cortado.
 2. Contorno circular sutil: borda refinada de 3px a 4px no Amarelo de Impacto ZUNTO! (`#FACC15`), harmonizada com a paleta oficial centralizada em `branding.py`.
-3. Calibração de dimensão e safe zone: diâmetro calibrado em 300px (ou parametrizável entre 280–320px) posicionado no canto inferior direito (`X=W-w-54`, `Y=H-h-320`), ocupando a faixa vertical segura $Y \approx 1320\dots1620\text{px}$, sem colidir com as legendas ZUNTO! ($Y \approx 1080\dots1280\text{px}$) nem com os botões nativos das plataformas (TikTok, Reels, Shorts).
+3. Calibração de dimensão e safe zone: diâmetro calibrado em 300px (ou parametrizável entre 280–320px) posicionado no canto inferior direito (`X=W-w-54`, `Y=H-h-320`), ocupando a faixa vertical segura $Y = 1300\dots1600\text{px}$ (para $H=1920$ e $h=300$, $1920 - 300 - 320 = 1300$), sem colidir com as legendas ZUNTO! ($Y \approx 1080\dots1280\text{px}$) nem com os botões nativos das plataformas (TikTok, Reels, Shorts).
 4. Onda sonora reativa (`showwaves`) integrada: visualizador de áudio contido organicamente na base interna do círculo, estilizado na cor ZUNTO! (`#FACC15@0.85`), sem vazar para fora da máscara circular.
 5. Preservação de contratos legados da v1.0: `BaseAvatarAnimator`, `AudioReactiveAvatarAnimator`, `MockAvatarAnimator` e a geração de `avatar.mp4` para manter intactos os 3 registros `Asset` do `StudioService`.
 
@@ -36,10 +36,10 @@ Fora de escopo: unificação de todos os passes no grafo single-pass definitivo 
   - O contorno acompanha perfeitamente a curvatura do círculo, criando acabamento profissional e destacando o apresentador sobre qualquer tipo de vídeo de fundo.
 
 ### 3. Dimensão e Safe Zone no Layout 9:16 (1080x1920)
-- **D-03:** Dimensão calibrada em 300px de diâmetro, posicionada no canto inferior direito em `X=W-w-54`, `Y=H-h-320` (faixa $Y \approx 1320\dots1620\text{px}$).
+- **D-03:** Dimensão calibrada em 300px de diâmetro, posicionada no canto inferior direito em `X=W-w-54`, `Y=H-h-320` (faixa vertical $Y = 1300\dots1600\text{px}$, pois $1920 - 300 - 320 = 1300$).
   - **Reversibility:** reversible — coordenadas do overlay.
   - Respeita rigorosamente a Safe Zone do `SafeZones9x16` de `branding.py`.
-  - Isola espacialmente o avatar: a faixa $Y=1080\dots1280\text{px}$ fica reservada para as legendas ZUNTO!, a faixa $Y=1320\dots1620\text{px}$ para o avatar PIP, e a margem inferior extrema ($Y > 1620\text{px}$) permanece livre para a interface de título/som do TikTok/Reels/Shorts.
+  - Isola espacialmente o avatar: a faixa $Y=1080\dots1280\text{px}$ fica reservada para as legendas ZUNTO!, a faixa $Y=1300\dots1600\text{px}$ para o avatar PIP (garantindo 20px de respiro abaixo das legendas), e a margem inferior de 320px ($Y > 1600\text{px}$) permanece livre para a interface de título/som do TikTok/Reels/Shorts.
 
 ### 4. Onda Sonora Reativa (Showwaves) Integrada
 - **D-04:** Onda sonora mantida e refinada na cor ZUNTO! Amarelo de Impacto (`#FACC15@0.85`), confinada geometricamente dentro da máscara circular.
@@ -75,3 +75,4 @@ Fora de escopo: unificação de todos os passes no grafo single-pass definitivo 
 - `tests/test_studio_avatar.py` — Suíte de testes existente do avatar.
 
 </canonical_refs>
+

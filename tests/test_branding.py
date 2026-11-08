@@ -57,9 +57,9 @@ def test_safe_zones_9x16_constants():
     assert safe.SUBTITLE_MARGIN_V == 640
 
     # Avatar PIP
-    assert safe.AVATAR_SIZE == 340
-    assert safe.AVATAR_MARGIN_RIGHT == 48
-    assert safe.AVATAR_MARGIN_BOTTOM == 260
+    assert safe.AVATAR_SIZE == 300
+    assert safe.AVATAR_MARGIN_RIGHT == 54
+    assert safe.AVATAR_MARGIN_BOTTOM == 320
 
     # Valida imutabilidade
     with pytest.raises(FrozenInstanceError):

@@ -4,19 +4,19 @@ milestone: v1.1
 milestone_name: ZUNTO! Visual Engine
 current_phase: 11
 current_phase_name: Avatar Reaction e Composição Visual Orgânica
-current_plan: 0
-status: ready
-stopped_at: Completed Phase 10 and verification
-last_updated: "2026-11-08T00:51:00.000Z"
+current_plan: 2
+status: complete
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-11-08T02:30:00.000Z"
 last_activity: 2026-11-08
-last_activity_desc: Phase 10 complete and verified (16/16 checks passed, 81 tests passing)
-state_head: fc06a7f
+last_activity_desc: Phase 11 complete and verified (86 tests passing, avatar reaction organic composition verified)
+state_head: 69d45e5c1d23f88f94a02e1532b0f520ded35ae3
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 50
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 67
 ---
 
 # Project State
@@ -26,17 +26,17 @@ progress:
 See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 
 **Core value:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.  
-**Current focus:** Phase 11 — Avatar Reaction e Composição Visual Orgânica
+**Current focus:** Phase 11 — Avatar Reaction e Composição Visual Orgânica (Complete)
 
 ## Current Position
 
 Phase: 11 — Avatar Reaction e Composição Visual Orgânica
-Current Plan: 0
-Total Plans in Phase: TBD
-Status: Ready for discuss/plan phase 11
-Last activity: 2026-11-08 — Completed Phase 10 (Motor de Legendas ZUNTO! e Desacoplamento)
+Current Plan: 2
+Total Plans in Phase: 2
+Status: Complete
+Last activity: 2026-11-08 — Completed 11-02-PLAN.md (Integração no ReactionVideoRenderer e safe zones)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -51,6 +51,8 @@ Progress: [█████░░░░░] 50%
 | Phase 09 P02 | 6m | 3 tasks | 4 files |
 | Phase 10 P01 | 8m | 3 tasks | 3 files |
 | Phase 10 P02 | 4m | 2 tasks | 2 files |
+| Phase 11-avatar-reaction-e-composicao-visual-organica P01 | 7m | 3 tasks | 4 files |
+| Phase 11-avatar-reaction-e-composicao-visual-organica P02 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -81,6 +83,11 @@ Progress: [█████░░░░░] 50%
 - [Phase 10]: D-04: Burn-in de legenda aplicado estritamente em camada única no passe final do ReactionVideoRenderer
 - [Phase 10]: D-05: Posição geométrica nominal de legendas com MarginV=640 e alinhamento inferior central (Alignment=2)
 - [Phase 10]: D-06: Validação de renderização empírica via amostragem de pixels rawvideo e delegação formal da validação visual final de UIs móveis para a Phase 13
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Calibração de SafeZones9x16 com size=300, margin_right=54 e margin_bottom=320 para isolar a zona vertical de legendas (1080..1280px)
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Utilização do codec de vídeo png em pix_fmt rgba dentro do container MP4 para transporte sem perdas de canal alfa
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Confinamento geométrico de showwaves (#FACC15@0.85) antes da máscara circular geq, prevenindo vazamento e caixas pretas opacas
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Eliminação total do filtro pad de moldura retangular branca em ReactionVideoRenderer (Cenário 3 da auditoria)
+- [Phase 11-avatar-reaction-e-composicao-visual-organica]: Posicionamento do overlay PIP em W-w-54:H-h-320 (X=726..1026, Y=1300..1600), isolando a zona de legendas (1080..1280px) e desobstruindo a barra inferior mobile (Y>=1600px)
 
 ### Pending Todos
 
@@ -92,6 +99,6 @@ None yet.
 
 ## Session
 
-**Last session:** 2026-11-08T00:46:26.175Z
-**Stopped at:** Completed 10-02-PLAN.md
+**Last session:** 2026-11-08T02:30:00.000Z
+**Stopped at:** Completed 11-02-PLAN.md
 **Resume file:** None
