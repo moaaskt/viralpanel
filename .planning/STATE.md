@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: ZUNTO! Visual Engine
-current_phase: 10
-current_phase_name: Motor de Legendas ZUNTO! e Desacoplamento
+current_phase: 11
+current_phase_name: Avatar Reaction e Composição Visual Orgânica
 current_plan: 0
 status: ready
-stopped_at: Completed Phase 09 and verification
-last_updated: "2026-11-06T09:38:00.000Z"
-last_activity: 2026-11-06
-last_activity_desc: Phase 09 verified and complete (14/14 checks passed, 67 tests passing)
-state_head: 7a1879a
+stopped_at: Completed Phase 10 and verification
+last_updated: "2026-11-08T00:51:00.000Z"
+last_activity: 2026-11-08
+last_activity_desc: Phase 10 complete and verified (16/16 checks passed, 81 tests passing)
+state_head: fc06a7f
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 33
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
+  percent: 50
 ---
 
 # Project State
@@ -26,17 +26,17 @@ progress:
 See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 
 **Core value:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.  
-**Current focus:** Phase 10 — Motor de Legendas ZUNTO! e Desacoplamento
+**Current focus:** Phase 11 — Avatar Reaction e Composição Visual Orgânica
 
 ## Current Position
 
-Phase: 10 — Motor de Legendas ZUNTO! e Desacoplamento
+Phase: 11 — Avatar Reaction e Composição Visual Orgânica
 Current Plan: 0
 Total Plans in Phase: TBD
-Status: Ready for discuss/plan phase 10
-Last activity: 2026-11-06 — Completed Phase 09 (Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!)
+Status: Ready for discuss/plan phase 11
+Last activity: 2026-11-08 — Completed Phase 10 (Motor de Legendas ZUNTO! e Desacoplamento)
 
-Progress: [████░░░░░░] 33%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ Progress: [████░░░░░░] 33%
 | Phase 08 P02 | 10min | 2 tasks | 1 files |
 | Phase 09 P01 | 4min | 2 tasks | 2 files |
 | Phase 09 P02 | 6m | 3 tasks | 4 files |
+| Phase 10 P01 | 8m | 3 tasks | 3 files |
+| Phase 10 P02 | 4m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -71,6 +73,14 @@ Progress: [████░░░░░░] 33%
 - [Phase 09]: D-03/D-04: Separação estrita de closing_thought e cta opcional nullable em GeneratedScriptSchema e full_text limpo sem linhas órfãs
 - [Phase 09]: D-06/D-07: FactualClaim com preservação rigorosa da transcrição original sem inventar fontes externas
 - [Phase 09]: D-08: Script.metadata_json armazena factual_claims e metadados de roteirização preservando compatibilidade com o banco
+- [Phase 10]: Adotar BorderStyle=3 com Outline=16 e MarginV=640 em preto profundo #0A0A0A para cobertura nativa de hard-subs preexistentes do TikTok
+- [Phase 10]: Implementar DTO imutável SubtitleJobConfig e desacoplar lógica temporal/estilística de subtitles.py de qualquer dependência direta do FFmpeg
+- [Phase 10]: Implementar segmentação orientada a pausas (. , ! ? ; :) com 3 a 5 palavras por cue e temporização proporcional contígua sem gaps/overlaps
+- [Phase 10]: Sanitização ASS de {} para () e quebras para \N, com destaque amarelo ZUNTO! {\c&H0015CCFA&} e fechamento compulsório em branco {\c&H00FFFFFF&}
+- [Phase 10]: D-01: Integração de SubtitleJobConfig em StudioService.produce preservando contratos de Asset e DB
+- [Phase 10]: D-04: Burn-in de legenda aplicado estritamente em camada única no passe final do ReactionVideoRenderer
+- [Phase 10]: D-05: Posição geométrica nominal de legendas com MarginV=640 e alinhamento inferior central (Alignment=2)
+- [Phase 10]: D-06: Validação de renderização empírica via amostragem de pixels rawvideo e delegação formal da validação visual final de UIs móveis para a Phase 13
 
 ### Pending Todos
 
@@ -82,6 +92,6 @@ None yet.
 
 ## Session
 
-**Last session:** 2026-11-06T09:30:56.977Z
-**Stopped at:** Completed 09-02-PLAN.md
+**Last session:** 2026-11-08T00:46:26.175Z
+**Stopped at:** Completed 10-02-PLAN.md
 **Resume file:** None

@@ -4,11 +4,12 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from viralpanel.branding import SafeZones9x16
 from viralpanel.models import Asset, Script
 from viralpanel.storage import StorageManager
 from viralpanel.studio.avatar import BaseAvatarAnimator
 from viralpanel.studio.renderer import ReactionVideoRenderer, has_video_stream
-from viralpanel.studio.subtitles import build_cues_from_script, write_ass_subtitles
+from viralpanel.studio.subtitles import SubtitleJobConfig, generate_subtitles
 from viralpanel.studio.voice import BaseVoiceSynthesizer
 
 
@@ -94,8 +95,13 @@ class StudioService:
 
         # 3. Legendas ASS sincronizadas
         subtitles_path = assets_dir / "captions.ass"
-        cues = build_cues_from_script(script_text, total_duration=voice_duration)
-        write_ass_subtitles(cues, subtitles_path)
+        job_config = SubtitleJobConfig(
+            script_text=script_text,
+            total_duration=voice_duration,
+            output_path=subtitles_path,
+            margin_v=SafeZones9x16.SUBTITLE_MARGIN_V,
+        )
+        generate_subtitles(job_config)
 
         # 4. Composição 9:16 Reaction via FFmpeg
         source_video_path = self._ensure_source_video(run_id, duration=max(voice_duration, 2.0))
