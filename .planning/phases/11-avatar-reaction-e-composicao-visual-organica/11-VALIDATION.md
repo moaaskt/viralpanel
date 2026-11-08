@@ -26,3 +26,4 @@
 ### Dimension 5: Integridade de Regressão e Contratos Legados
 - **Verificação**: Compatibilidade estrita de `BaseAvatarAnimator`, `AudioReactiveAvatarAnimator`, `MockAvatarAnimator` e `StudioService.produce(db, run_id, script) -> Asset`.
 - **Comando automatizado**: `./.venv/bin/pytest tests/ -v`
+
