@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,7 +17,12 @@ from viralpanel.studio.avatar import (
     MockAvatarAnimator,
     ensure_default_avatar_image,
 )
-from viralpanel.studio.renderer import ReactionVideoRenderer, probe_video_dimensions
+from viralpanel.studio.renderer import (
+    ReactionCompositionSpec,
+    ReactionVideoRenderer,
+    StudioRenderRequest,
+    probe_video_dimensions,
+)
 from viralpanel.studio.service import StudioService
 from viralpanel.studio.subtitles import (
     SubtitleJobConfig,
@@ -25,6 +31,51 @@ from viralpanel.studio.subtitles import (
     write_ass_subtitles,
 )
 from viralpanel.studio.voice import MockVoiceSynthesizer
+
+
+def test_studio_render_request_dto():
+    """Valida DTOs imutáveis ReactionCompositionSpec e StudioRenderRequest (D-03, D-04)."""
+    spec = ReactionCompositionSpec()
+    assert spec.target_width == 1080
+    assert spec.target_height == 1920
+    assert spec.fps == 24
+    assert spec.video_codec == "libx264"
+    assert spec.preset == "veryfast"
+    assert spec.crf == 20
+    assert spec.pix_fmt == "yuv420p"
+    assert spec.audio_codec == "aac"
+    assert spec.audio_bitrate == "192k"
+    assert spec.single_pass is True
+    assert spec.timeout_seconds == 180
+
+    with pytest.raises(FrozenInstanceError):
+        spec.preset = "slow"  # type: ignore
+
+    req = StudioRenderRequest(
+        run_id="run-123",
+        source_video_path="/tmp/source.mp4",  # type: ignore
+        avatar_video_path="/tmp/avatar.mp4",  # type: ignore
+        voice_audio_path="/tmp/voice.wav",  # type: ignore
+        ass_subtitle_path="/tmp/subs.ass",  # type: ignore
+        output_path="/tmp/out.mp4",  # type: ignore
+    )
+
+    assert isinstance(req.source_video_path, Path)
+    assert req.source_video_path == Path("/tmp/source.mp4")
+    assert isinstance(req.avatar_video_path, Path)
+    assert req.avatar_video_path == Path("/tmp/avatar.mp4")
+    assert isinstance(req.voice_audio_path, Path)
+    assert req.voice_audio_path == Path("/tmp/voice.wav")
+    assert isinstance(req.ass_subtitle_path, Path)
+    assert req.ass_subtitle_path == Path("/tmp/subs.ass")
+    assert isinstance(req.output_path, Path)
+    assert req.output_path == Path("/tmp/out.mp4")
+    assert req.composition == spec
+    assert req.voice_duration is None
+    assert req.avatar_config is None
+
+    with pytest.raises(FrozenInstanceError):
+        req.run_id = "run-999"  # type: ignore
 
 
 def test_ass_subtitles_generation(tmp_path):

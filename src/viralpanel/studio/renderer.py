@@ -1,13 +1,65 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 import json
 import logging
+from pathlib import Path
 import shutil
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
+import uuid
 
 from viralpanel.branding import SafeZones9x16
 from viralpanel.studio.voice import probe_duration
 
+if TYPE_CHECKING:
+    from viralpanel.studio.avatar import AvatarConfig
+
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ReactionCompositionSpec:
+    """Especificações técnicas da composição FFmpeg."""
+
+    target_width: int = SafeZones9x16.WIDTH
+    target_height: int = SafeZones9x16.HEIGHT
+    fps: int = 24
+    video_codec: str = "libx264"
+    preset: str = "veryfast"
+    crf: int = 20
+    pix_fmt: str = "yuv420p"
+    audio_codec: str = "aac"
+    audio_bitrate: str = "192k"
+    single_pass: bool = True
+    timeout_seconds: int = 180
+
+
+@dataclass(frozen=True)
+class StudioRenderRequest:
+    """Insumos estruturados para renderização de vídeo reaction."""
+
+    run_id: str | uuid.UUID
+    source_video_path: Path
+    avatar_video_path: Path
+    voice_audio_path: Path
+    ass_subtitle_path: Path
+    output_path: Path
+    voice_duration: float | None = None
+    avatar_config: AvatarConfig | None = None
+    composition: ReactionCompositionSpec = field(default_factory=ReactionCompositionSpec)
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "source_video_path",
+            "avatar_video_path",
+            "voice_audio_path",
+            "ass_subtitle_path",
+            "output_path",
+        ):
+            val = getattr(self, field_name)
+            if val is not None and not isinstance(val, Path):
+                object.__setattr__(self, field_name, Path(val))
 
 
 def probe_video_dimensions(video_path: Path) -> tuple[int, int]:
