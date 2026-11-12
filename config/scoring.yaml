@@ -13,6 +13,8 @@ thresholds:
   min_views: 1000
   reference_views: 100000
   reference_velocity_per_hour: 5000
+  min_duration_seconds: 15
+  max_duration_seconds: 180
 
 discovery:
   default_limit: 30
@@ -22,4 +24,13 @@ discovery:
     - "mentalidade"
     - "disciplina"
     - "produtividade"
-
+  seed_accounts:
+    - "eslen.delanogare"
+    - "reservatorio.de.dopamina"
+    - "wendellcarvalho"
+    - "flavioaugustodasilva"
+    - "joeljota"
+  search_queries:
+    - "desenvolvimento pessoal"
+    - "como ter foco e disciplina"
+    - "mentalidade de sucesso"

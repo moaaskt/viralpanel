@@ -10,11 +10,11 @@ ViralPanel é um pipeline autônomo de geração e publicação de conteúdo vir
 
 ### Constraints
 
-- **Tech Stack**: Python 3.12, PostgreSQL, Redis, Celery, FFmpeg, React, Chakra UI, Docker Compose
+- **Tech Stack**: Python 3.12, PostgreSQL, Redis, Celery, FFmpeg, React, Tailwind CSS, Shadcn UI, Docker Compose
 - **LLM**: Google Gemini 2.5 Flash para geração de roteiros originais e estruturados
 - **Áudio & Vídeo**: XTTS v2 para clonagem de voz, Whisper para transcrição, FFmpeg para renderização 9:16 e composição
 - **Publicação**: APIs oficiais diretas (TikTok, Meta Graph API, YouTube Data API v3)
-- **Design de UI**: Chakra UI com paleta limpa e profissional, estritamente sem neon
+- **Design de UI**: Shadcn UI com Tailwind CSS, paleta limpa e profissional, suporte a Dark Mode / Light Mode, estritamente sem neon
 
 <!-- GSD:project-end -->
 

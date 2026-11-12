@@ -8,10 +8,18 @@ from sqlalchemy.pool import StaticPool
 
 from viralpanel.database import Base
 from viralpanel.media.downloader import MockMediaDownloader
-from viralpanel.media.transcriber import MockTranscriber
+from viralpanel.media.transcriber import AudioTranscriber, MockTranscriber, TranscriptionResult
 from viralpanel.models import Asset, Script, SourceVideo
-from viralpanel.scripting.gemini import GeminiScriptWriter, GeneratedScriptSchema, MockGeminiScriptWriter
-from viralpanel.scripting.service import ScriptingService
+from viralpanel.scripting.gemini import (
+    FallbackScriptWriter,
+    FactualClaim,
+    GeminiScriptWriter,
+    GeneratedScriptSchema,
+    GroqScriptWriter,
+    MockGeminiScriptWriter,
+    ScriptWriter,
+)
+from viralpanel.scripting.service import InsufficientSpeechError, ScriptingService
 from viralpanel.storage import StorageManager
 
 
@@ -39,8 +47,18 @@ def test_gemini_writer_parses_structured_json(monkeypatch):
         "theme": "foco",
         "hook": "Seu celular está roubando sua vida.",
         "body": "Cada notificação quebra seu foco por minutos. " * 3,
+        "closing_thought": "Você não sabia. Agora sabe.",
         "cta": "Me segue para mais.",
         "estimated_duration_seconds": 30,
+        "factual_claims": [
+            {
+                "claim": "Notificações quebram o foco.",
+                "source_reference": "Universidade da Califórnia",
+                "source_excerpt": "quebra seu foco por minutos",
+                "timestamp": "00:05",
+                "verification_status": "extracted_from_transcript",
+            }
+        ],
     }
     captured = {}
 
@@ -51,7 +69,10 @@ def test_gemini_writer_parses_structured_json(monkeypatch):
     monkeypatch.setattr(writer, "_call", fake_call)
     out = writer.generate(MockTranscriber().transcribe(None))
     assert out.hook == payload["hook"]
-    assert "0–3s" in captured["prompt"] and "[000.00-003.00]" in captured["prompt"]
+    assert out.closing_thought == "Você não sabia. Agora sabe."
+    assert len(out.factual_claims) == 1
+    assert out.factual_claims[0].claim == "Notificações quebram o foco."
+    assert ("[000.00-003.00]" in captured["prompt"]) and ("0–3" in captured["prompt"] or "0-3" in captured["prompt"])
 
 
 def test_scripting_service_persists_script_and_asset(tmp_path):
@@ -69,6 +90,213 @@ def test_scripting_service_persists_script_and_asset(tmp_path):
         assert script.version == 1
         assert script.hook and "Salva" in script.script_text
         assert src.status == "scripted"
-        assert db.scalars(select(Asset)).one().asset_type == "source_audio"
+        assert script.metadata_json is not None
+        assert script.metadata_json["closing_thought"] == "Quem domina a própria rotina não precisa de sorte."
+        assert script.metadata_json["cta"] == "Salva esse vídeo e me segue para mais."
+        assert len(script.metadata_json["factual_claims"]) == 1
+        claim = script.metadata_json["factual_claims"][0]
+        assert claim["claim"] == "Pessoas de alta performance dependem de sistemas, não de inspiração diária."
+        assert claim["source_reference"] == "Hábitos Atômicos / James Clear"
+        assert claim["verification_status"] == "extracted_from_transcript"
+
+        assets = list(db.scalars(select(Asset)).all())
+        assert len(assets) == 2
+        asset_types = {a.asset_type for a in assets}
+        assert "source_video" in asset_types
+        assert "source_audio" in asset_types
         assert len(db.scalars(select(Script)).all()) == 1
+
+
+def test_scripting_service_persists_script_without_cta(tmp_path):
+    class NoCtaWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            return GeneratedScriptSchema(
+                theme="minimalismo mental",
+                hook="Elimine o excesso da sua mente.",
+                body="Menos decisões superficiais liberam energia cognitiva para o que realmente importa.",
+                closing_thought="Você não sabia. Agora sabe.",
+                cta=None,
+                estimated_duration_seconds=20.0,
+                factual_claims=[],
+            )
+
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+    svc = ScriptingService(
+        MockMediaDownloader(storage=StorageManager(tmp_path)), MockTranscriber(), NoCtaWriter()
+    )
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@a/video/no_cta", author="b", score=20)
+        db.add(src)
+        db.commit()
+        script = svc.process(db, run_id="r2", source=src)
+        assert script.metadata_json is not None
+        assert script.metadata_json["closing_thought"] == "Você não sabia. Agora sabe."
+        assert script.metadata_json["cta"] is None
+        assert script.metadata_json["factual_claims"] == []
+        assert "Você não sabia. Agora sabe." in script.script_text
+        assert script.script_text.endswith("Você não sabia. Agora sabe.")
+
+
+def test_groq_writer_raises_when_no_key_available(monkeypatch):
+    from viralpanel.config import Settings
+    monkeypatch.setattr("viralpanel.scripting.gemini.get_settings", lambda: Settings(groq_api_key=None, _env_file=None))
+    with pytest.raises(ValueError, match="GROQ_API_KEY ausente"):
+        GroqScriptWriter(api_key=None)
+
+
+def test_groq_writer_parses_structured_json(monkeypatch):
+    writer = GroqScriptWriter(api_key="fake-groq-key")
+    payload = {
+        "theme": "foco e dopamina",
+        "hook": "Seu cérebro está sendo hackeado.",
+        "body": "A dopamina barata destrói sua disciplina diária.",
+        "closing_thought": "A clareza mental começa quando o ruído cessa.",
+        "cta": "Me segue para blindar sua mente.",
+        "estimated_duration_seconds": 35.0,
+        "factual_claims": [],
+    }
+
+    def fake_call(prompt):
+        return json.dumps(payload)
+
+    monkeypatch.setattr(writer, "_call", fake_call)
+    out = writer.generate(TranscriptionResult(text="foco e disciplina", language="pt", segments=[]))
+    assert out.theme == payload["theme"]
+    assert out.hook == payload["hook"]
+    assert out.closing_thought == payload["closing_thought"]
+    assert out.estimated_duration_seconds == 35.0
+    assert out.estimated_duration_seconds == 35.0
+
+
+def test_fallback_script_writer_advances_on_error():
+    class FailingWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            raise RuntimeError("Primary API 503 Unavailable")
+
+    class SuccessfulWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            return GeneratedScriptSchema(
+                theme="Fallback Success",
+                hook="Funcionou pelo fallback!",
+                body="Conteúdo gerado com sucesso.",
+                cta="Siga o canal.",
+                estimated_duration_seconds=30.0,
+            )
+
+    writer = FallbackScriptWriter(writers=[FailingWriter(), SuccessfulWriter()])
+    res = writer.generate(TranscriptionResult(text="teste", language="pt", segments=[]))
+    assert res.theme == "Fallback Success"
+    assert res.hook == "Funcionou pelo fallback!"
+
+
+def test_fallback_script_writer_raises_when_all_fail():
+    class FailingWriter(ScriptWriter):
+        def generate(self, tr, fallback_context=""):
+            raise RuntimeError("API Unavailable")
+
+    writer = FallbackScriptWriter(writers=[FailingWriter(), FailingWriter()])
+    with pytest.raises(RuntimeError, match="Todos os provedores da cadeia de IA falharam"):
+        writer.generate(TranscriptionResult(text="teste", language="pt", segments=[]))
+
+
+def test_scripting_service_rejects_insufficient_speech(tmp_path):
+    class ShortSpeechTranscriber(AudioTranscriber):
+        def transcribe(self, audio_path):
+            return TranscriptionResult(text="apenas tres palavras", language="pt", segments=[])
+
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+    svc = ScriptingService(
+        MockMediaDownloader(storage=StorageManager(tmp_path)),
+        ShortSpeechTranscriber(),
+        MockGeminiScriptWriter(),
+        min_speech_words=15,
+    )
+    with factory() as db:
+        src = SourceVideo(url="https://www.tiktok.com/@a/video/music_only", author="a", score=50)
+        db.add(src)
+        db.commit()
+        with pytest.raises(InsufficientSpeechError, match="rejeitado"):
+            svc.process(db, run_id="r_skip", source=src)
+        db.refresh(src)
+        assert src.status == "skipped_no_speech"
+
+
+def test_factual_claim_validation():
+    claim = FactualClaim(
+        claim="80% das distrações vêm de notificações passivas.",
+        source_reference="Dr. Gloria Mark / Estudo de Atenção",
+        source_excerpt="notificações quebram o fluxo em 80%",
+        timestamp="00:15",
+        verification_status="extracted_from_transcript",
+    )
+    assert claim.claim.startswith("80%")
+    assert claim.verification_status == "extracted_from_transcript"
+    assert claim.source_reference == "Dr. Gloria Mark / Estudo de Atenção"
+
+    # Default verification status
+    simple_claim = FactualClaim(claim="Afirmação simples")
+    assert simple_claim.verification_status == "unverified_source_claim"
+    assert simple_claim.source_reference is None
+
+
+def test_generated_script_schema_closing_thought_and_cta_optional():
+    # Com closing_thought e sem cta (cta=None)
+    schema_no_cta = GeneratedScriptSchema(
+        hook="Você foi condicionado a falhar.",
+        body="O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.",
+        closing_thought="Você não sabia. Agora sabe.",
+        cta=None,
+        estimated_duration_seconds=30.0,
+    )
+    assert schema_no_cta.closing_thought == "Você não sabia. Agora sabe."
+    assert schema_no_cta.cta is None
+    assert schema_no_cta.full_text == (
+        "Você foi condicionado a falhar.\n\n"
+        "O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.\n\n"
+        "Você não sabia. Agora sabe."
+    )
+
+    # Com cta preenchida
+    schema_with_cta = GeneratedScriptSchema(
+        hook="Você foi condicionado a falhar.",
+        body="O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.",
+        closing_thought="A decisão final continua sendo sua.",
+        cta="Compartilhe este vídeo com quem precisa acordar.",
+        estimated_duration_seconds=35.0,
+    )
+    assert schema_with_cta.cta == "Compartilhe este vídeo com quem precisa acordar."
+    assert schema_with_cta.full_text == (
+        "Você foi condicionado a falhar.\n\n"
+        "O sistema foi desenhado para roubar seus melhores anos em troca de conveniência vazia.\n\n"
+        "A decisão final continua sendo sua.\n\n"
+        "Compartilhe este vídeo com quem precisa acordar."
+    )
+
+
+def test_generated_script_schema_full_text_ignores_blank_cta():
+    # CTA com string vazia ou apenas espaços não deve gerar quebras de linha órfãs
+    schema_empty_cta = GeneratedScriptSchema(
+        hook="Gancho de teste afiado.",
+        body="Desenvolvimento prático e direto sem enrolação de nenhum tipo.",
+        closing_thought="Fechamento reflexivo e impactante.",
+        cta="   ",
+        estimated_duration_seconds=25.0,
+    )
+    assert schema_empty_cta.full_text == (
+        "Gancho de teste afiado.\n\n"
+        "Desenvolvimento prático e direto sem enrolação de nenhum tipo.\n\n"
+        "Fechamento reflexivo e impactante."
+    )
+
+
+def test_script_model_metadata_json_default():
+    script = Script(source_video_id="vid_1")
+    assert script.metadata_json == {} or script.metadata_json is None
+
+
+
 

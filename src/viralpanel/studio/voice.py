@@ -1,8 +1,14 @@
+import asyncio
 import json
+import logging
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
+
+from viralpanel.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def probe_duration(media_path: Path) -> float:
@@ -124,4 +130,106 @@ class MockVoiceSynthesizer(BaseVoiceSynthesizer):
 
         output_path.write_bytes(b"RIFFMOCKWAV")
         return output_path, duration
+
+
+class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
+    """Síntese de voz neural ultra-realista pt-BR via edge-tts com normalização loudnorm."""
+
+    def __init__(self, voice: str | None = None, rate: str | None = None):
+        settings = get_settings()
+        self.voice = voice or settings.edge_tts_voice
+        self.rate = rate or settings.edge_tts_rate
+
+    def synthesize(
+        self,
+        text: str,
+        output_path: Path,
+        speaker_wav: Path | None = None,
+    ) -> tuple[Path, float]:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_mp3 = output_path.with_suffix(".edge.temp.mp3")
+        try:
+            import edge_tts
+
+            async def _run():
+                communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
+                await communicate.save(str(temp_mp3))
+
+            asyncio.run(_run())
+
+            if shutil.which("ffmpeg") and temp_mp3.exists():
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        str(temp_mp3),
+                        "-af",
+                        "loudnorm=I=-16:TP=-1.5:LRA=11",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "24000",
+                        str(output_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=60,
+                )
+            elif temp_mp3.exists():
+                shutil.copy(temp_mp3, output_path)
+
+            duration = probe_duration(output_path)
+            return output_path, round(duration, 2)
+        finally:
+            if temp_mp3.exists():
+                temp_mp3.unlink(missing_ok=True)
+
+
+class FallbackVoiceSynthesizer(BaseVoiceSynthesizer):
+    """Cadeia de sintetizadores: XTTS v2 (se configurado e com voz de referência) -> Edge-TTS pt-BR -> Mock."""
+
+    def __init__(self, synthesizers: list[BaseVoiceSynthesizer] | None = None):
+        if synthesizers is not None:
+            self.synthesizers = synthesizers
+        else:
+            settings = get_settings()
+            self.synthesizers = []
+
+            # 1. XTTS v2 se configurado e com áudio de referência do criador presente
+            if settings.tts_provider == "xtts" and settings.speaker_wav_path and Path(settings.speaker_wav_path).exists():
+                try:
+                    self.synthesizers.append(XTTSVoiceSynthesizer(default_speaker_wav=settings.speaker_wav_path))
+                except Exception as e:
+                    logger.warning("Falha ao inicializar XTTS: %s", e)
+
+            # 2. Edge-TTS Neural pt-BR (padrão principal de alta fidelidade)
+            try:
+                self.synthesizers.append(EdgeTTSVoiceSynthesizer(voice=settings.edge_tts_voice, rate=settings.edge_tts_rate))
+            except Exception as e:
+                logger.warning("Falha ao inicializar Edge-TTS: %s", e)
+
+            # 3. Mock como salvaguarda
+            self.synthesizers.append(MockVoiceSynthesizer())
+
+    def synthesize(
+        self,
+        text: str,
+        output_path: Path,
+        speaker_wav: Path | None = None,
+    ) -> tuple[Path, float]:
+        errors = []
+        for syn in self.synthesizers:
+            name = syn.__class__.__name__
+            try:
+                logger.info("Tentando síntese de voz com %s...", name)
+                out, dur = syn.synthesize(text, output_path, speaker_wav=speaker_wav)
+                logger.info("Voz sintetizada com sucesso via %s (duração: %.2fs)", name, dur)
+                return out, dur
+            except Exception as exc:
+                logger.warning("Falha no sintetizador %s: %s. Tentando próximo...", name, exc)
+                errors.append(f"{name}: {exc}")
+
+        raise RuntimeError(f"Todos os sintetizadores de voz falharam: {'; '.join(errors)}")
+
 
