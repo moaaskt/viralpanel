@@ -195,3 +195,4 @@ def test_inspection_directory_isolation_and_cli_execution(tmp_path: Path):
     report_text = report_file.read_text(encoding="utf-8")
     assert "[PENDENTE DE INSPEÇÃO HUMANA]" in report_text
     assert "- [x]" not in report_text, "Nenhum critério visual deve ser auto-aprovado no relatório"
+

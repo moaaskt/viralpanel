@@ -327,3 +327,4 @@ def test_inspect_composed_avatar_transparency(tmp_path: Path):
     assert not any("Canto" in e for e in res_partial.errors)
     assert res_partial.details["distributed_points_failed"] > 0
     assert any("região externa ao círculo" in e for e in res_partial.errors)
+

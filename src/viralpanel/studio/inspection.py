@@ -463,3 +463,4 @@ class InspectionRunner:
             mirror_file=clean_dir / "README.md",
         )
         return results
+
