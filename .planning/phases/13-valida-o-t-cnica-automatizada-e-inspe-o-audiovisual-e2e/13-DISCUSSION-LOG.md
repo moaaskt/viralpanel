@@ -36,3 +36,4 @@
   2. Gate técnico prioritário (apenas testes automatizados verdes).
 - **Seleção:** Gate cumulativo estrito.
 - **Notas:** Garante que o milestone v1.1 só seja finalizado após inspeção humana direta dos vídeos gerados.
+
