@@ -51,8 +51,10 @@ Plans:
 **Plans**: 2/2 plans executed
 
 Plans:
+
 - [x] 09-01-PLAN.md — Módulo Central de Identidade Visual `branding.py` e Suíte de Testes (BRND-01, BRND-02)
 - [x] 09-02-PLAN.md — Roteirista Gemini Editorial, Schemas (closing_thought + cta opcional), Rastreabilidade de Claims e Persistência de Metadados (SCRP-01, SCRP-02)
+
 **UI hint**: yes
 
 ### Phase 10: Motor de Legendas ZUNTO! e Desacoplamento
@@ -69,8 +71,10 @@ Plans:
 **Plans**: 2/2 plans executed
 
 Plans:
+
 - [x] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
 - [x] 10-02-PLAN.md — Integração em `StudioService.produce` e `ReactionVideoRenderer`, Cobertura de Hard-Subs com `MarginV=640`, Camada Única e Validação de Regressão da Suíte Completa (SUB-01, SUB-02, SUB-03, BRND-01)
+
 **UI hint**: yes
 
 ### Phase 11: Avatar Reaction e Composição Visual Orgânica
@@ -87,8 +91,10 @@ Plans:
 **Plans**: 2/2 plans executed
 
 Plans:
+
 - [x] 11-01-PLAN.md — Núcleo do Avatar Reaction em `avatar.py` e `branding.py`, DTO `AvatarConfig`, Recorte Circular com Canal Alfa Suave, Borda Amarela ZUNTO! (#FACC15) e Codec PNG em MP4 (AVTR-01, AVTR-03, BRND-01, BRND-02)
 - [x] 11-02-PLAN.md — Integração no `ReactionVideoRenderer`, Calibração SafeZone em W-w-54:H-h-320, Remoção da Moldura Branca e Teste Empírico de Composição sem Regressão (AVTR-01, AVTR-02, BRND-01, BRND-02)
+
 **UI hint**: yes
 
 ### Phase 12: Refatoração do Video Composer FFmpeg e Integração
@@ -105,6 +111,7 @@ Plans:
 **Plans**: 2/2 plans complete
 
 Plans:
+
 - [x] 12-01-PLAN.md — Núcleo do Video Composer Single-Pass, DTOs ReactionCompositionSpec e StudioRenderRequest, Lavfi Inline Fallback e Flags de Encoding (COMP-01, COMP-02, BRND-01, BRND-02)
 - [x] 12-02-PLAN.md — Integração do StudioService, Preservação de Contratos Celery, Persistência Atômica de Assets e Regressão E2E (COMP-03, COMP-01, COMP-02, BRND-01, BRND-02)
 
@@ -120,6 +127,9 @@ Plans:
   3. Aprovação formal do milestone condicionada cumulativamente aos testes automatizados verdes e à validação perceptual positiva dos vídeos gerados.
 
 **Plans**: TBD
+
+- [x] 13-01-PLAN.md
+- [ ] 13-02-PLAN.md
 
 ## Progress
 
