@@ -22,30 +22,34 @@ Fora de escopo: Adição de novas funcionalidades audiovisuais, novos filtros ou
 ## Implementation Decisions
 
 ### 1. Estratégia de Inspeção Automatizada de Mídia
-- **D-01:** Implementar um módulo reutilizável `MediaQualityValidator` (em `src/viralpanel/studio/validator.py`) que invoca `ffprobe` com saída JSON estruturada, validando especificações técnicas exatas:
+- **D-01:** Implementar um módulo reutilizável `MediaQualityValidator` (em `src/viralpanel/studio/validator.py`) que invoca `ffprobe` com saída JSON estruturada, validando especificações técnicas exatas do container final:
   - Resolução: exatos 1080x1920
   - Aspect ratio: 9:16
   - Video stream: codec `h264`, pixel format `yuv420p`, frame rate 24 fps
   - Audio stream: codec `aac`, taxa de amostragem mínima 44100Hz
-  - Sincronismo/Duração: coerência entre streams e integridade do container MP4
+  - Sincronismo/Duração: coerência estrita entre streams de áudio e vídeo (sem cortes prematuros ou descompasso perceptível) e integridade do container MP4
+  - Validação de transparência de composição: o avatar individual é gerado com canal alfa (`rgba`/`png`), e na composição final o fundo ao redor do círculo não pode se tornar uma caixa opaca/artefato retangular sobre o vídeo de fundo.
   — **Reversibility:** reversible — componente utilitário modular e testável.
 
 ### 2. Conjunto de Dados de Teste & Execução da Esteira
 - **D-02:** Disponibilizar comando CLI integrado (`python -m viralpanel.cli validate-e2e` ou equivalente) combinado com suíte de testes `pytest tests/test_e2e_inspection.py`.
+  - Testes 100% reproduzíveis e determinísticos gerados localmente (sem depender de URLs externas ou scrapers instáveis).
+  - Preservação estrita do contrato `StudioService.produce(db, run_id, script)` e criação auditável dos 3 registros `Asset` (`audio`, `avatar` e `final_video`).
   - O fluxo executa no mínimo dois cenários fim a fim:
-    a) Cenário Completo: Vídeo fonte com imagem/áudio + avatar circular orgânico ZUNTO! + legendas ASS ZUNTO!.
+    a) Cenário Completo: Vídeo fonte sintético/controlado com imagem/áudio + avatar circular orgânico ZUNTO! + legendas ASS ZUNTO!. Deve contemplar validação de legendas mesmo se o vídeo base possuir elementos gráficos/texto incorporados.
     b) Cenário Fallback: Áudio puro (sem stream de vídeo de fundo) ativando o background lavfi `#0f172a` inline single-pass sem gerar arquivos temporários espúrios.
   - Os artefatos gerados são salvos isoladamente em `storage/inspection/`.
   — **Reversibility:** reversible — script de orquestração de testes e CLI utilitário.
 
 ### 3. Protocolo e Evidências da Inspeção Visual Humana
-- **D-03:** Gerar relatório estruturado em Markdown (`.planning/phases/13-valida-o-t-cnica-automatizada-e-inspe-o-audiovisual-e2e/INSPECTION-REPORT.md` e espelho em `storage/inspection/README.md`) contendo:
+- **D-03:** Gerar relatório estruturado em Markdown (`.planning/phases/13-valida-o-t-cnica-automatizada-e-inspe-o-audiovisual-e2e/INSPECTION-REPORT.md` e espelho em `storage/inspection/README.md`) contendo evidências reais e mensuradas:
   - Metadados técnicos apurados pelo `MediaQualityValidator` para cada vídeo gerado.
   - Checklist dos 4 pilares visuais ZUNTO!:
     1. Ausência total de moldura branca ao redor do avatar circular.
-    2. Canal alfa e borda amarela de impacto (#FFDE59) preservados e posicionados em Safe Zone (Y=1300..1600).
-    3. Ausência definitiva de duplicação de legendas (apenas camada ASS estilizada ZUNTO! em MarginV=640).
-    4. Harmonia estética global e legibilidade do texto e do background.
+    2. Canal alfa e borda amarela de alto impacto ZUNTO! (`#FACC15`) preservados e posicionados em Safe Zone (Y=1300..1600).
+    3. Ausência definitiva de duplicação ou conflito de legendas (apenas camada ASS estilizada ZUNTO! em MarginV=640, sem sobreposição opaca com legendas pré-existentes na fonte).
+    4. Sincronia audiovisual perfeita, harmonia estética global e legibilidade do texto e do background.
+  - O relatório deve conter placeholders estruturados e aguardar a validação e confirmação humana explícita (sem aprovação visual automática).
   — **Reversibility:** reversible — documentação de auditoria e evidências.
 
 ### 4. Critérios de Gate para Conclusão do Milestone
@@ -80,3 +84,4 @@ Fora de escopo: Adição de novas funcionalidades audiovisuais, novos filtros ou
 - `.planning/ROADMAP.md` — Seção da Phase 13.
 
 </canonical_refs>
+
