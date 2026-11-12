@@ -1,10 +1,12 @@
 import asyncio
+import hashlib
 import json
 import logging
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 from viralpanel.config import get_settings
 
@@ -157,7 +159,10 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
 
             asyncio.run(_run())
 
-            if shutil.which("ffmpeg") and temp_mp3.exists():
+            if not shutil.which("ffmpeg"):
+                raise RuntimeError("FFmpeg é obrigatório para converter a síntese Edge-TTS MP3 para WAV.")
+
+            if temp_mp3.exists():
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -176,14 +181,105 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
                     capture_output=True,
                     timeout=60,
                 )
-            elif temp_mp3.exists():
-                shutil.copy(temp_mp3, output_path)
+            else:
+                raise RuntimeError("Falha na síntese Edge-TTS: arquivo MP3 intermediário não foi gerado.")
 
             duration = probe_duration(output_path)
-            return output_path, round(duration, 2)
+            if duration <= 0.0:
+                raise RuntimeError(f"FFprobe retornou duração inválida ({duration}s) para {output_path}")
+            return output_path, duration
         finally:
             if temp_mp3.exists():
                 temp_mp3.unlink(missing_ok=True)
+
+
+class PreSynthesizedVoice(BaseVoiceSynthesizer):
+    """Sintetizador que entrega cópias com verificação de integridade de um áudio WAV pré-sintetizado.
+
+    Garante que múltiplos cenários compartilhem rigorosamente o mesmo áudio físico,
+    eliminando variações de síntese e verificando formato, hash e texto solicitado.
+    """
+
+    def __init__(
+        self,
+        master_audio_path: Path,
+        duration: float,
+        sha256_hash: str,
+        expected_text: str,
+    ):
+        self.master_audio_path = Path(master_audio_path).resolve()
+        self.duration = float(duration)
+        self.sha256_hash = sha256_hash
+        self.expected_text = expected_text.strip()
+        self.delivered_copies: list[dict[str, Any]] = []
+        self._validate_master_wav()
+
+    def _validate_master_wav(self) -> None:
+        if not self.master_audio_path.exists():
+            raise FileNotFoundError(f"Áudio mestre não encontrado em {self.master_audio_path}")
+
+        raw_bytes = self.master_audio_path.read_bytes()
+        if not (raw_bytes.startswith(b"RIFF") and b"WAVE" in raw_bytes[:16]):
+            raise ValueError(f"O áudio mestre {self.master_audio_path} não possui cabeçalho RIFF/WAVE legítimo.")
+
+        calc_hash = hashlib.sha256(raw_bytes).hexdigest()
+        if calc_hash != self.sha256_hash:
+            raise ValueError(
+                f"Hash SHA-256 do áudio mestre ({calc_hash}) diverge do hash esperado ({self.sha256_hash})."
+            )
+
+        if shutil.which("ffprobe"):
+            proc = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=format_name:stream=codec_name",
+                    "-of",
+                    "json",
+                    str(self.master_audio_path),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            data = json.loads(proc.stdout or "{}")
+            fmt = data.get("format", {}).get("format_name", "")
+            streams = data.get("streams", [])
+            codec = streams[0].get("codec_name", "") if streams else ""
+            if "wav" not in fmt:
+                raise ValueError(f"Formato FFprobe do áudio mestre não é WAV: {fmt}")
+            if codec and "pcm" not in codec:
+                raise ValueError(f"Codec do áudio mestre não é PCM: {codec}")
+
+    def synthesize(
+        self,
+        text: str,
+        output_path: Path,
+        speaker_wav: Path | None = None,
+    ) -> tuple[Path, float]:
+        if text.strip() != self.expected_text:
+            raise ValueError(
+                f"Texto solicitado diverge do áudio pré-sintetizado mestre.\n"
+                f"Esperado: {self.expected_text}\n"
+                f"Recebido: {text.strip()}"
+            )
+
+        target = Path(output_path).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(self.master_audio_path, target)
+
+        delivered_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+        if delivered_hash != self.sha256_hash:
+            raise ValueError(f"Corrupção de integridade na entrega do áudio copiado para {target}")
+
+        self.delivered_copies.append({
+            "path": str(target),
+            "sha256": delivered_hash,
+            "duration": self.duration,
+        })
+        return target, self.duration
 
 
 class FallbackVoiceSynthesizer(BaseVoiceSynthesizer):
