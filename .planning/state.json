@@ -4,9 +4,9 @@
   "milestone": "v1.1 — ZUNTO! Visual Engine",
   "phases": [],
   "next": {
-    "command": "/gsd-progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 13 of 6 · 83% · executing"
   },
-  "updated_at": "2026-11-12T02:39:53.094Z"
+  "updated_at": "2026-11-13T22:23:00.207Z"
 }

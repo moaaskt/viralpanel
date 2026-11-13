@@ -141,3 +141,14 @@ Plans:
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
+
+### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 13
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 14 to break down)

@@ -132,6 +132,10 @@ Progress: [████████░░] 83%
 - [Phase 11-avatar-reaction-e-composicao-visual-organica]: Eliminação total do filtro pad de moldura retangular branca em ReactionVideoRenderer (Cenário 3 da auditoria)
 - [Phase 11-avatar-reaction-e-composicao-visual-organica]: Posicionamento do overlay PIP em W-w-54:H-h-320 (X=726..1026, Y=1300..1600), isolando a zona de legendas (1080..1280px) e desobstruindo a barra inferior mobile (Y>=1600px)
 
+### Roadmap Evolution
+
+- Phase 14 added: Formalização da Coleta e Scraper (Retrospectiva)
+
 ### Pending Todos
 
 None yet.
