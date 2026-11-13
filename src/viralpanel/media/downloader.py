@@ -2,12 +2,24 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from viralpanel.config import get_settings
 from viralpanel.storage import StorageManager
 
 logger = logging.getLogger(__name__)
+
+
+def get_ytdlp_cmd() -> list[str]:
+    """Retorna o comando executável de yt-dlp (no PATH do sistema ou como módulo sys.executable)."""
+    if binary := shutil.which("yt-dlp"):
+        return [binary]
+    try:
+        import yt_dlp  # noqa: F401
+        return [sys.executable, "-m", "yt_dlp"]
+    except ImportError:
+        raise RuntimeError("yt-dlp não encontrado no PATH nem no ambiente virtual (pip install yt-dlp)")
 
 
 class MediaDownloader:
@@ -30,14 +42,20 @@ class MediaDownloader:
         return d
 
     def download_video(self, run_id: str, url: str) -> Path:
-        if shutil.which("yt-dlp") is None:
-            raise RuntimeError("yt-dlp não encontrado no PATH (pip install yt-dlp)")
+        base_cmd = get_ytdlp_cmd()
 
         target = self.source_dir(run_id) / "source.mp4"
-        cmd = [
-            "yt-dlp",
+        # Limpeza preventiva contra colisão ou resíduos de candidatos anteriores rejeitados
+        if target.exists():
+            target.unlink(missing_ok=True)
+        audio_prev = target.with_name("audio.wav")
+        if audio_prev.exists():
+            audio_prev.unlink(missing_ok=True)
+
+        cmd = list(base_cmd) + [
             "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bestvideo+bestaudio/best",
             "-o", str(target),
+            "--force-overwrites",
             "--no-playlist",
             "--geo-bypass",
             "--user-agent",
@@ -75,6 +93,9 @@ class MediaDownloader:
             raise RuntimeError("ffmpeg não encontrado no PATH")
 
         out = output_audio_path or video_path.with_name("audio.wav")
+        if out.exists():
+            out.unlink(missing_ok=True)
+
         cmd = [
             "ffmpeg",
             "-y",
@@ -111,6 +132,12 @@ class MockMediaDownloader(MediaDownloader):
 
     def download_video(self, run_id: str, url: str) -> Path:
         target = self.source_dir(run_id) / "source.mp4"
+        if target.exists():
+            target.unlink(missing_ok=True)
+        audio_prev = target.with_name("audio.wav")
+        if audio_prev.exists():
+            audio_prev.unlink(missing_ok=True)
+
         if shutil.which("ffmpeg"):
             subprocess.run(
                 [
@@ -127,8 +154,10 @@ class MockMediaDownloader(MediaDownloader):
         return target
 
     def extract_audio(self, video_path: Path, output_audio_path: Path | None = None) -> Path:
+        out = output_audio_path or video_path.with_name("audio.wav")
+        if out.exists():
+            out.unlink(missing_ok=True)
         if shutil.which("ffmpeg") and video_path.read_bytes()[:9] != b"MOCKVIDEO":
             return super().extract_audio(video_path, output_audio_path)
-        out = output_audio_path or video_path.with_name("audio.wav")
         out.write_bytes(b"MOCKAUDIO")
         return out
