@@ -39,8 +39,8 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 ### Coleta e Scraper (DISC)
 
-- [ ] **DISC-04**: Normalização canônica de URLs do TikTok (eliminação de query parameters, caminhos variantes e IDs avulsos), deduplicação antes da persistência de candidatos e rejeição de candidatos com score menor ou igual a zero.
-- [ ] **DISC-05**: Detecção dinâmica e tolerante a falhas do executável `yt-dlp` com fallback para `sys.executable -m yt_dlp`, sobrescrita limpa de arquivos em retries (`--force-overwrites`) e remoção atômica de arquivos de mídia órfãos em caso de fala insuficiente (`InsufficientSpeechError`).
+- [x] **DISC-04**: Normalização canônica de URLs do TikTok (eliminação de query parameters, caminhos variantes e IDs avulsos), deduplicação antes da persistência de candidatos e rejeição de candidatos com score menor ou igual a zero.
+- [x] **DISC-05**: Detecção dinâmica e tolerante a falhas do executável `yt-dlp` com fallback para `sys.executable -m yt_dlp`, sobrescrita limpa de arquivos em retries (`--force-overwrites`) e remoção atômica de arquivos de mídia órfãos em caso de fala insuficiente (`InsufficientSpeechError`).
 
 ## Processo & Restrições de Engenharia
 
@@ -80,5 +80,5 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | SCRP-02 | Phase 9 | Complete |
 | QUAL-01 | Phase 13 | Mapped |
 | QUAL-02 | Phase 13 | Mapped |
-| DISC-04 | Phase 14 | Mapped |
-| DISC-05 | Phase 14 | Mapped |
+| DISC-04 | Phase 14 | Complete |
+| DISC-05 | Phase 14 | Complete |
