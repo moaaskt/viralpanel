@@ -31,27 +31,30 @@ class DiscoverySettings(BaseModel):
     default_limit: int = 30
     hashtags: list[str] = Field(
         default_factory=lambda: [
-            "desenvolvimentopessoal",
-            "motivacao",
-            "mentalidade",
-            "disciplina",
-            "produtividade",
+            "curiosidades",
+            "ciencia",
+            "tecnologia",
+            "misterios",
+            "descobertas",
+            "fatosdesconhecidos",
+            "vocesabia",
         ]
     )
     seed_accounts: list[str] = Field(
         default_factory=lambda: [
-            "eslen.delanogare",
-            "reservatorio.de.dopamina",
-            "wendellcarvalho",
-            "flavioaugustodasilva",
-            "joeljota",
+            "vocesabia",
+            "cienciatododia",
+            "curiosidadesdomundo",
+            "manualdomundo",
+            "fatosdesconhecidos",
         ]
     )
     search_queries: list[str] = Field(
         default_factory=lambda: [
-            "desenvolvimento pessoal",
-            "como ter foco e disciplina",
-            "mentalidade de sucesso",
+            "curiosidades que você não sabia",
+            "descobertas científicas misteriosas",
+            "fatos chocantes de ciência e tecnologia",
+            "mistérios do universo explicados",
         ]
     )
 

@@ -12,7 +12,8 @@ def test_load_scoring_config_from_yaml():
     assert cfg.weights.engagement_ratio == 0.45
     assert cfg.weights.velocity_24h == 0.30
     assert cfg.discovery.default_limit == 30
-    assert "desenvolvimentopessoal" in cfg.discovery.hashtags
+    assert "curiosidades" in cfg.discovery.hashtags
+    assert "ciencia" in cfg.discovery.hashtags
 
 
 def test_viral_score_below_min_views_returns_zero():

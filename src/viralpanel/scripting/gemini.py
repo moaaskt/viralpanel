@@ -361,7 +361,13 @@ class FallbackScriptWriter(ScriptWriter):
                     logger.warning("Não foi possível inicializar Groq Fallback: %s", e)
 
         if not self.writers:
-            logger.warning("Nenhum provedor de IA real configurado. FallbackScriptWriter usará MockGeminiScriptWriter.")
+            if not settings.pipeline_mock_mode:
+                raise RuntimeError(
+                    "Nenhum provedor de IA real configurado (GEMINI_API_KEY/GROQ_API_KEY ausentes) "
+                    "e PIPELINE_MOCK_MODE=false. Configure as chaves de API necessárias no .env "
+                    "ou ative explicitamente PIPELINE_MOCK_MODE=true para testes simulados."
+                )
+            logger.warning("PIPELINE_MOCK_MODE=true: Nenhum provedor de IA real configurado. Usando MockGeminiScriptWriter.")
             self.writers.append(MockGeminiScriptWriter())
 
     def generate(

@@ -7,15 +7,33 @@ import sys
 from viralpanel.studio.inspection import InspectionRunner
 
 
+def _cmd_calibrate_audio(args: argparse.Namespace) -> int:
+    output_dir = Path(args.output_dir)
+    runs = int(args.runs)
+
+    print(f"=== ZUNTO! Calibração Empírica Prévia de Áudio ({runs} runs) ===")
+    runner = InspectionRunner()
+    result = runner.run_calibration(output_dir=output_dir, runs=runs)
+
+    print(f"Relatório de Calibração gerado em: {result['calibration_report']}")
+    print(f"Hash SHA-256 do Áudio Mestre: {result['master_sha256']}")
+    print(f"Duração Mestre: {result['master_duration']:.4f}s")
+    stats = result["stats"]
+    print(f"Dispersão Pearson (Norm vs Fallback): min={stats['pearson_nf']['min']:.6f}, max={stats['pearson_nf']['max']:.6f}, std={stats['pearson_nf']['std']:.6f}")
+    print(f"Dispersão NMAE (Norm vs Fallback): min={stats['nmae_nf']['min']:.6f}, max={stats['nmae_nf']['max']:.6f}, std={stats['nmae_nf']['std']:.6f}")
+    return 0
+
+
 def _cmd_validate_e2e(args: argparse.Namespace) -> int:
     output_dir = Path(args.output_dir)
     report_path = Path(args.report_path)
+    voice_mode = args.voice_mode
 
     runner = InspectionRunner()
-    results = runner.run_all(output_dir=output_dir, report_path=report_path)
+    results = runner.run_all(output_dir=output_dir, report_path=report_path, voice_mode=voice_mode)
 
     all_passed = True
-    print("=== ZUNTO! E2E Inspection & Technical Validation ===")
+    print(f"=== ZUNTO! E2E Inspection & Technical Validation (voice_mode={voice_mode}) ===")
     for item in results:
         v_val = item["video_validation"]
         a_val = item["avatar_validation"]
@@ -65,7 +83,31 @@ def build_parser() -> argparse.ArgumentParser:
         default=".planning/phases/13-valida-o-t-cnica-automatizada-e-inspe-o-audiovisual-e2e/INSPECTION-REPORT.md",
         help="Caminho do relatório Markdown de inspeção.",
     )
+    val_parser.add_argument(
+        "--voice-mode",
+        choices=["neural", "mock"],
+        default="neural",
+        help="Modo de síntese de voz: 'neural' (Edge-TTS) ou 'mock' (offline).",
+    )
     val_parser.set_defaults(func=_cmd_validate_e2e)
+
+    calib_parser = subparsers.add_parser(
+        "calibrate-audio",
+        help="Executa a Calibração Empírica Prévia de Áudio (N runs controlados).",
+    )
+    calib_parser.add_argument(
+        "--output-dir",
+        default="storage/inspection",
+        help="Diretório onde o CALIBRATION-REPORT.md será salvo.",
+    )
+    calib_parser.add_argument(
+        "--runs",
+        type=int,
+        default=3,
+        help="Número de execuções controladas para medição de dispersão (default: 3).",
+    )
+    calib_parser.set_defaults(func=_cmd_calibrate_audio)
+
     return parser
 
 
@@ -77,4 +119,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

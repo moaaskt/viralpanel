@@ -1,4 +1,4 @@
-# ViralPanel - Configuração de Scoring de Viralidade (TikTok)
+# ZUNTO! - Configuração Editorial e Scoring de Viralidade (TikTok)
 weights:
   views: 0.25
   engagement_ratio: 0.45
@@ -19,18 +19,21 @@ thresholds:
 discovery:
   default_limit: 30
   hashtags:
-    - "desenvolvimentopessoal"
-    - "motivacao"
-    - "mentalidade"
-    - "disciplina"
-    - "produtividade"
+    - "curiosidades"
+    - "ciencia"
+    - "tecnologia"
+    - "misterios"
+    - "descobertas"
+    - "fatosdesconhecidos"
+    - "vocesabia"
   seed_accounts:
-    - "eslen.delanogare"
-    - "reservatorio.de.dopamina"
-    - "wendellcarvalho"
-    - "flavioaugustodasilva"
-    - "joeljota"
+    - "vocesabia"
+    - "cienciatododia"
+    - "curiosidadesdomundo"
+    - "manualdomundo"
+    - "fatosdesconhecidos"
   search_queries:
-    - "desenvolvimento pessoal"
-    - "como ter foco e disciplina"
-    - "mentalidade de sucesso"
+    - "curiosidades que você não sabia"
+    - "descobertas científicas misteriosas"
+    - "fatos chocantes de ciência e tecnologia"
+    - "mistérios do universo explicados"

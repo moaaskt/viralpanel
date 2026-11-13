@@ -2,7 +2,9 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -11,6 +13,31 @@ from viralpanel.discovery.base import BaseScraper, ScrapedVideoMetadata
 from viralpanel.discovery.utils import netscape_to_patchright_storage
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_tiktok_url(raw_url: str, default_author: str = "unknown") -> str:
+    """Normaliza URLs do TikTok para o formato canônico: https://www.tiktok.com/@{author}/video/{video_id}."""
+    clean = raw_url.split("?")[0].rstrip("/")
+    match = re.search(r"(?:video/|/v/|^)(\d+)", clean)
+    if not match:
+        return clean
+    vid_id = match.group(1)
+    author_match = re.search(r"@([^/]+)", clean)
+    author = author_match.group(1) if author_match else default_author
+    if not author or author == "unknown":
+        author = default_author or "user"
+    return f"https://www.tiktok.com/@{author}/video/{vid_id}"
+
+
+def get_ytdlp_cmd() -> list[str] | None:
+    """Retorna o comando executável de yt-dlp (no PATH do sistema ou como módulo sys.executable)."""
+    if shutil.which("yt-dlp"):
+        return ["yt-dlp"]
+    try:
+        import yt_dlp  # noqa: F401
+        return [sys.executable, "-m", "yt_dlp"]
+    except ImportError:
+        return None
 
 
 class MockDiscoveryScraper(BaseScraper):
@@ -109,7 +136,9 @@ class TikTokDiscoveryScraper(BaseScraper):
                 posted_at = datetime.now(timezone.utc)
 
             desc = item.get("desc") or item.get("title") or ""
-            video_url = f"https://www.tiktok.com/@{author}/video/{video_id}"
+            video_url = normalize_tiktok_url(
+                f"https://www.tiktok.com/@{author}/video/{video_id}", default_author=author
+            )
 
             # Extrair hashtags do desc ou usar tag_or_query
             found_tags = re.findall(r"#(\w+)", desc)
@@ -261,8 +290,9 @@ class TikTokDiscoveryScraper(BaseScraper):
         targets: list[str],
         max_items_per_target: int,
     ) -> list[ScrapedVideoMetadata]:
-        if shutil_which := subprocess.run(["which", "yt-dlp"], capture_output=True, text=True).returncode != 0:
-            logger.warning("yt-dlp não disponível no PATH.")
+        ytdlp_cmd = get_ytdlp_cmd()
+        if not ytdlp_cmd:
+            logger.warning("yt-dlp não disponível no PATH nem no ambiente virtual.")
             return []
 
         results: list[ScrapedVideoMetadata] = []
@@ -280,8 +310,7 @@ class TikTokDiscoveryScraper(BaseScraper):
                 url = f"https://www.tiktok.com/tag/{clean_tag}"
                 tag_or_acc = clean_tag
 
-            cmd = [
-                "yt-dlp",
+            cmd = list(ytdlp_cmd) + [
                 "--flat-playlist",
                 "--dump-json",
                 "--playlist-end", str(max_items_per_target),
@@ -313,13 +342,12 @@ class TikTokDiscoveryScraper(BaseScraper):
                     except json.JSONDecodeError:
                         continue
 
-                    video_url = data.get("webpage_url") or data.get("url")
-                    if not video_url:
+                    raw_video_url = data.get("webpage_url") or data.get("url")
+                    if not raw_video_url:
                         continue
 
-                    # yt-dlp flat playlist pode retornar apenas video id na url
-                    if not video_url.startswith("http"):
-                        video_url = f"https://www.tiktok.com/video/{video_url}"
+                    author = data.get("uploader") or data.get("creator") or data.get("channel") or tag_or_acc
+                    video_url = normalize_tiktok_url(raw_video_url, default_author=author)
 
                     ts = data.get("timestamp")
                     posted_at = (
@@ -331,7 +359,7 @@ class TikTokDiscoveryScraper(BaseScraper):
                         ScrapedVideoMetadata(
                             url=video_url,
                             platform="tiktok",
-                            author=data.get("uploader") or data.get("creator") or data.get("channel") or tag_or_acc,
+                            author=author,
                             title=data.get("title") or data.get("description") or "",
                             views=int(data.get("view_count") or 0),
                             likes=int(data.get("like_count") or 0),

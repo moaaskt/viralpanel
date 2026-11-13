@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from viralpanel.discovery.base import BaseScraper, ScrapedVideoMetadata
 from viralpanel.discovery.scoring import ScoringConfig, calculate_viral_score, load_scoring_config
-from viralpanel.discovery.tiktok import TikTokDiscoveryScraper
+from viralpanel.discovery.tiktok import TikTokDiscoveryScraper, normalize_tiktok_url
 from viralpanel.models import SourceVideo
 
 
@@ -37,21 +37,27 @@ class DiscoveryService:
         )
 
         ref_now = now or datetime.now(timezone.utc)
-        persisted: list[SourceVideo] = []
+        persisted_map: dict[str, SourceVideo] = {}
 
         for item in scraped_items:
+            norm_url = normalize_tiktok_url(item.url, default_author=item.author)
             score = calculate_viral_score(item, config=self.scoring_config, now=ref_now)
-            existing = db.scalar(select(SourceVideo).where(SourceVideo.url == item.url))
+            existing = persisted_map.get(norm_url)
+            if existing is None:
+                existing = db.scalar(
+                    select(SourceVideo).where((SourceVideo.url == item.url) | (SourceVideo.url == norm_url))
+                )
             if existing is not None:
+                existing.url = norm_url
                 existing.author = item.author
                 existing.metrics = item.to_metrics_dict()
                 existing.score = score
                 existing.collected_at = ref_now
-                persisted.append(existing)
+                persisted_map[norm_url] = existing
             else:
                 record = SourceVideo(
                     platform=item.platform,
-                    url=item.url,
+                    url=norm_url,
                     author=item.author,
                     metrics=item.to_metrics_dict(),
                     score=score,
@@ -59,9 +65,10 @@ class DiscoveryService:
                     status="pending",
                 )
                 db.add(record)
-                persisted.append(record)
+                persisted_map[norm_url] = record
 
         db.commit()
+        persisted = list(persisted_map.values())
         for record in persisted:
             db.refresh(record)
 
@@ -71,7 +78,7 @@ class DiscoveryService:
     def select_best_candidate(self, db: Session) -> SourceVideo | None:
         stmt = (
             select(SourceVideo)
-            .where(SourceVideo.status == "pending")
+            .where(SourceVideo.status == "pending", SourceVideo.score > 0.0)
             .order_by(SourceVideo.score.desc())
             .limit(1)
         )

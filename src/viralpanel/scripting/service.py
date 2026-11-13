@@ -43,6 +43,10 @@ class ScriptingService:
             if not isinstance(self.transcriber, MockTranscriber) and word_count < self.min_speech_words:
                 source.status = "skipped_no_speech"
                 db.commit()
+                if video.exists():
+                    video.unlink(missing_ok=True)
+                if audio.exists():
+                    audio.unlink(missing_ok=True)
                 msg = (
                     f"Vídeo {source.url} rejeitado: apenas {word_count} palavras faladas "
                     f"(mínimo exigido: {self.min_speech_words})"
