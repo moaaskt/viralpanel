@@ -144,11 +144,11 @@ Plans:
 
 ### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Formalizar retrospectivamente no GSD e validar tecnicamente as melhorias de resiliência e estabilização de coleta implementadas na esteira discovery/media (normalização e deduplicação canônica de URLs do TikTok, suporte cross-platform ao executável yt-dlp, limpeza atômica de arquivos prévios em retries e rejeição de candidatos com score não-positivo), vinculando as evidências dos 12 commits existentes aos requisitos DISC-04 e DISC-05 e comprovando 100% de aprovação na suíte de testes de regressão.
 **Depends on:** Phase 13
-**Plans:** 0 plans
+**Requirements**: DISC-04, DISC-05
+**Plans:** 1 plan
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 14 to break down)
+- [ ] 14-01-PLAN.md — Formalização Retrospectiva da Coleta, Deduplicação Canônica e Resiliência yt-dlp (DISC-04, DISC-05)

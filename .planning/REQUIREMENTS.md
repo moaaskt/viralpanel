@@ -37,6 +37,11 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 - [ ] **QUAL-01**: Validador técnico automatizado pós-renderização que inspeciona dimensões exatas (1080x1920), aspect ratio (9:16), duração, streams A/V e integridade do arquivo.
 - [ ] **QUAL-02**: Testes de regressão audiovisual ponta a ponta com geração de vídeos reais inspecionados visualmente (ausência de legendas duplicadas, artefatos no avatar e safe zones).
 
+### Coleta e Scraper (DISC)
+
+- [ ] **DISC-04**: Normalização canônica de URLs do TikTok (eliminação de query parameters, caminhos variantes e IDs avulsos), deduplicação antes da persistência de candidatos e rejeição de candidatos com score menor ou igual a zero.
+- [ ] **DISC-05**: Detecção dinâmica e tolerante a falhas do executável `yt-dlp` com fallback para `sys.executable -m yt_dlp`, sobrescrita limpa de arquivos em retries (`--force-overwrites`) e remoção atômica de arquivos de mídia órfãos em caso de fala insuficiente (`InsufficientSpeechError`).
+
 ## Processo & Restrições de Engenharia
 
 - **Investigação Prévia e Mapeamento de Contratos Obrigatórios**: Identificar a causa raiz exata dos bugs visuais e documentar entradas, saídas, responsabilidades e dependências entre `subtitles.py`, `renderer.py`, avatar e Celery tasks antes de qualquer código.
@@ -75,3 +80,5 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | SCRP-02 | Phase 9 | Complete |
 | QUAL-01 | Phase 13 | Mapped |
 | QUAL-02 | Phase 13 | Mapped |
+| DISC-04 | Phase 14 | Mapped |
+| DISC-05 | Phase 14 | Mapped |
