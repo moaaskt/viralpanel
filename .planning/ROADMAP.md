@@ -16,6 +16,7 @@
 - [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
 - [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
+- [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
 
 ## Phase Details
 
@@ -143,6 +144,7 @@ Plans:
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
 | Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
+| Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
 ### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
 
@@ -154,3 +156,14 @@ Plans:
 Plans:
 
 - [x] 14-01-PLAN.md — Formalização Retrospectiva da Coleta, Deduplicação Canônica e Resiliência yt-dlp (DISC-04, DISC-05)
+
+### Phase 15: Database Schema Integrity & PostgreSQL Migration Tests
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 15 to break down)

@@ -7,16 +7,16 @@ current_phase_name: Validação Técnica Automatizada e Inspeção Audiovisual E
 current_plan: Not started
 status: planning
 stopped_at: Phase 14 complete, ready to plan Phase 13
-last_updated: "2026-11-13T22:55:56.921Z"
+last_updated: "2026-11-14T00:45:00.137Z"
 last_activity: 2026-11-13
-last_activity_desc: Phase 14 complete, transitioned to Phase 13
-state_head: 0a006c8b72a5874871c160b18ddc9a3e4a9b86e8
+state_head: a3f610f525a51c53322d324308afbac0351afe39
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
   total_plans: 13
   completed_plans: 12
-  percent: 86
+  percent: 75
+last_activity_desc: Phase 14 complete, transitioned to Phase 13
 ---
 
 # Project State
@@ -34,9 +34,9 @@ Phase: 13 — Validação Técnica Automatizada e Inspeção Audiovisual E2E
 Current Plan: Not started
 Total Plans in Phase: 2
 Status: Ready to plan
-Last activity: 2026-11-13 — Phase 14 complete, transitioned to Phase 13
+Last activity: 2026-11-13
 
-Progress: [█████████░] 86%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -135,6 +135,7 @@ Progress: [█████████░] 86%
 ### Roadmap Evolution
 
 - Phase 14 added: Formalização da Coleta e Scraper (Retrospectiva)
+- Phase 15 added: Database Schema Integrity & PostgreSQL Migration Tests
 
 ### Pending Todos
 
