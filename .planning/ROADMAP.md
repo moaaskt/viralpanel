@@ -12,9 +12,11 @@
 - [x] **Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz** - Investigação técnica das causas de duplicação de legendas, artefatos do avatar e mapeamento rigoroso dos contratos entre subtitles.py, renderer.py e tasks Celery (completed 2026-11-06)
 - [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** - Refinamento de prompts no Gemini 2.5 Flash para retenção, rastreabilidade de fontes factuais, CTA contextual e identidade visual ZUNTO! (completed 2026-11-06)
 - [x] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO! (completed 2026-11-08)
-- [ ] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16
+- [x] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16 (completed 2026-11-08)
 - [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
+- [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
+- [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
 
 ## Phase Details
 
@@ -141,3 +143,28 @@ Plans:
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
+| Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
+| Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
+
+### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
+
+**Goal:** Formalizar retrospectivamente no GSD e validar tecnicamente as melhorias de resiliência e estabilização de coleta implementadas na esteira discovery/media (normalização e deduplicação canônica de URLs do TikTok, suporte cross-platform ao executável yt-dlp, limpeza atômica de arquivos prévios em retries e rejeição de candidatos com score não-positivo), vinculando as evidências dos 12 commits existentes aos requisitos DISC-04 e DISC-05 e comprovando 100% de aprovação na suíte de testes de regressão.
+**Depends on:** Phase 13
+**Requirements**: DISC-04, DISC-05
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 14-01-PLAN.md — Formalização Retrospectiva da Coleta, Deduplicação Canônica e Resiliência yt-dlp (DISC-04, DISC-05)
+
+### Phase 15: Database Schema Integrity & PostgreSQL Migration Tests
+
+**Goal:** Corrigir o schema drift do banco de dados, implementar migração incremental isolada mantendo imutabilidade de 001, refatorar alembic/env.py para injeção de conexão e validar migrações com PostgreSQL real e SQLite.
+**Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05
+**Depends on:** Phase 14
+**Plans:** 1 plan
+
+Plans:
+
+**Wave 1:**
+- [ ] 15-01-PLAN.md — Refatoração de alembic/env.py, Migração Incremental 002 e Testes de Schema Drift
