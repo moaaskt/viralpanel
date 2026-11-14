@@ -42,6 +42,14 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 - [x] **DISC-04**: Normalização canônica de URLs do TikTok (eliminação de query parameters, caminhos variantes e IDs avulsos), deduplicação antes da persistência de candidatos e rejeição de candidatos com score menor ou igual a zero.
 - [x] **DISC-05**: Detecção dinâmica e tolerante a falhas do executável `yt-dlp` com fallback para `sys.executable -m yt_dlp`, sobrescrita limpa de arquivos em retries (`--force-overwrites`) e remoção atômica de arquivos de mídia órfãos em caso de fala insuficiente (`InsufficientSpeechError`).
 
+### Integridade de Schema & Migrações de Banco (MIGR)
+
+- [ ] **MIGR-01**: Migração incremental 002 adicionando a coluna `metadata_json` (JSON, nullable=True) na tabela `scripts`, preservando a imutabilidade histórica da migração 001.
+- [ ] **MIGR-02**: Refatoração de `alembic/env.py` para suportar injeção dinâmica de conexão (`context.config.attributes["connection"]`) e resolução dinâmica de URL (`sqlalchemy.url`), viabilizando testes determinísticos e isolados.
+- [ ] **MIGR-03**: Teste automatizado de ciclo de vida completo de migrações (`upgrade clean to head`, `upgrade incremental 001->002` com integridade de dados legados e novos, e `downgrade 002->001->base`).
+- [ ] **MIGR-04**: Teste automatizado de detecção de schema drift via `compare_metadata(mc, Base.metadata)` garantindo zero discrepâncias entre os modelos ORM (`Script`) e o banco físico.
+- [ ] **MIGR-05**: Suporte dual-engine no harness de teste (execução determinística e rápida sobre SQLite isolado em `tmp_path` e validação estrita PostgreSQL real condicional à disponibilidade do serviço).
+
 ## Processo & Restrições de Engenharia
 
 - **Investigação Prévia e Mapeamento de Contratos Obrigatórios**: Identificar a causa raiz exata dos bugs visuais e documentar entradas, saídas, responsabilidades e dependências entre `subtitles.py`, `renderer.py`, avatar e Celery tasks antes de qualquer código.
@@ -82,3 +90,8 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | QUAL-02 | Phase 13 | Mapped |
 | DISC-04 | Phase 14 | Complete |
 | DISC-05 | Phase 14 | Complete |
+| MIGR-01 | Phase 15 | Planned |
+| MIGR-02 | Phase 15 | Planned |
+| MIGR-03 | Phase 15 | Planned |
+| MIGR-04 | Phase 15 | Planned |
+| MIGR-05 | Phase 15 | Planned |

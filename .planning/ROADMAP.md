@@ -159,11 +159,12 @@ Plans:
 
 ### Phase 15: Database Schema Integrity & PostgreSQL Migration Tests
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Corrigir o schema drift do banco de dados, implementar migração incremental isolada mantendo imutabilidade de 001, refatorar alembic/env.py para injeção de conexão e validar migrações com PostgreSQL real e SQLite.
+**Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05
 **Depends on:** Phase 14
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 15 to break down)
+**Wave 1:**
+- [ ] 15-01-PLAN.md — Refatoração de alembic/env.py, Migração Incremental 002 e Testes de Schema Drift
