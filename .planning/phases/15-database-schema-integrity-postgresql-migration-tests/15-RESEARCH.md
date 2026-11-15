@@ -11,14 +11,17 @@
 ### Locked Decisions
 - **D-01 (Imutabilidade da Revisão 001):** A migração inicial `alembic/versions/001_initial_schema.py` é estritamente imutável. Quaisquer alterações de schema devem ser aplicadas através de migrações incrementais versionadas. [VERIFIED: ANALYZER-04:67-70]
 - **D-02 (Migração Incremental 002):** A resolução do schema drift identificado no Finding F-01 (`scripts.metadata_json`) deve ser realizada criando a migração `alembic/versions/002_add_metadata_json_to_scripts.py`, com `down_revision = '001'`, implementando `upgrade()` com `op.add_column` e `downgrade()` com `op.drop_column`. [VERIFIED: ANALYZER-04:49,69]
-- **D-03 (Desacoplamento do Alembic env.py):** `alembic/env.py` deve ser refatorado cirurgicamente para suportar conexões injetadas via `context.config.attributes.get('connection')` e URL configurável via `context.config.get_main_option('sqlalchemy.url')`, eliminando a dependência rígida de `create_engine(get_settings().database_url)` em tempo de importação e execução. [VERIFIED: alembic/env.py:9,19]
-- **D-04 (Harness de Testes de Migração):** Criação de `tests/test_migrations.py` cobrindo:
+- **D-03 (Desacoplamento do Alembic env.py):** `alembic/env.py` deve ser refatorado cirurgicamente para suportar conexões injetadas via `context.config.attributes.get('connection')` e URL configurável via `context.config.get_main_option('sqlalchemy.url')` ou `TEST_DATABASE_URL`, eliminando a dependência rígida de `create_engine(get_settings().database_url)` em tempo de importação e execução. [VERIFIED: alembic/env.py:9,19]
+- **D-04 (Harness de Testes e Ciclo Completo de Migração):** Criação de `tests/test_migrations.py` cobrindo o ciclo completo de migrações:
   1. Subida limpa da base até `head` (`upgrade head`).
-  2. Subida incremental de `001` até `head` (`002`), com asserção de integridade de dados pré-existentes.
-  3. Downgrade completo de `head` até `001` e `base` (`downgrade base`).
-  4. Ausência de schema drift entre `Base.metadata` e o banco migrado via `compare_metadata()`. [VERIFIED: ANALYZER-04:70,196-200]
-- **D-05 (Estratégia de Ambientes Dual-Engine):** A suíte de testes deve executar com 100% de sucesso tanto em ambiente de desenvolvimento local (usando SQLite isolado para validação do ciclo de vida DDL do Alembic) quanto contra PostgreSQL real (quando a porta 5432 / Docker estiver ativa ou em esteira CI/CD). [VERIFIED: user_instructions]
-- **D-06 (Fronteira Estrita de Escopo da Phase 15):** A migração `003` (`Asset.status`) e os campos de concorrência/lease de `SourceVideo` pertencem exclusivamente à Phase 16 (Concorrência, Fencing & Lifecycle). A Phase 15 mantém foco estrito e cirúrgico na resolução do drift de `Script.metadata_json` e na homologação da infraestrutura de testes de migração. [VERIFIED: user_instructions, ANALYZER-04:195-200]
+  2. Subida incremental de `001` até `head` (`002`), com asserção estrita de preservação e integridade de dados legados (registros pré-existentes mantêm `metadata_json = None`) e inserção de novos registros com JSON estruturado.
+  3. Ciclo completo round-trip: `head → 001 → base → head`, assegurando que o downgrade não deixa tabelas ou versões órfãs e que re-aplicar o upgrade do zero restaura o schema completo sem erros.
+  4. Detecção automatizada de schema drift: no SQLite, filtros estritamente documentados apenas para divergências conhecidas de dialeto; no PostgreSQL, asserção estrita `assert diff == []` sem nenhum filtro que mascare divergências. [VERIFIED: ANALYZER-04:70,196-200]
+- **D-05 (Estratégia Dual-Engine e PostgreSQL Obrigatório no CI):** 
+  1. No ambiente de CI (`CI=true` ou `GITHUB_ACTIONS=true`), o PostgreSQL 16 é OBRIGATÓRIO. O teste contra PostgreSQL real NUNCA pode ser ignorado ou pulado (skip proibido no CI; falha obrigatória do build com `pytest.fail()` se o PostgreSQL não estiver disponível).
+  2. A execução condicional com skip de PostgreSQL é restrita exclusivamente ao ambiente local de desenvolvimento quando não houver instância respondendo na porta 5432.
+  3. Configuração de workflow formal de CI (`.github/workflows/ci.yml`) com serviço `postgres:16`, container healthcheck (`pg_isready`), porta 5432 mapeada, variável `TEST_DATABASE_URL` e execução obrigatória dos testes de migração e da suíte completa. [VERIFIED: user_instructions]
+- **D-06 (Fronteira Estrita de Escopo da Phase 15):** A migração `003` (`Asset.status`) e os campos de concorrência/lease de `SourceVideo` pertencem exclusivamente à Phase 16 (Concorrência, Fencing & Lifecycle). A Phase 15 mantém foco estrito e cirúrgico na resolução do drift de `Script.metadata_json`, na homologação da infraestrutura de testes de migração e no workflow de CI com PostgreSQL 16. [VERIFIED: user_instructions, ANALYZER-04:195-200]
 
 ### the agent's Discretion
 - Tratamento de divergências de reflexão de tipos do SQLite (ex: nullability de chaves primárias e constraints anônimas) no teste de `compare_metadata()`.
@@ -414,16 +417,16 @@ def test_incremental_migration_001_to_002_and_data_integrity(alembic_config_sqli
         assert "factual_claims" in (json.loads(row_new[1]) if isinstance(row_new[1], str) else row_new[1])
 
 
-def test_downgrade_cycle(alembic_config_sqlite):
-    """Garante que o downgrade reverte 002 -> 001 e 001 -> base sem erros."""
+def test_migration_roundtrip_cycle(alembic_config_sqlite):
+    """Garante que o ciclo completo round-trip (head -> 001 -> base -> head) executa sem resíduos."""
     cfg, engine = alembic_config_sqlite
 
-    # Sobe até head
+    # 1. Sobe até head (base -> head)
     with engine.connect() as conn:
         cfg.attributes["connection"] = conn
         command.upgrade(cfg, "head")
 
-    # Downgrade para 001
+    # 2. Reverte para 001 (head -> 001)
     with engine.connect() as conn:
         cfg.attributes["connection"] = conn
         command.downgrade(cfg, "001")
@@ -435,7 +438,7 @@ def test_downgrade_cycle(alembic_config_sqlite):
         mc = MigrationContext.configure(conn)
         assert mc.get_current_revision() == "001"
 
-    # Downgrade para base
+    # 3. Reverte para base (001 -> base)
     with engine.connect() as conn:
         cfg.attributes["connection"] = conn
         command.downgrade(cfg, "base")
@@ -447,9 +450,29 @@ def test_downgrade_cycle(alembic_config_sqlite):
         mc = MigrationContext.configure(conn)
         assert mc.get_current_revision() is None
 
+    # 4. Re-aplica upgrade até head (base -> head)
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        inspector = inspect(conn)
+        tables = set(inspector.get_table_names())
+        assert {"source_videos", "scripts", "assets", "publications", "runs"}.issubset(tables)
+        cols = [c["name"] for c in inspector.get_columns("scripts")]
+        assert "metadata_json" in cols
+        mc = MigrationContext.configure(conn)
+        assert mc.get_current_revision() == "002"
+
 
 def test_schema_no_drift_compare_metadata(alembic_config_sqlite):
-    """Valida ausência de schema drift estrutural entre Base.metadata e banco migrado."""
+    """Valida ausência de schema drift estrutural entre Base.metadata e banco migrado no SQLite.
+    
+    Filtros de dialeto no SQLite são estritamente documentados:
+    - Divergências anônimas de constraints ou PK nullability específicas da reflexão do SQLite
+      são toleradas apenas quando não afetam tabelas ou colunas.
+    - Qualquer add_column, remove_column, add_table ou remove_table é estritamente proibido.
+    """
     cfg, engine = alembic_config_sqlite
 
     with engine.connect() as conn:
@@ -465,24 +488,48 @@ def test_schema_no_drift_compare_metadata(alembic_config_sqlite):
             d for d in diff 
             if d[0] in ("add_column", "remove_column", "add_table", "remove_table")
         ]
-        assert structural_diffs == [], f"Schema drift detectado: {structural_diffs}"
+        assert structural_diffs == [], f"Schema drift estrutural detectado no SQLite: {structural_diffs}"
 
         # Assegura que metadata_json especificamente não possui drift
         add_cols = [d for d in diff if d[0] == "add_column" and d[2] == "scripts" and d[3].name == "metadata_json"]
         assert len(add_cols) == 0, "metadata_json está ausente no banco migrado"
 
 
-@pytest.mark.skipif(not is_postgres_available(), reason="PostgreSQL não disponível na porta 5432")
+def is_ci() -> bool:
+    """Detecta se o teste está executando em ambiente de Integração Contínua (CI)."""
+    import os
+    return os.getenv("CI") == "true" or os.getenv("GITHUB_ACTIONS") == "true"
+
+
 def test_postgres_real_migration_and_strict_zero_drift():
-    """Validação estrita de zero-drift contra instância PostgreSQL real."""
-    url = get_settings().database_url
+    """Validação estrita de zero-drift contra instância PostgreSQL real.
+    
+    REGRAS DE CONECTIVIDADE E FALHA:
+    - No CI: PostgreSQL é OBRIGATÓRIO. Se não estiver acessível, FALHA com pytest.fail().
+      O teste NUNCA pode ser silenciosamente ignorado/pulado no CI.
+    - Em ambiente local: permite pytest.skip() exclusivamente se o PostgreSQL não estiver respondendo.
+    
+    REGRA DE SCHEMA DRIFT NO POSTGRESQL:
+    - Exige compare_metadata() == [] rigorosamente SEM NENHUM FILTRO.
+    """
+    import os
+    if not is_postgres_available():
+        if is_ci():
+            pytest.fail(
+                "PostgreSQL 16 é OBRIGATÓRIO no CI, mas não foi detectado respondendo na porta 5432! "
+                "O workflow de CI deve provisionar o container postgres:16 com TEST_DATABASE_URL."
+            )
+        else:
+            pytest.skip("PostgreSQL não disponível na porta 5432 (permitido apenas em ambiente local)")
+
+    url = os.getenv("TEST_DATABASE_URL") or get_settings().database_url
     engine = create_engine(url)
 
     ini_path = Path(__file__).parent.parent / "alembic.ini"
     cfg = Config(str(ini_path))
     cfg.set_main_option("sqlalchemy.url", url)
 
-    # Executa ciclo no PostgreSQL
+    # Executa ciclo completo round-trip no PostgreSQL: downgrade base -> upgrade head
     with engine.connect() as conn:
         cfg.attributes["connection"] = conn
         command.downgrade(cfg, "base")
@@ -491,10 +538,66 @@ def test_postgres_real_migration_and_strict_zero_drift():
     with engine.connect() as conn:
         mc = MigrationContext.configure(conn)
         diff = compare_metadata(mc, Base.metadata)
-        # No PostgreSQL, não há artefatos de SQLite: o diff deve ser rigorosamente vazio
+        # No PostgreSQL, não há tolerância nem filtros: o diff deve ser rigorosamente vazio
         assert diff == [], f"Divergência de schema encontrada no PostgreSQL: {diff}"
 
     engine.dispose()
+```
+
+### 4. Workflow de CI `.github/workflows/ci.yml`
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [developer, main]
+  pull_request:
+    branches: [developer, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: viralpanel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      CI: "true"
+      TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/viralpanel_test"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" || pip install -r requirements.txt
+
+      - name: Run PostgreSQL Migration Tests (Mandatory in CI)
+        run: |
+          pytest -vv tests/test_migrations.py
+
+      - name: Run Full Test Suite
+        run: |
+          pytest -q
 ```
 
 ---
@@ -502,9 +605,9 @@ def test_postgres_real_migration_and_strict_zero_drift():
 ## Validation Architecture
 
 ### 1. Test Harness Setup
-- A suíte `tests/test_migrations.py` não necessita de nenhuma variável de ambiente obrigatória para rodar em modo local resiliente.
-- Quando executada sem PostgreSQL ativo, todos os 4 testes de ciclo de migração (clean upgrade, incremental com dados, downgrade e schema drift estrutural) rodam 100% verdes via SQLite isolado.
-- Quando executada com PostgreSQL ativo (ou em CI com `services: postgres:16`), o teste estrito `test_postgres_real_migration_and_strict_zero_drift` é ativado automaticamente, comprovando compatibilidade nativa com PostgreSQL 16.
+- A suíte `tests/test_migrations.py` suporta execução dual-engine com garantia de CI verde e testes locais resilientes.
+- **Ambiente Local (sem Postgres):** Executa clean upgrade, incremental com dados legados, ciclo round-trip (`head → 001 → base → head`) e schema drift estrutural via SQLite isolado em `tmp_path`. O teste de Postgres realiza skip informativo.
+- **Ambiente de CI (GitHub Actions):** Serviço `postgres:16` com container healthcheck provisionado e `TEST_DATABASE_URL` configurado. A variável `CI=true` ativa a obrigatoriedade estrita: se o banco não responder, o job falha com `pytest.fail()`. O teste `test_postgres_real_migration_and_strict_zero_drift` executa com sucesso e exige `compare_metadata() == []` sem filtros.
 
 ### 2. Comandos de Validação Rápida
 
@@ -514,6 +617,9 @@ def test_postgres_real_migration_and_strict_zero_drift():
 
 # Execução com saída detalhada e exibição de prints
 .venv\Scripts\pytest.exe -vv -s tests/test_migrations.py
+
+# Validação estática da sintaxe do workflow de CI
+.venv\Scripts\python.exe -c "import yaml; data = yaml.safe_load(open('.github/workflows/ci.yml', encoding='utf-8')); assert 'postgres' in data['jobs']['test']['services']; print('CI workflow syntax valid')"
 
 # Execução de regressão de todo o repositório (garantindo que nada quebrou)
 .venv\Scripts\pytest.exe -q
@@ -525,8 +631,9 @@ def test_postgres_real_migration_and_strict_zero_drift():
 - [ ] `alembic/env.py` refatorado para consumir `context.config.attributes.get('connection')` e `config.get_main_option('sqlalchemy.url')`.
 - [ ] Arquivo `tests/test_migrations.py` criado com cobertura completa:
   - Subida limpa até `head`.
-  - Subida incremental com validação de dados em `scripts.metadata_json`.
-  - Downgrade até `base`.
-  - Detecção de drift via `compare_metadata()`.
-  - Teste condicional contra PostgreSQL real.
+  - Subida incremental com validação de dados legados (`None`) e novos em `scripts.metadata_json`.
+  - Ciclo completo round-trip (`head → 001 → base → head`).
+  - Detecção de drift via `compare_metadata()`: filtros de dialeto documentados no SQLite, zero filtros no PostgreSQL (`assert diff == []`).
+  - Teste contra PostgreSQL real OBRIGATÓRIO no CI (falha imediata com `pytest.fail()` se indisponível; skip condicional permitido apenas em dev local).
+- [ ] Arquivo `.github/workflows/ci.yml` configurado com serviço `postgres:16`, `TEST_DATABASE_URL` e execução obrigatória dos testes de migração.
 - [ ] 100% dos testes passando (`117 passed` preexistentes + novos testes de migração).
