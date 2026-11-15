@@ -135,9 +135,9 @@ def test_studio_service_renders_vertical_9x16_reaction_video(tmp_path):
 
         # 1. Validar BorderStyle=3, MarginV=640 e cor de fundo &H000A0A0A& (preto profundo ZUNTO!)
         assert "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding" in ass_content
-        # Linha de estilo: ...3,16,0,2,80,80,640,1
-        assert ",3,16,0,2,80,80,640,1" in ass_content, (
-            "Estilo Default deve conter BorderStyle=3, Outline=16, Alignment=2 e MarginV=640"
+        # Linha de estilo: ...3,16,0,2,80,80,690,1
+        assert f",3,16,0,2,80,80,{SafeZones9x16.SUBTITLE_MARGIN_V},1" in ass_content, (
+            f"Estilo Default deve conter BorderStyle=3, Outline=16, Alignment=2 e MarginV={SafeZones9x16.SUBTITLE_MARGIN_V}"
         )
         deep_black_ass = hex_to_ass_color(ZuntoPalette.DEEP_BLACK)  # &H000A0A0A&
         assert deep_black_ass in ass_content, f"Cor da caixa opaca {deep_black_ass} deve estar no cabeçalho ASS"
@@ -357,7 +357,7 @@ def test_empirical_reference_frame_ass_rendering(tmp_path):
     bot_r, bot_g, bot_b = get_pixel_rgb(540, 1600)
     assert bot_r > 200 and bot_g < 30 and bot_b > 200, "Base inferior deve permanecer fundo magenta"
 
-    # 2. Inspecionar empiricamente a presença da caixa opaca ZUNTO! (#0A0A0A) na faixa SafeZone (Y 1080 a 1280)
+    # 2. Inspecionar empiricamente a presença da caixa opaca ZUNTO! (#0A0A0A) na faixa SafeZone (Y 1030 a 1250)
     # Procuramos pixels escuros da caixa opaca (R, G, B <= 25)
     dark_box_pixels = 0
     for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
@@ -367,7 +367,7 @@ def test_empirical_reference_frame_ass_rendering(tmp_path):
                 dark_box_pixels += 1
 
     assert dark_box_pixels > 1000, (
-        f"A caixa opaca ZUNTO! (#0A0A0A) deve estar presente na faixa SafeZone Y 1080-1280. Encontrados {dark_box_pixels} pixels."
+        f"A caixa opaca ZUNTO! (#0A0A0A) deve estar presente na faixa SafeZone Y {SafeZones9x16.SUBTITLE_Y_MIN}-{SafeZones9x16.SUBTITLE_Y_MAX}. Encontrados {dark_box_pixels} pixels."
     )
 
 

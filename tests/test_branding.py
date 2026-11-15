@@ -52,9 +52,9 @@ def test_safe_zones_9x16_constants():
     assert safe.LEFT_MARGIN == 48
 
     # Zonas verticais calibradas para legendas
-    assert safe.SUBTITLE_Y_MIN == 1080
-    assert safe.SUBTITLE_Y_MAX == 1280
-    assert safe.SUBTITLE_MARGIN_V == 640
+    assert safe.SUBTITLE_Y_MIN == 1030
+    assert safe.SUBTITLE_Y_MAX == 1250
+    assert safe.SUBTITLE_MARGIN_V == 690
 
     # Avatar PIP
     assert safe.AVATAR_SIZE == 300

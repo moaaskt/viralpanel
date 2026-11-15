@@ -56,7 +56,7 @@ class SubtitleJobConfig:
     min_words_per_cue: int = 3
     play_res_x: int = SafeZones9x16.WIDTH
     play_res_y: int = SafeZones9x16.HEIGHT
-    margin_v: int = SafeZones9x16.SUBTITLE_MARGIN_V  # 640
+    margin_v: int = SafeZones9x16.SUBTITLE_MARGIN_V  # 690
     box_padding: int = 16  # Outline no BorderStyle=3
     font_size: int = ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
     font_name: str = ZuntoTypography.PRIMARY_FONT  # Montserrat

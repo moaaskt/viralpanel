@@ -453,6 +453,9 @@ class InspectionRunner:
 
         vf_filters: list[str] = [
             "drawbox=x=80:y=260:w=920:h=720:color=#334155@0.55:t=fill",
+            # Elementos dinâmicos determinísticos comprovando vídeo-base ativo em 24fps
+            f"drawbox=x='140+580*(0.5+0.5*sin(2*PI*t/2.5))':y=440:w=140:h=140:color=#38bdf8:t=fill",
+            f"drawbox=x=140:y=740:w='800*(t/{duration})':h=24:color=#10b981:t=fill",
         ]
         if with_burned_text:
             vf_filters.append("drawbox=x=420:y=1175:w=240:h=45:color=#475569:t=fill")
