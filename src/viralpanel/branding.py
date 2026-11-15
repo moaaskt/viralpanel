@@ -42,11 +42,11 @@ class SafeZones9x16:
     RIGHT_MARGIN: Final[int] = 140     # Evitar botões de like, comentários, salvar e compartilhar
     LEFT_MARGIN: Final[int] = 48       # Margem lateral esquerda segura
 
-    # Zonas verticais calibradas (homologadas na Seção 3.5 do 08-AUDIT-REPORT.md)
-    # Legenda ZUNTO!: Y ≈ 1080px a 1280px (MarginV ≈ 640 a partir da base)
-    SUBTITLE_Y_MIN: Final[int] = 1080
-    SUBTITLE_Y_MAX: Final[int] = 1280
-    SUBTITLE_MARGIN_V: Final[int] = 640
+    # Zonas verticais calibradas (homologadas per Phase 13 com folga segura de 54px ao Avatar)
+    # Legenda ZUNTO!: Y ≈ 1030px a 1250px (MarginV = 690 a partir da base)
+    SUBTITLE_Y_MIN: Final[int] = 1030
+    SUBTITLE_Y_MAX: Final[int] = 1250
+    SUBTITLE_MARGIN_V: Final[int] = 690
 
     # Avatar Reaction: Canto inferior direito acima da barra do TikTok
     # Posicionado em Y ≈ 1300px a 1600px, X ≈ 726px a 1026px (size=300px, margin_right=54, margin_bottom=320)
