@@ -21,7 +21,7 @@ class AvatarConfig:
     size: int = SafeZones9x16.AVATAR_SIZE
     crop_mode: Literal["circle_alpha", "native_rgba"] = "circle_alpha"
     border_color: str = ZuntoPalette.IMPACT_YELLOW
-    border_width: int = 4
+    border_width: int = 6
     overlay_x_expr: str = "W-w-54"
     overlay_y_expr: str = "H-h-320"
     enable_waveform: bool = True
@@ -50,7 +50,7 @@ def ensure_default_avatar_image(avatar_path: Path | str | None = None) -> Path:
                         "drawbox=x=96:y=96:w=320:h=320:color=#1e293b:t=fill,"
                         "drawbox=x=128:y=128:w=256:h=256:color=#334155:t=fill,"
                         "drawbox=x=192:y=160:w=128:h=128:color=#38bdf8:t=fill,"
-                        "drawbox=x=160:y=310:w=192:h=90:color=#0284c7:t=fill"
+                        "drawbox=x=160:y=310:w=192:h=90:color=#1a1a1a:t=fill"
                     ),
                     "-frames:v",
                     "1",
@@ -150,7 +150,7 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
 
             if self.config.enable_waveform:
                 wave_filter = (
-                    f"[1:a]showwaves=s={size}x80:mode=line:colors={showwaves_color}:rate=24,format=rgba[wave];"
+                    f"[1:a]showwaves=s={size}x80:mode=line:colors={showwaves_color}:draw=full:rate=24,format=rgba[wave];"
                     f"[base][wave]overlay=x=0:y=H-h-20:shortest=1[composed];"
                 )
             else:
@@ -161,10 +161,10 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
                 f"crop={size}:{size},format=rgba[base];"
                 f"{wave_filter}"
                 f"[composed]geq="
-                f"r='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{r_val},r(X,Y)))':"
-                f"g='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{g_val},g(X,Y)))':"
-                f"b='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 0.5}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{b_val},b(X,Y)))':"
-                f"a='clip(255*({r_outer + 0.5}-hypot(X-{cx},Y-{cy})), 0, 255)'[vout]"
+                f"r='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{r_val},r(X,Y)))':"
+                f"g='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{g_val},g(X,Y)))':"
+                f"b='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{b_val},b(X,Y)))':"
+                f"a='clip(255*({r_outer + 1.0}-hypot(X-{cx},Y-{cy}))/2.0, 0, 255)'[vout]"
             )
             cmd = [
                 "ffmpeg",
