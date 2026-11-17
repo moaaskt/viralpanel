@@ -26,6 +26,245 @@ _PORTUGUESE_STOPWORDS: Final[set[str]] = {
     "isso", "isto", "aquilo", "seu", "sua", "seus", "suas",
     "é", "foi", "ser", "sao", "são", "tem", "vai", "ter",
 }
+STOPWORDS: Final[set[str]] = _PORTUGUESE_STOPWORDS
+
+
+def _clean_token(tok: str) -> str:
+    """Normaliza token removendo pontuação periférica e aplicando lowercase."""
+    return re.sub(r"^[^\w]+|[^\w]+$", "", tok.lower())
+
+
+def _alnum_token(tok: str) -> str:
+    """Remove toda pontuação interna e periférica para comparar hífens/contrações."""
+    return re.sub(r"[^\w]", "", tok.lower())
+
+
+def _interpolate_segment(
+    words: list[str],
+    start_sec: float,
+    end_sec: float,
+    total_duration: float,
+) -> list[dict]:
+    """Distribui um intervalo [start_sec, end_sec] proporcionalmente ao peso em caracteres."""
+    clamped_start = round(min(max(0.0, start_sec), total_duration), 3)
+    clamped_end = round(min(max(clamped_start, end_sec), total_duration), 3)
+    span = max(0.0, clamped_end - clamped_start)
+    char_counts = [max(len(w), 1) for w in words]
+    total_chars = max(sum(char_counts), 1)
+
+    cur = clamped_start
+    items: list[dict] = []
+    for idx, (word, count) in enumerate(zip(words, char_counts)):
+        if idx == len(words) - 1:
+            w_end = clamped_end
+        else:
+            w_end = round(min(cur + (count / total_chars) * span, clamped_end), 3)
+        w_start = round(min(cur, w_end), 3)
+        items.append({
+            "word": word,
+            "start": w_start,
+            "end": w_end,
+            "duration": round(max(0.0, w_end - w_start), 3),
+        })
+        cur = w_end
+    return items
+
+
+def align_words_with_timestamps(
+    script_words: list[str],
+    word_timestamps: list[dict] | None,
+    total_duration: float,
+) -> list[dict]:
+    """Alinha palavras do roteiro com eventos WordBoundary de forma sequencial, monotônica e desambiguada.
+
+    - Trata pontuações periféricas, contrações e palavras compostas por hífen (1<->N e N<->1).
+    - Desambiguação no lookahead: evita stopwords curtas (<= 2 caracteres ou em STOPWORDS)
+      como âncoras isoladas e exige confirmação bi-gram em repetições ou stopwords.
+    - Aplica clamp estrito em [0.0, total_duration] preservando ordem monotônica.
+    """
+    if not script_words:
+        return []
+
+    safe_total = max(float(total_duration), 0.0)
+    if not word_timestamps:
+        return _interpolate_segment(script_words, 0.0, safe_total, safe_total)
+
+    aligned: list[dict] = []
+    s_idx = 0
+    wb_idx = 0
+    num_script = len(script_words)
+    num_wb = len(word_timestamps)
+    last_end = 0.0
+
+    while s_idx < num_script:
+        word = script_words[s_idx]
+        c_word = _clean_token(word)
+        a_word = _alnum_token(word)
+
+        if wb_idx >= num_wb:
+            remaining = _interpolate_segment(script_words[s_idx:], last_end, safe_total, safe_total)
+            aligned.extend(remaining)
+            break
+
+        wb = word_timestamps[wb_idx]
+        c_wb = _clean_token(str(wb.get("word", "")))
+        a_wb = _alnum_token(str(wb.get("word", "")))
+
+        # 1. Correspondência exata após stripping de pontuação
+        if c_word == c_wb or (a_word and a_word == a_wb):
+            raw_start = float(wb.get("start", last_end))
+            raw_end = float(wb.get("end", raw_start))
+            start = round(min(max(last_end, raw_start), safe_total), 3)
+            end = round(min(max(start, raw_end), safe_total), 3)
+            aligned.append({
+                "word": word,
+                "start": start,
+                "end": end,
+                "duration": round(max(0.0, end - start), 3),
+            })
+            last_end = end
+            s_idx += 1
+            wb_idx += 1
+            continue
+
+        # 2. Fusão 1 script word <-> N speech events (ex: "guarda-chuva" ou "d'água")
+        if a_wb and a_word and len(a_word) > len(a_wb) and a_word.startswith(a_wb):
+            acc = a_wb
+            scan_wb = wb_idx + 1
+            while scan_wb < num_wb and len(acc) < len(a_word):
+                next_a = _alnum_token(str(word_timestamps[scan_wb].get("word", "")))
+                if not next_a or not a_word.startswith(acc + next_a):
+                    break
+                acc += next_a
+                scan_wb += 1
+            if acc == a_word:
+                raw_start = float(wb.get("start", last_end))
+                raw_end = float(word_timestamps[scan_wb - 1].get("end", raw_start))
+                start = round(min(max(last_end, raw_start), safe_total), 3)
+                end = round(min(max(start, raw_end), safe_total), 3)
+                aligned.append({
+                    "word": word,
+                    "start": start,
+                    "end": end,
+                    "duration": round(max(0.0, end - start), 3),
+                })
+                last_end = end
+                s_idx += 1
+                wb_idx = scan_wb
+                continue
+
+        # 3. Fissão N script words <-> 1 speech event
+        if a_word and a_wb and len(a_wb) > len(a_word) and a_wb.startswith(a_word):
+            acc_s = a_word
+            scan_s = s_idx + 1
+            while scan_s < num_script and len(acc_s) < len(a_wb):
+                next_sa = _alnum_token(script_words[scan_s])
+                if not next_sa or not a_wb.startswith(acc_s + next_sa):
+                    break
+                acc_s += next_sa
+                scan_s += 1
+            if acc_s == a_wb and scan_s > s_idx + 1:
+                raw_start = float(wb.get("start", last_end))
+                raw_end = float(wb.get("end", raw_start))
+                start = max(last_end, min(max(0.0, raw_start), safe_total))
+                end = max(start, min(raw_end, safe_total))
+                seg = _interpolate_segment(script_words[s_idx:scan_s], start, end, safe_total)
+                aligned.extend(seg)
+                last_end = seg[-1]["end"]
+                s_idx = scan_s
+                wb_idx += 1
+                continue
+
+        # 4. Lookahead Resync com desambiguação de stopwords e palavras repetidas
+        best_anchor: tuple[int, int] | None = None
+        best_score: tuple[int, int] = (999, 999)
+
+        max_look_s = min(4, num_script - s_idx)
+        max_look_wb = min(4, num_wb - wb_idx)
+
+        for look_s in range(0, max_look_s):
+            cand_s = _clean_token(script_words[s_idx + look_s])
+            if not cand_s:
+                continue
+            for look_wb in range(0, max_look_wb):
+                if look_s == 0 and look_wb == 0:
+                    continue
+                cand_wb = _clean_token(str(word_timestamps[wb_idx + look_wb].get("word", "")))
+                if cand_s != cand_wb:
+                    continue
+
+                is_stopword = len(cand_s) <= 2 or cand_s in STOPWORDS
+                has_prev_or_next_repeat = (
+                    (s_idx + look_s + 1 < num_script and _clean_token(script_words[s_idx + look_s + 1]) == cand_s)
+                    or (s_idx + look_s - 1 >= s_idx and _clean_token(script_words[s_idx + look_s - 1]) == cand_s)
+                    or (wb_idx + look_wb + 1 < num_wb and _clean_token(str(word_timestamps[wb_idx + look_wb + 1].get("word", ""))) == cand_s)
+                )
+
+                has_next_s = (s_idx + look_s + 1) < num_script
+                has_next_wb = (wb_idx + look_wb + 1) < num_wb
+                bigram_confirmed = False
+
+                if has_next_s and has_next_wb:
+                    next_s = _clean_token(script_words[s_idx + look_s + 1])
+                    next_wb = _clean_token(str(word_timestamps[wb_idx + look_wb + 1].get("word", "")))
+                    bigram_confirmed = bool(next_s and next_s == next_wb)
+                elif (not has_next_s) and (not has_next_wb):
+                    bigram_confirmed = True
+
+                if (is_stopword or has_prev_or_next_repeat) and not bigram_confirmed:
+                    continue
+
+                # Prefere âncora confirmada por bi-gram e de menor deslocamento (look_s + look_wb)
+                score = (0 if bigram_confirmed else 1, look_s + look_wb)
+                if score < best_score:
+                    best_score = score
+                    best_anchor = (look_s, look_wb)
+
+        if best_anchor is not None:
+            look_s, look_wb = best_anchor
+            if look_s == 0:
+                # Evento(s) de fala espúrio(s) descartado(s) antes da palavra atual do roteiro
+                wb_idx += look_wb
+                continue
+
+            target_start = min(max(last_end, float(word_timestamps[wb_idx + look_wb].get("start", last_end))), safe_total)
+            if look_s == 1 and look_wb == 1:
+                # Substituição direta 1<->1 (ex: numeral "400" vs "quatrocentos")
+                raw_start = float(wb.get("start", last_end))
+                raw_end = float(wb.get("end", raw_start))
+                start = round(min(max(last_end, raw_start), target_start, safe_total), 3)
+                end = round(min(max(start, min(raw_end, target_start)), safe_total), 3)
+                aligned.append({
+                    "word": word,
+                    "start": start,
+                    "end": end,
+                    "duration": round(max(0.0, end - start), 3),
+                })
+                last_end = end
+            else:
+                seg = _interpolate_segment(script_words[s_idx : s_idx + look_s], last_end, target_start, safe_total)
+                aligned.extend(seg)
+                last_end = seg[-1]["end"]
+            s_idx += look_s
+            wb_idx += look_wb
+            continue
+
+        # 5. Sem âncora no lookahead: consome par local com clamp estrito
+        raw_start = float(wb.get("start", last_end))
+        raw_end = float(wb.get("end", raw_start))
+        start = round(min(max(last_end, raw_start), safe_total), 3)
+        end = round(min(max(start, raw_end), safe_total), 3)
+        aligned.append({
+            "word": word,
+            "start": start,
+            "end": end,
+            "duration": round(max(0.0, end - start), 3),
+        })
+        last_end = end
+        s_idx += 1
+        wb_idx += 1
+
+    return aligned
 
 
 class SubtitleCue(BaseModel):

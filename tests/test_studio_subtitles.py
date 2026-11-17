@@ -10,6 +10,7 @@ from viralpanel.branding import (
 from viralpanel.studio.subtitles import (
     SubtitleCue,
     SubtitleJobConfig,
+    align_words_with_timestamps,
     build_ass_header,
     build_cues_from_script,
     format_ass_dialogue_line,
@@ -279,5 +280,134 @@ def test_no_style_leakage_between_cues_and_words(tmp_path: Path):
             pos_yellow = text_part.find(r"{\c&H0015CCFA&}")
             pos_white = text_part.find(r"{\c&H00FFFFFF&}")
             assert pos_white > pos_yellow
+
+
+def test_align_words_with_timestamps_handles_punctuation_and_numbers():
+    """Alinhador trata pontuações periféricas e numerais falados por extenso sem perder o fluxo."""
+    script_words = "Você, não sabia... Mas 400 pessoas viram!".split()
+    wb = [
+        {"word": "você", "start": 0.1, "end": 0.4},
+        {"word": "não", "start": 0.45, "end": 0.7},
+        {"word": "sabia", "start": 0.75, "end": 1.2},
+        {"word": "mas", "start": 1.3, "end": 1.5},
+        {"word": "quatrocentos", "start": 1.55, "end": 2.1},
+        {"word": "pessoas", "start": 2.15, "end": 2.6},
+        {"word": "viram", "start": 2.65, "end": 3.1},
+    ]
+
+    aligned = align_words_with_timestamps(script_words, wb, total_duration=3.5)
+    assert [w["word"] for w in aligned] == script_words
+    assert aligned[0]["start"] == pytest.approx(0.1, abs=1e-3)
+    assert aligned[4]["start"] == pytest.approx(1.55, abs=1e-3)
+    assert aligned[4]["end"] == pytest.approx(2.1, abs=1e-3)
+    assert aligned[5]["start"] == pytest.approx(2.15, abs=1e-3)
+    assert aligned[6]["end"] == pytest.approx(3.1, abs=1e-3)
+
+
+def test_align_words_with_timestamps_handles_compound_and_hyphenated_words():
+    """Alinhador absorve múltiplos eventos WordBoundary em palavras com hífen e contrações."""
+    script_words = ["O", "guarda-chuva", "d'água", "abriu."]
+    wb = [
+        {"word": "o", "start": 0.0, "end": 0.15},
+        {"word": "guarda", "start": 0.2, "end": 0.5},
+        {"word": "chuva", "start": 0.5, "end": 0.85},
+        {"word": "d'", "start": 0.9, "end": 1.0},
+        {"word": "água", "start": 1.0, "end": 1.35},
+        {"word": "abriu", "start": 1.4, "end": 1.9},
+    ]
+
+    aligned = align_words_with_timestamps(script_words, wb, total_duration=2.0)
+    assert [w["word"] for w in aligned] == script_words
+    assert aligned[1]["start"] == pytest.approx(0.2, abs=1e-3)
+    assert aligned[1]["end"] == pytest.approx(0.85, abs=1e-3)
+    assert aligned[2]["start"] == pytest.approx(0.9, abs=1e-3)
+    assert aligned[2]["end"] == pytest.approx(1.35, abs=1e-3)
+    assert aligned[3]["start"] == pytest.approx(1.4, abs=1e-3)
+
+
+def test_align_words_with_timestamps_handles_ambiguous_lookahead_and_repeated_words():
+    """Lookahead filtra stopwords curtas e preserva ordem correta em palavras repetidas."""
+    # Cenário A: omissão antes de palavra repetida ("não, não")
+    script_rep = ["Ele", "disse", "que", "não,", "não", "sabia", "que", "viria."]
+    wb_rep = [
+        {"word": "ele", "start": 0.0, "end": 0.3},
+        {"word": "disse", "start": 0.3, "end": 0.6},
+        # "que" omitido pelo TTS; espaço de 0.1s antes do primeiro "não"
+        {"word": "não", "start": 0.7, "end": 1.0},
+        {"word": "não", "start": 1.05, "end": 1.35},
+        {"word": "sabia", "start": 1.4, "end": 1.8},
+        {"word": "que", "start": 1.8, "end": 1.95},
+        {"word": "viria", "start": 1.95, "end": 2.4},
+    ]
+    res_a = align_words_with_timestamps(script_rep, wb_rep, total_duration=2.5)
+    assert len(res_a) == len(script_rep)
+    # Primeiro "não," deve alinhar no primeiro evento (0.7..1.0), não saltar para o segundo (1.05..1.35)
+    assert res_a[3]["start"] == pytest.approx(0.7, abs=1e-3)
+    assert res_a[4]["start"] == pytest.approx(1.05, abs=1e-3)
+    assert res_a[5]["start"] == pytest.approx(1.4, abs=1e-3)
+
+    # Cenário B: descompasso antes de "que" ambíguo não deve pular "não" nem alinhar com "que viria"
+    script_amb = ["Ele", "disse", "que", "não", "sabia", "que", "viria"]
+    wb_amb = [
+        {"word": "ele", "start": 0.0, "end": 0.3},
+        {"word": "ruido", "start": 0.35, "end": 0.45},
+        {"word": "sabia", "start": 0.8, "end": 1.2},
+        {"word": "que", "start": 1.2, "end": 1.4},
+        {"word": "viria", "start": 1.4, "end": 1.9},
+    ]
+    res_b = align_words_with_timestamps(script_amb, wb_amb, total_duration=2.0)
+    assert res_b[4]["start"] == pytest.approx(0.8, abs=1e-3)  # "sabia"
+    assert res_b[5]["start"] == pytest.approx(1.2, abs=1e-3)  # "que"
+    assert res_b[6]["start"] == pytest.approx(1.4, abs=1e-3)  # "viria"
+    # Monotonicidade absoluta preservada
+    for i in range(len(res_b)):
+        assert res_b[i]["start"] <= res_b[i]["end"]
+        if i > 0:
+            assert res_b[i - 1]["end"] <= res_b[i]["start"]
+
+
+def test_align_words_with_timestamps_recovers_after_token_desync():
+    """Recupera alinhamento exato após evento espúrio seguido de palavra omitida."""
+    script_words = ["Foco", "total", "agora", "mesmo", "sempre."]
+    wb = [
+        {"word": "foco", "start": 0.1, "end": 0.5},
+        {"word": "uhm", "start": 0.55, "end": 0.65},  # evento espúrio antes de "agora" ("total" omitido)
+        {"word": "agora", "start": 0.8, "end": 1.2},
+        {"word": "mesmo", "start": 1.25, "end": 1.65},
+        {"word": "sempre", "start": 1.7, "end": 2.2},
+    ]
+
+    aligned = align_words_with_timestamps(script_words, wb, total_duration=2.4)
+    assert [w["word"] for w in aligned] == script_words
+    assert aligned[2]["start"] == pytest.approx(0.8, abs=1e-3)
+    assert aligned[3]["start"] == pytest.approx(1.25, abs=1e-3)
+    assert aligned[4]["start"] == pytest.approx(1.7, abs=1e-3)
+
+
+def test_align_words_with_timestamps_fallback_when_empty_or_none():
+    """Aciona estimativa proporcional contígua quando word_timestamps for None ou vazio."""
+    script_words = ["Ação", "gera", "resultado."]
+    for empty_arg in (None, []):
+        aligned = align_words_with_timestamps(script_words, empty_arg, total_duration=3.0)
+        assert len(aligned) == 3
+        assert aligned[0]["start"] == 0.0
+        assert aligned[-1]["end"] == pytest.approx(3.0, abs=1e-3)
+        for i in range(len(aligned) - 1):
+            assert aligned[i]["end"] == pytest.approx(aligned[i + 1]["start"], abs=1e-3)
+
+
+def test_align_words_with_timestamps_clamps_to_total_duration():
+    """Aplica clamp estrito em [0.0, total_duration] mesmo com timestamps extrapolando o áudio."""
+    script_words = ["Comece", "agora."]
+    wb = [
+        {"word": "comece", "start": -0.2, "end": 1.2},
+        {"word": "agora", "start": 1.5, "end": 25.0},
+    ]
+
+    aligned = align_words_with_timestamps(script_words, wb, total_duration=2.5)
+    assert aligned[0]["start"] == 0.0
+    assert aligned[-1]["end"] == 2.5
+    assert all(0.0 <= w["start"] <= w["end"] <= 2.5 for w in aligned)
+
 
 
