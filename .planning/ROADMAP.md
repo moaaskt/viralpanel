@@ -139,11 +139,13 @@ Plans:
 **Goal:** Implementar legendas dinâmicas Active Word Highlight palavra por palavra sincronizadas com timestamps reais da fala (`WordBoundary`), mantendo branco puro (`#FFFFFF`) para palavras passadas/futuras, amarelo de impacto (`#FACC15`) apenas na palavra pronunciada, continuidade da caixa opaca sem flicker e fallback proporcional.
 **Requirements**: SUB-02, SUB-03
 **Depends on:** Phase 13
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 13.1 to break down)
+**Wave 1:**
+
+- [ ] 13.1-01-PLAN.md — Motor Active Word Highlight ZUNTO!, Sincronização WordBoundary, Sidecar com Duplo Hash e Validação A/V
 
 ## Progress
 
@@ -155,7 +157,7 @@ Plans:
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
-| Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 0/0 | Not started | - |
+| Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 0/1 | Ready to execute | - |
 | Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
 | Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
