@@ -342,15 +342,117 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ASS_HEADER: Final[str] = build_ass_header()
 
 
-def _format_ass_timestamp(seconds: float) -> str:
-    total_cs = max(int(round(seconds * 100)), 0)
-    cs = total_cs % 100
-    total_sec = total_cs // 100
+def _format_cs(cs: int) -> str:
+    """Formata centésimos inteiros de segundo para carimbo temporal ASS (H:MM:SS.cs)."""
+    safe_cs = max(int(cs), 0)
+    centis = safe_cs % 100
+    total_sec = safe_cs // 100
     secs = total_sec % 60
     total_min = total_sec // 60
     mins = total_min % 60
     hours = total_min // 60
-    return f"{hours}:{mins:02d}:{secs:02d}.{cs:02d}"
+    return f"{hours}:{mins:02d}:{secs:02d}.{centis:02d}"
+
+
+def _format_ass_timestamp(seconds: float) -> str:
+    return _format_cs(max(int(round(seconds * 100)), 0))
+
+
+def _normalize_ass_color_tag(color: str) -> str:
+    cleaned = color.strip()
+    return cleaned if cleaned.endswith("&") else f"{cleaned}&"
+
+
+def generate_word_karaoke_dialogue_events(
+    cue_words: list[dict],
+    yellow_ass_color: str,
+    white_ass_color: str,
+    total_audio_duration: float,
+) -> list[str]:
+    """Gera eventos Dialogue sequenciais por palavra ativa no estilo ZUNTO! Word Highlight.
+
+    Invariantes:
+    1. Exclusividade estrita: apenas a palavra ativa recebe o amarelo ZUNTO!, e as
+       demais permanecem/retornam ao branco puro (sem tags \\k/\\kf).
+    2. Piso visual de 50ms sem sobreposição (end_i <= start_{i+1}) e sem propagar drift
+       cumulativo; a sincronização acústica real prevalece se a janela < 50ms.
+    3. Pausas intra-bloco curtas (<= 120ms) estendem a palavra ativa; pausas longas
+       (> 120ms) emitem evento neutro contíguo todo branco mantendo a caixa preta ativa.
+    4. Contiguidade inteira em centésimos: event[k].end_cs == event[k+1].start_cs.
+    """
+    if not cue_words:
+        return []
+
+    safe_total = max(float(total_audio_duration), 0.0)
+    yellow_tag = _normalize_ass_color_tag(yellow_ass_color)
+    white_tag = _normalize_ass_color_tag(white_ass_color)
+    num_words = len(cue_words)
+
+    calibrated_words: list[dict] = []
+    for i in range(num_words):
+        raw_start = float(cue_words[i].get("start", 0.0))
+        raw_end = float(cue_words[i].get("end", raw_start))
+        start_i = min(max(0.0, raw_start), safe_total)
+        end_i = min(max(start_i, raw_end), safe_total)
+
+        if i + 1 < num_words:
+            next_start = min(max(start_i, float(cue_words[i + 1].get("start", safe_total))), safe_total)
+        else:
+            next_start = safe_total
+
+        available = max(0.0, next_start - start_i)
+        if available < 0.05:
+            effective_end = min(next_start, safe_total)
+        else:
+            effective_end = min(max(end_i, start_i + 0.05), next_start, safe_total)
+
+        calibrated_words.append({
+            "word": sanitize_ass_text(str(cue_words[i].get("word", ""))),
+            "start": start_i,
+            "end": effective_end,
+            "duration": round(max(0.0, effective_end - start_i), 3),
+        })
+
+    sanitized_words = [w["word"] for w in calibrated_words]
+    neutral_text = " ".join(sanitized_words)
+    start_cs_list = [max(int(round(w["start"] * 100)), 0) for w in calibrated_words]
+    end_cs_list = [max(int(round(w["end"] * 100)), start_cs_list[idx]) for idx, w in enumerate(calibrated_words)]
+
+    dialogues: list[str] = []
+    for i in range(num_words):
+        start_cs = start_cs_list[i]
+        end_cs = end_cs_list[i]
+
+        if i + 1 < num_words:
+            next_start_cs = start_cs_list[i + 1]
+            # Garante invariante de não-sobreposição também após arredondamento em centésimos
+            end_cs = min(max(start_cs, end_cs), next_start_cs)
+            gap_cs = max(0, next_start_cs - end_cs)
+        else:
+            next_start_cs = end_cs
+            gap_cs = 0
+
+        if 0 < gap_cs <= 12:
+            end_cs = next_start_cs
+
+        formatted_tokens: list[str] = []
+        for j, token in enumerate(sanitized_words):
+            if j == i:
+                formatted_tokens.append(f"{{\\c{yellow_tag}}}{token}{{\\c{white_tag}}}")
+            else:
+                formatted_tokens.append(token)
+        dialogue_text = " ".join(formatted_tokens)
+
+        dialogues.append(
+            f"Dialogue: 0,{_format_cs(start_cs)},{_format_cs(end_cs)},Default,,0,0,0,,{dialogue_text}"
+        )
+
+        if gap_cs > 12:
+            dialogues.append(
+                f"Dialogue: 0,{_format_cs(end_cs)},{_format_cs(next_start_cs)},Default,,0,0,0,,{neutral_text}"
+            )
+
+    return dialogues
 
 
 def sanitize_ass_text(text: str) -> str:

@@ -15,6 +15,7 @@ from viralpanel.studio.subtitles import (
     build_cues_from_script,
     format_ass_dialogue_line,
     generate_subtitles,
+    generate_word_karaoke_dialogue_events,
     sanitize_ass_text,
     select_highlight_word,
     split_script_into_cues,
@@ -408,6 +409,99 @@ def test_align_words_with_timestamps_clamps_to_total_duration():
     assert aligned[0]["start"] == 0.0
     assert aligned[-1]["end"] == 2.5
     assert all(0.0 <= w["start"] <= w["end"] <= 2.5 for w in aligned)
+
+
+def _parse_ass_time_to_cs(ts: str) -> int:
+    hours_s, mins_s, sec_cs = ts.split(":")
+    secs_s, cs_s = sec_cs.split(".")
+    return ((int(hours_s) * 3600 + int(mins_s) * 60 + int(secs_s)) * 100) + int(cs_s)
+
+
+def test_word_karaoke_dialogue_events_minimum_50ms_floor_without_overlap():
+    """Piso de 50ms estende palavra curta quando há folga, mas respeita start_{i+1} quando < 50ms."""
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+
+    # Palavra 1: 20ms falados, mas próxima palavra começa só 30ms depois -> real sync prevalece (end=0.13)
+    # Palavra 2: 20ms falados, com folga de 200ms antes da próxima -> piso de 50ms aplicado (end=0.18)
+    # Palavra 3: estendida até no máximo total_audio_duration
+    cue_words = [
+        {"word": "E", "start": 0.10, "end": 0.12},
+        {"word": "o", "start": 0.13, "end": 0.15},
+        {"word": "foco", "start": 0.35, "end": 0.70},
+    ]
+    events = generate_word_karaoke_dialogue_events(cue_words, yellow, white, total_audio_duration=1.0)
+    # Ev1: E [0.10..0.13] (sem invadir 0.13), Ev2: o [0.13..0.18] (50ms floor), Ev3: neutro [0.18..0.35], Ev4: foco [0.35..0.70]
+    bounds = [
+        (_parse_ass_time_to_cs(line.split(",")[1]), _parse_ass_time_to_cs(line.split(",")[2]))
+        for line in events
+    ]
+    assert bounds[0] == (10, 13)
+    assert bounds[1] == (13, 18)  # piso de 5 centésimos = 50ms
+    assert bounds[2] == (18, 35)  # evento neutro mantendo a caixa sem empurrar "foco"
+    assert bounds[3] == (35, 70)  # início de "foco" permanece ancorado em 0.35s
+
+
+def test_word_karaoke_dialogue_events_strict_centisecond_contiguity():
+    """Garante contiguidade inteira event[k].end_cs == event[k+1].start_cs (zero gaps/overlaps)."""
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+
+    cue_words = [
+        {"word": "Você", "start": 0.124, "end": 0.416},
+        {"word": "não", "start": 0.489, "end": 0.712},
+        {"word": "sabia.", "start": 1.154, "end": 1.886},
+    ]
+    events = generate_word_karaoke_dialogue_events(cue_words, yellow, white, total_audio_duration=2.0)
+    assert len(events) >= 3
+    for k in range(len(events) - 1):
+        end_k = _parse_ass_time_to_cs(events[k].split(",")[2])
+        start_next = _parse_ass_time_to_cs(events[k + 1].split(",")[1])
+        assert end_k == start_next, f"Gap/overlap entre evento {k} e {k+1}: {events[k]} vs {events[k+1]}"
+
+
+def test_pause_handling_short_gap_absorption_vs_long_gap_neutral_event():
+    """Pausas <= 120ms são absorvidas na palavra ativa; pausas > 120ms geram evento neutro branco."""
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+
+    cue_words = [
+        {"word": "Primeiro", "start": 0.00, "end": 0.30},
+        # gap = 80ms -> absorvido (Primeiro vai de 0.00 até 0.38)
+        {"word": "segundo", "start": 0.38, "end": 0.60},
+        # gap = 300ms -> pausa longa -> evento neutro de 0.60 até 0.90 todo branco
+        {"word": "terceiro", "start": 0.90, "end": 1.40},
+    ]
+    events = generate_word_karaoke_dialogue_events(cue_words, yellow, white, total_audio_duration=1.5)
+    assert len(events) == 4  # Primeiro + segundo + neutro + terceiro
+
+    assert events[0].startswith("Dialogue: 0,0:00:00.00,0:00:00.38,")
+    assert events[1].startswith("Dialogue: 0,0:00:00.38,0:00:00.60,")
+    assert events[2].startswith("Dialogue: 0,0:00:00.60,0:00:00.90,")
+    assert yellow not in events[2]
+    assert events[2].endswith(",,Primeiro segundo terceiro")
+    assert events[3].startswith("Dialogue: 0,0:00:00.90,0:00:01.40,")
+
+
+def test_dialogue_events_contain_single_yellow_word_per_event():
+    """Cada evento ativo destaca exclusivamente uma palavra em amarelo e fecha em branco puro."""
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+
+    cue_words = [
+        {"word": "Ação", "start": 0.0, "end": 0.4},
+        {"word": "gera", "start": 0.45, "end": 0.8},
+        {"word": "poder.", "start": 0.85, "end": 1.3},
+    ]
+    events = generate_word_karaoke_dialogue_events(cue_words, yellow, white, total_audio_duration=1.5)
+    assert len(events) == 3
+
+    for idx, (line, active) in enumerate(zip(events, ["Ação", "gera", "poder."])):
+        text_part = line.split(",,", 1)[1]
+        assert text_part.count(f"\\c{yellow}") == 1, f"Evento {idx} deve conter exatamente 1 amarelo: {line}"
+        assert f"{{\\c{yellow}}}{active}{{\\c{white}}}" in text_part
+        assert r"\k" not in text_part and r"\kf" not in text_part
+
 
 
 
