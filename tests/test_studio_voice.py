@@ -1,16 +1,19 @@
 import hashlib
 import json
+import logging
 from pathlib import Path
 import shutil
 import subprocess
-import types
 import pytest
 from viralpanel.studio.voice import (
     BaseVoiceSynthesizer,
     EdgeTTSVoiceSynthesizer,
     FallbackVoiceSynthesizer,
     MockVoiceSynthesizer,
+    PreSynthesizedVoice,
+    XTTSVoiceSynthesizer,
     compute_file_sha256,
+    load_and_validate_word_timestamps,
 )
 
 
@@ -126,6 +129,196 @@ def test_edge_tts_synthesizer_cleans_obsolete_sidecar_before_synthesis(tmp_path,
 
     assert not stale_sidecar.exists(), "Sidecar obsoleto deve ter sido removido antes da falha"
     assert synth.last_word_timestamps is None
+
+
+def test_load_and_validate_word_timestamps_rejects_text_mismatch(tmp_path, caplog):
+    """Rejeita sidecar quando text_hash diverge do roteiro esperado, acionando fallback proporcional."""
+    caplog.set_level(logging.WARNING)
+    audio_path = tmp_path / "audio.wav"
+    audio_path.write_bytes(b"RIFFAUDIODATA")
+    sidecar = audio_path.with_suffix(".words.json")
+    envelope = {
+        "schema_version": "1.0",
+        "audio_file": audio_path.name,
+        "audio_duration_sec": 1.0,
+        "audio_hash": compute_file_sha256(audio_path),
+        "text_hash": hashlib.sha256(b"Texto original").hexdigest(),
+        "word_count": 2,
+        "timestamps": [
+            {"word": "Texto", "start": 0.0, "end": 0.4, "duration": 0.4},
+            {"word": "original", "start": 0.4, "end": 1.0, "duration": 0.6},
+        ],
+    }
+    sidecar.write_text(json.dumps(envelope), encoding="utf-8")
+
+    result = load_and_validate_word_timestamps(
+        sidecar,
+        expected_text="Texto modificado",
+        expected_duration=1.0,
+        expected_audio_path=audio_path,
+    )
+    assert result is None
+    assert "text_hash divergente" in caplog.text
+
+
+def test_load_and_validate_word_timestamps_rejects_audio_mismatch(tmp_path, caplog):
+    """Rejeita sidecar quando audio_hash diverge do arquivo de áudio real."""
+    caplog.set_level(logging.WARNING)
+    audio_a = tmp_path / "audio_a.wav"
+    audio_b = tmp_path / "audio_b.wav"
+    audio_a.write_bytes(b"RIFF_AUDIO_BYTES_A")
+    audio_b.write_bytes(b"RIFF_AUDIO_BYTES_B")
+
+    text = "Mesmo texto"
+    sidecar = audio_b.with_suffix(".words.json")
+    envelope = {
+        "schema_version": "1.0",
+        "audio_file": audio_a.name,
+        "audio_duration_sec": 1.0,
+        "audio_hash": compute_file_sha256(audio_a),
+        "text_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "word_count": 2,
+        "timestamps": [
+            {"word": "Mesmo", "start": 0.0, "end": 0.5, "duration": 0.5},
+            {"word": "texto", "start": 0.5, "end": 1.0, "duration": 0.5},
+        ],
+    }
+    sidecar.write_text(json.dumps(envelope), encoding="utf-8")
+
+    result = load_and_validate_word_timestamps(
+        sidecar,
+        expected_text=text,
+        expected_duration=1.0,
+        expected_audio_path=audio_b,
+    )
+    assert result is None
+    assert "audio_hash divergente" in caplog.text
+
+
+def test_load_and_validate_word_timestamps_discards_corrupt_or_empty_sidecar(tmp_path, caplog):
+    """Descarta sidecars ausentes, vazios, JSON quebrados, listas vazias ou com divergência > 0.15s."""
+    caplog.set_level(logging.WARNING)
+
+    # 1. Arquivo ausente
+    assert load_and_validate_word_timestamps(tmp_path / "missing.words.json") is None
+
+    # 2. Arquivo vazio
+    empty_sidecar = tmp_path / "empty.words.json"
+    empty_sidecar.write_text("   ", encoding="utf-8")
+    assert load_and_validate_word_timestamps(empty_sidecar) is None
+
+    # 3. JSON quebrado
+    corrupt_sidecar = tmp_path / "corrupt.words.json"
+    corrupt_sidecar.write_text("{broken json", encoding="utf-8")
+    assert load_and_validate_word_timestamps(corrupt_sidecar) is None
+
+    # 4. Lista vazia
+    empty_list_sidecar = tmp_path / "empty_list.words.json"
+    empty_list_sidecar.write_text(json.dumps({"timestamps": []}), encoding="utf-8")
+    assert load_and_validate_word_timestamps(empty_list_sidecar) is None
+
+    # 5. Divergência de duração > 0.15s
+    dur_sidecar = tmp_path / "dur_mismatch.words.json"
+    dur_sidecar.write_text(
+        json.dumps({
+            "audio_duration_sec": 2.0,
+            "timestamps": [{"word": "Oi", "start": 0.0, "end": 0.5}],
+        }),
+        encoding="utf-8",
+    )
+    assert load_and_validate_word_timestamps(dur_sidecar, expected_duration=2.5) is None
+    assert "Divergência temporal excessiva" in caplog.text
+
+
+def test_fallback_voice_synthesizer_propagates_word_timestamps(tmp_path):
+    """FallbackVoiceSynthesizer propaga last_word_timestamps do sintetizador bem-sucedido."""
+    expected_ts = [{"word": "Foco", "start": 0.0, "end": 0.4, "duration": 0.4}]
+
+    class FailingSynth(BaseVoiceSynthesizer):
+        def synthesize(self, text, output_path, speaker_wav=None):
+            raise RuntimeError("Primary down")
+
+    class TimestampSynth(BaseVoiceSynthesizer):
+        def __init__(self):
+            self.last_word_timestamps = None
+
+        def synthesize(self, text, output_path, speaker_wav=None):
+            output_path.write_bytes(b"RIFFOK")
+            self.last_word_timestamps = expected_ts
+            return output_path, 0.5
+
+    chain = FallbackVoiceSynthesizer(synthesizers=[FailingSynth(), TimestampSynth()])
+    out, dur = chain.synthesize("Foco", tmp_path / "out.wav")
+    assert out.exists()
+    assert dur == 0.5
+    assert chain.last_word_timestamps == expected_ts
+
+
+def test_presynthesized_voice_loads_sidecar_and_delivers_word_timestamps(tmp_path):
+    """PreSynthesizedVoice valida e copia o sidecar .words.json associado ao áudio mestre."""
+    master_wav = tmp_path / "master.wav"
+    MockVoiceSynthesizer(min_duration=1.5, max_duration=1.5).synthesize("Você sabe.", master_wav)
+    master_sha = compute_file_sha256(master_wav)
+    text = "Você sabe."
+    timestamps = [
+        {"word": "Você", "start": 0.1, "end": 0.6, "duration": 0.5},
+        {"word": "sabe.", "start": 0.7, "end": 1.4, "duration": 0.7},
+    ]
+    master_sidecar = master_wav.with_suffix(".words.json")
+    master_sidecar.write_text(
+        json.dumps({
+            "schema_version": "1.0",
+            "audio_file": master_wav.name,
+            "audio_duration_sec": 1.5,
+            "audio_hash": master_sha,
+            "text_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "word_count": 2,
+            "timestamps": timestamps,
+        }),
+        encoding="utf-8",
+    )
+
+    pre_voice = PreSynthesizedVoice(
+        master_audio_path=master_wav,
+        duration=1.5,
+        sha256_hash=master_sha,
+        expected_text=text,
+    )
+    target = tmp_path / "delivered" / "narration.wav"
+    out, dur = pre_voice.synthesize(text, target)
+
+    assert out == target.resolve()
+    assert dur == 1.5
+    assert pre_voice.last_word_timestamps == timestamps
+    assert target.with_suffix(".words.json").exists()
+
+
+def test_mock_and_xtts_synthesizers_gracefully_return_none_timestamps(tmp_path, monkeypatch):
+    """MockVoiceSynthesizer e XTTSVoiceSynthesizer operam com last_word_timestamps=None sem falhas."""
+    mock_wav = tmp_path / "mock.wav"
+    stale_sidecar = mock_wav.with_suffix(".words.json")
+    stale_sidecar.write_text("stale", encoding="utf-8")
+
+    mock_synth = MockVoiceSynthesizer(min_duration=1.5, max_duration=1.5)
+    _, mock_dur = mock_synth.synthesize("Fallback proporcional.", mock_wav)
+    assert mock_dur > 0
+    assert mock_synth.last_word_timestamps is None
+    assert not stale_sidecar.exists()
+
+    xtts = XTTSVoiceSynthesizer()
+
+    class FakeTTS:
+        def tts_to_file(self, **kwargs):
+            Path(kwargs["file_path"]).write_bytes(b"RIFFXTTS")
+
+    monkeypatch.setattr(xtts, "_load", lambda: FakeTTS())
+    monkeypatch.setattr("viralpanel.studio.voice.probe_duration", lambda p: 2.0)
+
+    xtts_wav = tmp_path / "xtts.wav"
+    _, xtts_dur = xtts.synthesize("Teste XTTS", xtts_wav)
+    assert xtts_dur == 2.0
+    assert xtts.last_word_timestamps is None
+
 
 
 
