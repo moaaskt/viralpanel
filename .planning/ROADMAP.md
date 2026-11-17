@@ -15,7 +15,7 @@
 - [x] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16 (completed 2026-11-08)
 - [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
-- [ ] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** - Active Word Highlight palavra por palavra sincronizado com WordBoundary real da narração
+- [x] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** - Active Word Highlight palavra por palavra sincronizado com WordBoundary real da narração (completed 2026-11-17)
 - [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
 - [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
 
@@ -139,13 +139,13 @@ Plans:
 **Goal:** Implementar legendas dinâmicas Active Word Highlight palavra por palavra sincronizadas com timestamps reais da fala (`WordBoundary`), mantendo branco puro (`#FFFFFF`) para palavras passadas/futuras, amarelo de impacto (`#FACC15`) apenas na palavra pronunciada, continuidade da caixa opaca sem flicker e fallback proporcional.
 **Requirements**: SUB-02, SUB-03
 **Depends on:** Phase 13
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 
 **Wave 1:**
 
-- [ ] 13.1-01-PLAN.md — Motor Active Word Highlight ZUNTO!, Sincronização WordBoundary, Sidecar com Duplo Hash e Validação A/V
+- [x] 13.1-01-PLAN.md — Motor Active Word Highlight ZUNTO!, Sincronização WordBoundary, Sidecar com Duplo Hash e Validação A/V
 
 ## Progress
 
@@ -157,7 +157,7 @@ Plans:
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
-| Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 0/1 | Ready to execute | - |
+| Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
 | Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
 | Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
