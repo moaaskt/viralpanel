@@ -13,6 +13,15 @@ from viralpanel.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def compute_file_sha256(path: Path) -> str:
+    """Calcula o hash SHA-256 de um arquivo em blocos de 64KB."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as file_handle:
+        while chunk := file_handle.read(65536):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def probe_duration(media_path: Path) -> float:
     """Retorna a duração em segundos de um arquivo de áudio/vídeo usando ffprobe."""
     if not media_path.exists():
@@ -39,6 +48,8 @@ def probe_duration(media_path: Path) -> float:
 
 
 class BaseVoiceSynthesizer(ABC):
+    last_word_timestamps: list[dict] | None = None
+
     @abstractmethod
     def synthesize(
         self,
@@ -141,6 +152,7 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
         settings = get_settings()
         self.voice = voice or settings.edge_tts_voice
         self.rate = rate or settings.edge_tts_rate
+        self.last_word_timestamps: list[dict] | None = None
 
     def synthesize(
         self,
@@ -150,19 +162,45 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
     ) -> tuple[Path, float]:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         temp_mp3 = output_path.with_suffix(".edge.temp.mp3")
+        sidecar_path = output_path.with_suffix(".words.json")
+
+        # Limpeza preemptiva para impedir reuso de estado ou sidecar obsoleto
+        self.last_word_timestamps = None
+        sidecar_path.unlink(missing_ok=True)
+        word_timestamps: list[dict] = []
+
         try:
             import edge_tts
 
             async def _run():
-                communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
-                await communicate.save(str(temp_mp3))
+                communicate = edge_tts.Communicate(
+                    text,
+                    self.voice,
+                    rate=self.rate,
+                    boundary="WordBoundary",
+                )
+                with open(temp_mp3, "wb") as mp3_file:
+                    async for chunk in communicate.stream():
+                        chunk_type = chunk.get("type")
+                        if chunk_type == "audio":
+                            mp3_file.write(chunk["data"])
+                        elif chunk_type == "WordBoundary":
+                            start_sec = float(chunk["offset"]) / 10_000_000.0
+                            dur_sec = float(chunk["duration"]) / 10_000_000.0
+                            end_sec = start_sec + dur_sec
+                            word_timestamps.append({
+                                "word": str(chunk["text"]),
+                                "start": round(start_sec, 4),
+                                "end": round(end_sec, 4),
+                                "duration": round(dur_sec, 4),
+                            })
 
             asyncio.run(_run())
 
             if not shutil.which("ffmpeg"):
                 raise RuntimeError("FFmpeg é obrigatório para converter a síntese Edge-TTS MP3 para WAV.")
 
-            if temp_mp3.exists():
+            if temp_mp3.exists() and temp_mp3.stat().st_size > 0:
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -187,6 +225,25 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
             duration = probe_duration(output_path)
             if duration <= 0.0:
                 raise RuntimeError(f"FFprobe retornou duração inválida ({duration}s) para {output_path}")
+
+            if word_timestamps:
+                self.last_word_timestamps = word_timestamps
+                metadata = {
+                    "schema_version": "1.0",
+                    "audio_file": output_path.name,
+                    "audio_duration_sec": round(duration, 3),
+                    "audio_hash": compute_file_sha256(output_path),
+                    "text_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "word_count": len(word_timestamps),
+                    "timestamps": word_timestamps,
+                }
+                sidecar_path.write_text(
+                    json.dumps(metadata, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            else:
+                logger.warning("Síntese Edge-TTS concluída sem eventos WordBoundary; fallback proporcional será usado.")
+
             return output_path, duration
         finally:
             if temp_mp3.exists():
