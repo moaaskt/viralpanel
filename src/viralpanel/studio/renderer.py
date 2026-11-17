@@ -170,8 +170,8 @@ class ReactionVideoRenderer:
         filter_complex = (
             f"[0:v]scale={composition.target_width}:{composition.target_height}:force_original_aspect_ratio=increase,"
             f"crop={composition.target_width}:{composition.target_height},setsar=1[bg];"
-            f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=decrease[pip];"
-            f"[bg][pip]overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:shortest=1[composed];"
+            f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=decrease:flags=lanczos,format=rgba[pip];"
+            f"[bg][pip]overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:shortest=1:format=yuv420:alpha=straight[composed];"
             f"[composed]ass='{escaped_ass}'[vout]"
         )
 

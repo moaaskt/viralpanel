@@ -32,8 +32,8 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
     assert config.brand_style == "ZUNTO"
     assert config.max_words_per_cue == 5
     assert config.min_words_per_cue == 3
-    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 640
-    assert config.margin_v == 640
+    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 690
+    assert config.margin_v == 690
     assert config.box_padding == 16
     assert config.font_size == ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
     assert config.font_name == ZuntoTypography.PRIMARY_FONT  # Montserrat
@@ -43,7 +43,7 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
 
 
 def test_ass_header_zunto_style():
-    """Valida que o cabeçalho ASS possui BorderStyle=3, MarginV=640 e cores ZUNTO!."""
+    """Valida que o cabeçalho ASS possui BorderStyle=3, MarginV=690 e cores ZUNTO!."""
     header = build_ass_header()
 
     assert "PlayResX: 1080" in header
@@ -78,7 +78,7 @@ def test_ass_header_zunto_style():
     # 16: Outline (16)
     # 17: Shadow (0)
     # 18: Alignment (2)
-    # 21: MarginV (640)
+    # 21: MarginV (690)
     assert tokens[0] == "Default"
     assert tokens[2] == "64"
     assert tokens[3] == expected_primary
@@ -89,7 +89,7 @@ def test_ass_header_zunto_style():
     assert tokens[16] == "16"  # Outline=16 (padding)
     assert tokens[17] == "0"  # Shadow=0
     assert tokens[18] == "2"  # Alignment=2 (Bottom-center)
-    assert tokens[21] == "640"  # MarginV=640
+    assert tokens[21] == "690"  # MarginV=690
 
 
 def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
@@ -111,7 +111,7 @@ def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
     assert "PlayResY: 1920" in content
     assert "[V4+ Styles]" in content
     assert "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV" in content
-    assert ",3,16,0,2,80,80,640,1" in content
+    assert f",3,16,0,2,80,80,{SafeZones9x16.SUBTITLE_MARGIN_V},1" in content
     assert "Dialogue: 0," in content
 
 

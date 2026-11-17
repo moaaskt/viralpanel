@@ -4,6 +4,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -13,11 +14,16 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from viralpanel.branding import SafeZones9x16, ZuntoPalette
 from viralpanel.cli import main as cli_main
 from viralpanel.database import Base
 from viralpanel.models import Asset, Script, SourceVideo
 from viralpanel.storage import StorageManager
-from viralpanel.studio.avatar import MockAvatarAnimator
+from viralpanel.studio.avatar import (
+    AudioReactiveAvatarAnimator,
+    AvatarConfig,
+    MockAvatarAnimator,
+)
 from viralpanel.studio.inspection import (
     AudioSignalEnergyError,
     CANONICAL_SCRIPT_TEXT,
@@ -32,8 +38,9 @@ from viralpanel.studio.inspection import (
     file_kernel_lock,
     pcm_bytes_to_floats,
 )
-from viralpanel.studio.renderer import StudioRenderRequest
+from viralpanel.studio.renderer import ReactionVideoRenderer, StudioRenderRequest
 from viralpanel.studio.service import StudioService
+from viralpanel.studio.subtitles import SubtitleJobConfig, generate_subtitles
 from viralpanel.studio.voice import MockVoiceSynthesizer, PreSynthesizedVoice
 
 
@@ -374,3 +381,358 @@ def test_older_sequence_cannot_overwrite_newer_publication(tmp_path: Path):
     after_data = json.loads(latest_file.read_text(encoding="utf-8"))
     assert after_data["sequence_number"] == 10
     assert after_data["run_id"] == "run_newer_10"
+
+
+def test_avatar_alpha_channel_isolation(tmp_path: Path):
+    """Comprova canal alfa no vídeo intermediário do avatar: 0 fora, transição na borda, 255 dentro."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para teste empírico de canal alfa")
+
+    # 1. Gera áudio mock de 2s
+    audio_path = tmp_path / "voice_mock.wav"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", "sine=frequency=440:sample_rate=44100:duration=2.0",
+            "-c:a", "pcm_s16le", str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    animator = AudioReactiveAvatarAnimator()
+    avatar_mov = tmp_path / "avatar_intermediate.mp4"
+    animator.generate_avatar_video(audio_path, avatar_mov)
+    assert avatar_mov.exists()
+
+    # Extrai o frame em rawvideo rgba (300x300x4 = 360.000 bytes)
+    raw_path = tmp_path / "avatar_frame.raw"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-ss", "0.5", "-i", str(avatar_mov),
+            "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgba",
+            str(raw_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    raw_bytes = raw_path.read_bytes()
+    assert len(raw_bytes) == 300 * 300 * 4
+
+    def get_rgba(x: int, y: int) -> tuple[int, int, int, int]:
+        idx = (y * 300 + x) * 4
+        return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2], raw_bytes[idx + 3]
+
+    # A) Fora do círculo (hypot > 151.5) nos 4 cantos da caixa 300x300
+    for corner_x, corner_y in [(10, 10), (290, 10), (10, 290), (290, 290)]:
+        r, g, b, a = get_rgba(corner_x, corner_y)
+        assert a == 0, f"Canal alfa em ({corner_x}, {corner_y}) deve ser 0 (transparência total). Obtido: {a}"
+        assert (r, g, b) == (0, 0, 0), f"RGB fora do círculo deve ser 0. Obtido: {(r, g, b)}"
+
+    # B) Borda externa de transição suave (antialiasing de 2px, hypot ≈ 150)
+    # Em x=150, y=0 (distância 150):
+    r_edge, g_edge, b_edge, a_edge = get_rgba(150, 0)
+    assert 0 < a_edge <= 255, f"Canal alfa na borda externa deve estar na rampa de antialiasing. Obtido: {a_edge}"
+
+    # C) Dentro do círculo do avatar (hypot < 144)
+    r_in, g_in, b_in, a_in = get_rgba(150, 150)
+    assert a_in == 255, f"Canal alfa no centro deve ser 255 (opacidade total). Obtido: {a_in}"
+
+
+def test_composed_avatar_transparency_and_no_leak(tmp_path: Path):
+    """Comprova ausência de vazamento de pixels e transparência real nos 4 cantos e perímetro da composição final."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para teste de composição")
+
+    source_video = tmp_path / "source.mp4"
+    InspectionRunner.generate_synthetic_source_video(source_video, duration=2.5, bg_hex="#1e293b")
+
+    audio_path = tmp_path / "voice.wav"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", "sine=frequency=440:sample_rate=44100:duration=2.5",
+            "-c:a", "pcm_s16le", str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    animator = AudioReactiveAvatarAnimator()
+    avatar_mov = tmp_path / "avatar.mp4"
+    animator.generate_avatar_video(audio_path, avatar_mov)
+
+    ass_path = tmp_path / "subs.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text="Teste de transparência sem vazamento.",
+            total_duration=2.5,
+            output_path=ass_path,
+        )
+    )
+
+    final_video = tmp_path / "final_composed.mp4"
+    renderer = ReactionVideoRenderer()
+    renderer.render(
+        source_video_path=source_video,
+        avatar_video_path=avatar_mov,
+        voice_audio_path=audio_path,
+        ass_subtitle_path=ass_path,
+        output_path=final_video,
+    )
+    assert final_video.exists()
+
+    # Extrai frame do vídeo base original e do vídeo composto em t=1.0s
+    ref_raw_path = tmp_path / "ref_frame.raw"
+    comp_raw_path = tmp_path / "comp_frame.raw"
+    for in_vid, out_raw in [(source_video, ref_raw_path), (final_video, comp_raw_path)]:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-ss", "1.0", "-i", str(in_vid),
+                "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                str(out_raw),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+    ref_bytes = ref_raw_path.read_bytes()
+    comp_bytes = comp_raw_path.read_bytes()
+    assert len(ref_bytes) == 1080 * 1920 * 3
+    assert len(comp_bytes) == 1080 * 1920 * 3
+
+    def get_comp_rgb(x: int, y: int) -> tuple[int, int, int]:
+        idx = (y * 1080 + x) * 3
+        return comp_bytes[idx], comp_bytes[idx + 1], comp_bytes[idx + 2]
+
+    def get_ref_rgb(x: int, y: int) -> tuple[int, int, int]:
+        idx = (y * 1080 + x) * 3
+        return ref_bytes[idx], ref_bytes[idx + 1], ref_bytes[idx + 2]
+
+    # Avatar bounding box: X=726..1026, Y=1300..1600 (cx=876, cy=1450, r=150)
+    # Cantos da bounding box (distância do centro = hypot(150, 150) = 212px > 151px)
+    corners = [(735, 1310), (1015, 1310), (735, 1590), (1015, 1590)]
+    for x, y in corners:
+        comp_rgb = get_comp_rgb(x, y)
+        ref_rgb = get_ref_rgb(x, y)
+        delta = max(abs(c - r) for c, r in zip(comp_rgb, ref_rgb))
+        assert delta <= 8, f"Vazamento de pixel detectado no canto ({x}, {y}): final={comp_rgb}, ref={ref_rgb}, delta={delta}"
+
+
+def test_avatar_yellow_border_integrity_h264(tmp_path: Path):
+    """Comprova integridade da cor amarela ZUNTO! (#FACC15) em 8 ângulos radiais após compressão H.264."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para teste de contorno amarelo")
+
+    source_video = tmp_path / "source.mp4"
+    InspectionRunner.generate_synthetic_source_video(source_video, duration=2.5, bg_hex="#1e293b")
+
+    audio_path = tmp_path / "voice.wav"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", "sine=frequency=440:sample_rate=44100:duration=2.5",
+            "-c:a", "pcm_s16le", str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    animator = AudioReactiveAvatarAnimator()
+    avatar_mov = tmp_path / "avatar.mp4"
+    animator.generate_avatar_video(audio_path, avatar_mov)
+
+    ass_path = tmp_path / "subs.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text="Contorno amarelo ZUNTO!",
+            total_duration=2.5,
+            output_path=ass_path,
+        )
+    )
+
+    final_video = tmp_path / "final_composed.mp4"
+    renderer = ReactionVideoRenderer()
+    renderer.render(
+        source_video_path=source_video,
+        avatar_video_path=avatar_mov,
+        voice_audio_path=audio_path,
+        ass_subtitle_path=ass_path,
+        output_path=final_video,
+    )
+
+    comp_raw_path = tmp_path / "comp_frame.raw"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-ss", "1.0", "-i", str(final_video),
+            "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24",
+            str(comp_raw_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    raw_bytes = comp_raw_path.read_bytes()
+
+    def get_comp_rgb(x: int, y: int) -> tuple[int, int, int]:
+        idx = (y * 1080 + x) * 3
+        return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+
+    # Centro do avatar no frame 1080x1920: cx=876, cy=1450
+    # Raio médio da borda de 6px (r=144 a 150): r_mid = 147
+    cx, cy, r_mid = 876, 1450, 147
+    angles_deg = [0, 45, 90, 135, 180, 225, 270, 315]
+
+    for deg in angles_deg:
+        rad = math.radians(deg)
+        sample_x = int(round(cx + r_mid * math.cos(rad)))
+        sample_y = int(round(cy + r_mid * math.sin(rad)))
+        r, g, b = get_comp_rgb(sample_x, sample_y)
+        # Amarelo ZUNTO! (#FACC15 -> R=250, G=204, B=21). Em H.264 comprimido:
+        # R e G devem ser dominantes e B substancialmente mais baixo (R > 130, G > 100 e R > B * 1.3)
+        assert r > 130 and g > 100, f"Ângulo {deg}° ({sample_x}, {sample_y}) perdeu intensidade: R={r}, G={g}, B={b}"
+        assert r > b * 1.25, f"Ângulo {deg}° ({sample_x}, {sample_y}) perdeu cromaticidade amarela: R={r}, G={g}, B={b}"
+
+
+def test_avatar_no_green_artifacts_synthetic(tmp_path: Path):
+    """Comprova ausência total de artefatos verdes na região de sobreposição do waveform sobre o busto neutro do avatar sintético."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para teste de ausência de verde")
+
+    source_video = tmp_path / "source.mp4"
+    InspectionRunner.generate_synthetic_source_video(source_video, duration=2.5, bg_hex="#1e293b")
+
+    audio_path = tmp_path / "voice.wav"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", "sine=frequency=330:sample_rate=44100:duration=2.5",
+            "-c:a", "pcm_s16le", str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    animator = AudioReactiveAvatarAnimator()
+    avatar_mov = tmp_path / "avatar.mp4"
+    animator.generate_avatar_video(audio_path, avatar_mov)
+
+    ass_path = tmp_path / "subs.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text="Sem artefatos esverdeados.",
+            total_duration=2.5,
+            output_path=ass_path,
+        )
+    )
+
+    final_video = tmp_path / "final_composed.mp4"
+    renderer = ReactionVideoRenderer()
+    renderer.render(
+        source_video_path=source_video,
+        avatar_video_path=avatar_mov,
+        voice_audio_path=audio_path,
+        ass_subtitle_path=ass_path,
+        output_path=final_video,
+    )
+
+    comp_raw_path = tmp_path / "comp_frame.raw"
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-ss", "1.0", "-i", str(final_video),
+            "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24",
+            str(comp_raw_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    raw_bytes = comp_raw_path.read_bytes()
+
+    def get_comp_rgb(x: int, y: int) -> tuple[int, int, int]:
+        idx = (y * 1080 + x) * 3
+        return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+
+    # Região de interseção do busto do avatar padrão com o waveform:
+    # Avatar Y = 1300..1600. Waveform Y=200..280 (no frame 1080x1920: Y ≈ 1450..1550, X ≈ 780..970)
+    green_artifact_pixels = []
+    for y in range(1450, 1550, 2):
+        for x in range(780, 970, 2):
+            r, g, b = get_comp_rgb(x, y)
+            # Assinatura de artefato verde ZUNTO: G desproporcionalmente dominante sobre R e B
+            if g > r * 1.3 and g > b * 1.3 and g > 70:
+                green_artifact_pixels.append((x, y, r, g, b))
+
+    assert len(green_artifact_pixels) == 0, (
+        f"Detectados {len(green_artifact_pixels)} pixels esverdeados anômalos no busto do avatar. "
+        f"Exemplos: {green_artifact_pixels[:5]}"
+    )
+
+
+def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
+    """Valida empiricamente que legendas com 1, 2, 3 linhas e textos longos preservam distância >= 40px ao avatar e respeitam safe zones."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para validação de safe zones de legenda")
+
+    test_cases = [
+        ("FOCO TOTAL", "1_linha"),
+        ("O SUCESSO EXIGE DISCIPLINA DIÁRIA E CONSTANTE", "2_linhas"),
+        ("QUANDO VOCÊ DECIDE NÃO DESISTIR NADA NO MUNDO PODE PARAR A SUA EVOLUÇÃO", "3_linhas_longo"),
+    ]
+
+    for script_text, label in test_cases:
+        ass_path = tmp_path / f"subs_{label}.ass"
+        job_cfg = SubtitleJobConfig(
+            script_text=script_text,
+            total_duration=3.0,
+            output_path=ass_path,
+        )
+        generate_subtitles(job_cfg)
+        escaped_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+
+        raw_path = tmp_path / f"frame_{label}.raw"
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", "color=c=magenta:s=1080x1920:d=0.1",
+                "-vf", f"ass='{escaped_ass}'",
+                "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                str(raw_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        raw_bytes = raw_path.read_bytes()
+
+        # Encontra a caixa opaca preta da legenda (RGB <= 25)
+        box_y_coords = []
+        box_x_coords = []
+        for y in range(0, 1920, 4):
+            for x in range(0, 1080, 8):
+                idx = (y * 1080 + x) * 3
+                r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+                if r <= 25 and g <= 25 and b <= 25:
+                    box_y_coords.append(y)
+                    box_x_coords.append(x)
+
+        assert len(box_y_coords) > 0, f"Caixa preta da legenda deve ser detectada para o caso {label}"
+        min_y = min(box_y_coords)
+        max_y = max(box_y_coords)
+        min_x = min(box_x_coords)
+
+        # 1. Distância ao Avatar (Topo do avatar em Y=1300)
+        avatar_top_y = 1300
+        clearance = avatar_top_y - max_y
+        assert clearance >= 40, (
+            f"Caso {label}: folga vertical até o avatar deve ser >= 40px. "
+            f"Base da legenda: Y={max_y}, Avatar: Y={avatar_top_y}, Folga={clearance}px"
+        )
+
+        # 2. Respeito ao cabeçalho mobile (SafeZone Top >= 220)
+        assert min_y >= SafeZones9x16.TOP_MARGIN, (
+            f"Caso {label}: legenda invadiu a safe zone superior. Topo: Y={min_y} < {SafeZones9x16.TOP_MARGIN}"
+        )
+
+        # 3. Respeito às margens laterais
+        assert min_x >= SafeZones9x16.LEFT_MARGIN - 20, (
+            f"Caso {label}: margem lateral esquerda violada. min_x={min_x}"
+        )
+

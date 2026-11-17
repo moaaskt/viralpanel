@@ -22,7 +22,7 @@ def test_avatar_config_defaults_and_immutability():
     assert config.size == SafeZones9x16.AVATAR_SIZE == 300
     assert config.crop_mode == "circle_alpha"
     assert config.border_color == ZuntoPalette.IMPACT_YELLOW == "#FACC15"
-    assert config.border_width == 4
+    assert config.border_width == 6
     assert config.overlay_x_expr == "W-w-54"
     assert config.overlay_y_expr == "H-h-320"
     assert config.enable_waveform is True

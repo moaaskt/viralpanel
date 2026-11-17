@@ -11,7 +11,7 @@
 ### Locked Decisions
 - **D-01 (Imutabilidade da Revisão 001):** A migração inicial `alembic/versions/001_initial_schema.py` é estritamente imutável. Quaisquer alterações de schema devem ser aplicadas através de migrações incrementais versionadas. [VERIFIED: ANALYZER-04:67-70]
 - **D-02 (Migração Incremental 002):** A resolução do schema drift identificado no Finding F-01 (`scripts.metadata_json`) deve ser realizada criando a migração `alembic/versions/002_add_metadata_json_to_scripts.py`, com `down_revision = '001'`, implementando `upgrade()` com `op.add_column` e `downgrade()` com `op.drop_column`. [VERIFIED: ANALYZER-04:49,69]
-- **D-03 (Desacoplamento do Alembic env.py):** `alembic/env.py` deve ser refatorado cirurgicamente para suportar conexões injetadas via `context.config.attributes.get('connection')` e URL configurável via `context.config.get_main_option('sqlalchemy.url')` ou `TEST_DATABASE_URL`, eliminando a dependência rígida de `create_engine(get_settings().database_url)` em tempo de importação e execução. [VERIFIED: alembic/env.py:9,19]
+- **D-03 (Desacoplamento do Alembic env.py):** `alembic/env.py` deve ser refatorado cirurgicamente para suportar conexões injetadas via `context.config.attributes.get('connection')` e URL configurável via `context.config.get_main_option('sqlalchemy.url')`, eliminando a dependência rígida de `create_engine(get_settings().database_url)` em tempo de importação e execução. O fallback para `get_settings().database_url` ocorre exclusivamente em tempo de execução padrão da aplicação fora dos testes de migração. [VERIFIED: alembic/env.py:9,19]
 - **D-04 (Harness de Testes e Ciclo Completo de Migração):** Criação de `tests/test_migrations.py` cobrindo o ciclo completo de migrações:
   1. Subida limpa da base até `head` (`upgrade head`).
   2. Subida incremental de `001` até `head` (`002`), com asserção estrita de preservação e integridade de dados legados (registros pré-existentes mantêm `metadata_json = None`) e inserção de novos registros com JSON estruturado.
@@ -19,9 +19,16 @@
   4. Detecção automatizada de schema drift: no SQLite, filtros estritamente documentados apenas para divergências conhecidas de dialeto; no PostgreSQL, asserção estrita `assert diff == []` sem nenhum filtro que mascare divergências. [VERIFIED: ANALYZER-04:70,196-200]
 - **D-05 (Estratégia Dual-Engine e PostgreSQL Obrigatório no CI):** 
   1. No ambiente de CI (`CI=true` ou `GITHUB_ACTIONS=true`), o PostgreSQL 16 é OBRIGATÓRIO. O teste contra PostgreSQL real NUNCA pode ser ignorado ou pulado (skip proibido no CI; falha obrigatória do build com `pytest.fail()` se o PostgreSQL não estiver disponível).
-  2. A execução condicional com skip de PostgreSQL é restrita exclusivamente ao ambiente local de desenvolvimento quando não houver instância respondendo na porta 5432.
+  2. A execução condicional com skip de PostgreSQL é restrita exclusivamente ao ambiente local de desenvolvimento quando `TEST_DATABASE_URL` não estiver configurada ou a instância não estiver respondendo.
   3. Configuração de workflow formal de CI (`.github/workflows/ci.yml`) com serviço `postgres:16`, container healthcheck (`pg_isready`), porta 5432 mapeada, variável `TEST_DATABASE_URL` e execução obrigatória dos testes de migração e da suíte completa. [VERIFIED: user_instructions]
 - **D-06 (Fronteira Estrita de Escopo da Phase 15):** A migração `003` (`Asset.status`) e os campos de concorrência/lease de `SourceVideo` pertencem exclusivamente à Phase 16 (Concorrência, Fencing & Lifecycle). A Phase 15 mantém foco estrito e cirúrgico na resolução do drift de `Script.metadata_json`, na homologação da infraestrutura de testes de migração e no workflow de CI com PostgreSQL 16. [VERIFIED: user_instructions, ANALYZER-04:195-200]
+- **D-07 (Isolamento Estrito de Banco e Prevenção de Perda de Dados):** O teste de PostgreSQL (`test_postgres_real_migration_and_strict_zero_drift`) executa comandos destrutivos (`downgrade base`) e, por isso, deve utilizar EXCLUSIVAMENTE `TEST_DATABASE_URL`. É terminantemente proibido qualquer fallback para `DATABASE_URL` ou `get_settings().database_url`. Antes de instanciar a engine ou disparar comandos Alembic, o teste e a função `is_postgres_available()` devem validar:
+  1. `TEST_DATABASE_URL` explicitamente configurada e não-vazia.
+  2. Esquema da URL estritamente PostgreSQL (`postgresql://`, `postgresql+psycopg2://`, etc.).
+  3. Banco de dados de destino exatamente igual a `viralpanel_test`. Qualquer outro banco é rejeitado imediatamente com erro de segurança.
+  4. Conexão autenticada ativa confirma em runtime que `SELECT current_database() == 'viralpanel_test'`.
+  5. Se em ambiente local `TEST_DATABASE_URL` estiver ausente, permite skip informativo sem tocar em nenhum banco.
+  6. Se em CI a variável estiver ausente, inválida, apontar para outro banco ou a conexão falhar, executa `pytest.fail()` imediatamente antes de qualquer operação destrutiva. [VERIFIED: user_instructions]
 
 ### the agent's Discretion
 - Tratamento de divergências de reflexão de tipos do SQLite (ex: nullability de chaves primárias e constraints anônimas) no teste de `compare_metadata()`.
@@ -169,6 +176,11 @@ Essa chamada reflete o catálogo do banco real através da conexão ativa e comp
 - **Causa:** Confusão de escopo entre o Blueprint de Remediação (onde a Phase 15 originalmente agrupava 002 e 003) e as decisões consolidadas pelo Tech Lead.
 - **Mitigação:** Manter a Phase 15 focada **exclusivamente** na coluna `scripts.metadata_json` e no harness de testes de migração. `Asset.status` será tratado na Phase 16.
 
+### 5. Queda Acidental e Perda de Dados no Banco da Aplicação por Fallback de URL de Teste
+- **Sintoma:** Testes de migração executando `command.downgrade(cfg, "base")` contra o banco de dados operacional da aplicação (`viralpanel`), expurgando tabelas em ambiente local ou staging.
+- **Causa:** O teste de PostgreSQL ou a função `is_postgres_available()` fazer fallback para `DATABASE_URL` ou `get_settings().database_url` quando `TEST_DATABASE_URL` estiver ausente.
+- **Mitigação:** Proibir expressamente qualquer fallback para a URL da aplicação na suíte de testes do PostgreSQL. Exigir `TEST_DATABASE_URL` exclusivamente, validar esquema `postgresql`, validar que o nome do banco é estritamente `viralpanel_test` e checar em runtime `SELECT current_database() == 'viralpanel_test'` antes de qualquer comando DDL destrutivo. Em dev local, pular o teste com `pytest.skip()` se a variável estiver ausente; em CI, falhar compulsoriamente com `pytest.fail()`.
+
 ---
 
 ## Code Examples
@@ -290,26 +302,63 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect, text
-from viralpanel.config import get_settings
+from sqlalchemy.engine.url import make_url
 from viralpanel.database import Base
 
 
+def get_verified_test_db_url() -> str:
+    """Valida estritamente a URL de teste do PostgreSQL.
+    
+    Regras de Segurança:
+    1. A variável TEST_DATABASE_URL deve estar explicitamente configurada e não vazia.
+    2. O esquema deve ser estritamente PostgreSQL (postgresql://, postgresql+psycopg2://, etc.).
+    3. O banco de destino DEVE ser exatamente 'viralpanel_test'. Proibido qualquer outro banco.
+    
+    Retorna a URL validada ou lança ValueError caso qualquer critério falhe.
+    """
+    raw_url = os.getenv("TEST_DATABASE_URL")
+    if not raw_url or not raw_url.strip():
+        raise ValueError("TEST_DATABASE_URL não configurada ou vazia.")
+    
+    parsed = make_url(raw_url.strip())
+    if not parsed.drivername.startswith("postgresql"):
+        raise ValueError(f"TEST_DATABASE_URL possui driver inválido ({parsed.drivername}). Esperado driver PostgreSQL.")
+    
+    if parsed.database != "viralpanel_test":
+        raise ValueError(
+            f"BLOQUEIO DE SEGURANÇA: TEST_DATABASE_URL aponta para o banco '{parsed.database}'. "
+            f"O teste destrutivo exige exclusivamente o banco 'viralpanel_test' para prevenir corrupção de dados."
+        )
+    return str(parsed)
+
+
 def is_postgres_available() -> bool:
-    """Verifica se há um servidor PostgreSQL respondendo na porta configurada."""
+    """Verifica se há um servidor PostgreSQL de teste respondendo especificamente para TEST_DATABASE_URL.
+    
+    Não utiliza NUNCA a URL da aplicação (get_settings().database_url).
+    Se TEST_DATABASE_URL não estiver configurada ou for inválida, retorna False imediatamente.
+    """
     try:
-        url = get_settings().database_url
-        # Tenta conectar via socket no host/porta padrão 5432
+        url = get_verified_test_db_url()
+        parsed = make_url(url)
+        host = parsed.host or "127.0.0.1"
+        port = parsed.port or 5432
+
+        # 1. Checagem rápida de socket TCP no host/porta do banco de teste
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(0.8)
-        result = sock.connect_ex(("127.0.0.1", 5432))
+        result = sock.connect_ex((host, port))
         sock.close()
         if result != 0:
             return False
-        
-        # Valida autenticação rápida
+
+        # 2. Conexão real e validação de current_database() == 'viralpanel_test'
         eng = create_engine(url, connect_args={"connect_timeout": 2})
         with eng.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            db_name = conn.execute(text("SELECT current_database()")).scalar()
+            if db_name != "viralpanel_test":
+                eng.dispose()
+                return False
         eng.dispose()
         return True
     except Exception:
@@ -502,32 +551,68 @@ def is_ci() -> bool:
 
 
 def test_postgres_real_migration_and_strict_zero_drift():
-    """Validação estrita de zero-drift contra instância PostgreSQL real.
+    """Validação estrita de zero-drift contra instância PostgreSQL real isolada.
     
-    REGRAS DE CONECTIVIDADE E FALHA:
-    - No CI: PostgreSQL é OBRIGATÓRIO. Se não estiver acessível, FALHA com pytest.fail().
-      O teste NUNCA pode ser silenciosamente ignorado/pulado no CI.
-    - Em ambiente local: permite pytest.skip() exclusivamente se o PostgreSQL não estiver respondendo.
-    
-    REGRA DE SCHEMA DRIFT NO POSTGRESQL:
-    - Exige compare_metadata() == [] rigorosamente SEM NENHUM FILTRO.
+    REGRAS DE SEGURANÇA E ISOLAMENTO DE DADOS:
+    - Utiliza EXCLUSIVAMENTE TEST_DATABASE_URL. Fallback para DATABASE_URL ou get_settings() é estritamente proibido.
+    - Pré-validação obrigatória antes de instanciar engine ou executar Alembic:
+      * TEST_DATABASE_URL definida e não-vazia.
+      * Esquema estritamente PostgreSQL.
+      * Banco de destino exatamente igual a 'viralpanel_test'.
+      * Conexão autenticada ativa confirma SELECT current_database() == 'viralpanel_test'.
+    - No CI: PostgreSQL é OBRIGATÓRIO. Se a variável estiver ausente, inválida, apontar para outro
+      banco ou a conexão falhar, executa pytest.fail() imediatamente antes de qualquer operação destrutiva.
+    - Em ambiente local: se TEST_DATABASE_URL estiver ausente ou o banco inacessível, emite pytest.skip().
+    - Zero drift: exige compare_metadata() == [] rigorosamente sem filtros.
     """
     import os
+    raw_test_url = os.getenv("TEST_DATABASE_URL")
+
+    # 1. Guarda de presença: tratamento diferenciado local vs CI
+    if not raw_test_url or not raw_test_url.strip():
+        if is_ci():
+            pytest.fail(
+                "FALHA DE SEGURANÇA NO CI: TEST_DATABASE_URL não configurada! "
+                "O workflow de CI deve definir TEST_DATABASE_URL apontando para 'viralpanel_test'."
+            )
+        else:
+            pytest.skip(
+                "TEST_DATABASE_URL não configurada em ambiente local. "
+                "Para rodar testes reais contra PostgreSQL, configure TEST_DATABASE_URL apontando para 'viralpanel_test'."
+            )
+
+    # 2. Validação estrita de esquema e banco de destino ('viralpanel_test')
+    try:
+        test_url = get_verified_test_db_url()
+    except ValueError as e:
+        if is_ci():
+            pytest.fail(f"FALHA DE SEGURANÇA NO CI: {e}")
+        else:
+            pytest.skip(f"TEST_DATABASE_URL inválida em ambiente local: {e}")
+
+    # 3. Validação de conectividade exclusiva em TEST_DATABASE_URL
     if not is_postgres_available():
         if is_ci():
             pytest.fail(
-                "PostgreSQL 16 é OBRIGATÓRIO no CI, mas não foi detectado respondendo na porta 5432! "
-                "O workflow de CI deve provisionar o container postgres:16 com TEST_DATABASE_URL."
+                "FALHA DE CONECTIVIDADE NO CI: PostgreSQL de teste (viralpanel_test) não está acessível em TEST_DATABASE_URL! "
+                "Verifique a inicialização do container de serviço postgres:16."
             )
         else:
-            pytest.skip("PostgreSQL não disponível na porta 5432 (permitido apenas em ambiente local)")
+            pytest.skip("PostgreSQL de teste (viralpanel_test) não está respondendo em TEST_DATABASE_URL.")
 
-    url = os.getenv("TEST_DATABASE_URL") or get_settings().database_url
-    engine = create_engine(url)
+    # 4. Engine criada exclusivamente a partir da URL validada de teste (sem fallback)
+    engine = create_engine(test_url)
+
+    # 5. Dupla checagem de runtime em conexão aberta antes do downgrade destrutivo
+    with engine.connect() as conn:
+        active_db = conn.execute(text("SELECT current_database()")).scalar()
+        assert active_db == "viralpanel_test", (
+            f"SEGURANÇA VIOLADA: Conexão ativa no banco '{active_db}', esperado exclusivamente 'viralpanel_test'. Abortando!"
+        )
 
     ini_path = Path(__file__).parent.parent / "alembic.ini"
     cfg = Config(str(ini_path))
-    cfg.set_main_option("sqlalchemy.url", url)
+    cfg.set_main_option("sqlalchemy.url", test_url)
 
     # Executa ciclo completo round-trip no PostgreSQL: downgrade base -> upgrade head
     with engine.connect() as conn:
@@ -606,8 +691,9 @@ jobs:
 
 ### 1. Test Harness Setup
 - A suíte `tests/test_migrations.py` suporta execução dual-engine com garantia de CI verde e testes locais resilientes.
-- **Ambiente Local (sem Postgres):** Executa clean upgrade, incremental com dados legados, ciclo round-trip (`head → 001 → base → head`) e schema drift estrutural via SQLite isolado em `tmp_path`. O teste de Postgres realiza skip informativo.
-- **Ambiente de CI (GitHub Actions):** Serviço `postgres:16` com container healthcheck provisionado e `TEST_DATABASE_URL` configurado. A variável `CI=true` ativa a obrigatoriedade estrita: se o banco não responder, o job falha com `pytest.fail()`. O teste `test_postgres_real_migration_and_strict_zero_drift` executa com sucesso e exige `compare_metadata() == []` sem filtros.
+- **Ambiente Local (sem Postgres):** Executa clean upgrade, incremental com dados legados, ciclo round-trip (`head → 001 → base → head`) e schema drift estrutural via SQLite isolado em `tmp_path`. Se `TEST_DATABASE_URL` não for fornecida, o teste de PostgreSQL emite skip informativo sem tentar acessar a base da aplicação.
+- **Ambiente de CI (GitHub Actions):** Serviço `postgres:16` com container healthcheck provisionado e `TEST_DATABASE_URL` configurado exclusivamente para `viralpanel_test`. A variável `CI=true` ativa a obrigatoriedade estrita: se a variável estiver ausente, se apontar para outro banco ou se o banco não responder, o job falha com `pytest.fail()`. O teste `test_postgres_real_migration_and_strict_zero_drift` executa com sucesso e exige `compare_metadata() == []` sem filtros.
+- **Prevenção de Perda de Dados:** É terminantemente proibido fallback para `DATABASE_URL` ou `get_settings().database_url` em qualquer teste do PostgreSQL.
 
 ### 2. Comandos de Validação Rápida
 
@@ -634,6 +720,7 @@ jobs:
   - Subida incremental com validação de dados legados (`None`) e novos em `scripts.metadata_json`.
   - Ciclo completo round-trip (`head → 001 → base → head`).
   - Detecção de drift via `compare_metadata()`: filtros de dialeto documentados no SQLite, zero filtros no PostgreSQL (`assert diff == []`).
-  - Teste contra PostgreSQL real OBRIGATÓRIO no CI (falha imediata com `pytest.fail()` se indisponível; skip condicional permitido apenas em dev local).
-- [ ] Arquivo `.github/workflows/ci.yml` configurado com serviço `postgres:16`, `TEST_DATABASE_URL` e execução obrigatória dos testes de migração.
+  - Teste contra PostgreSQL real consome EXCLUSIVAMENTE `TEST_DATABASE_URL` (zero fallback para database_url da aplicação), com pré-validação estrita do banco `viralpanel_test` e `current_database()`.
+  - No CI, falha obrigatória com `pytest.fail()` se `TEST_DATABASE_URL` ausente, inválida, apontar para outro banco ou inacessível. Em dev local, skip informativo seguro.
+- [ ] Arquivo `.github/workflows/ci.yml` configurado com serviço `postgres:16`, `TEST_DATABASE_URL` apontando para `viralpanel_test` e execução obrigatória dos testes de migração.
 - [ ] 100% dos testes passando (`117 passed` preexistentes + novos testes de migração).
