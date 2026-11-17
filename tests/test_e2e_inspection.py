@@ -5,9 +5,11 @@ import math
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import time
+import wave
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -735,4 +737,171 @@ def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
         assert min_x >= SafeZones9x16.LEFT_MARGIN - 20, (
             f"Caso {label}: margem lateral esquerda violada. min_x={min_x}"
         )
+
+
+def test_mp4_karaoke_audio_energy_cross_validation(tmp_path: Path):
+    """Validação cruzada E2E entre áudio AAC decodificado (RMS) do MP4 final e destaque ativo por palavra."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para validação cruzada audiovisual E2E")
+
+    proc_check = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
+    if "ass" not in proc_check.stdout:
+        pytest.skip("FFmpeg sem suporte ao filtro libass (ass)")
+
+    sample_rate = 24000
+    total_duration = 2.4
+    total_samples = int(sample_rate * total_duration)
+
+    # Três rajadas acústicas (0.15-0.55, 0.90-1.30, 1.65-2.15) separadas por silêncio (> 300ms)
+    bursts = [
+        (0.15, 0.55, 440.0, 0.35),
+        (0.90, 1.30, 550.0, 1.10),
+        (1.65, 2.15, 660.0, 1.90),
+    ]
+    silences = [0.72, 1.48]
+
+    pcm_samples: list[int] = []
+    for n in range(total_samples):
+        t = n / sample_rate
+        amp = 0.0
+        for b_start, b_end, freq, _ in bursts:
+            if b_start <= t < b_end:
+                amp = 0.5 * math.sin(2.0 * math.pi * freq * t)
+                break
+        pcm_samples.append(int(max(-32767, min(32767, amp * 32767.0))))
+
+    voice_wav = tmp_path / "narration_bursts.wav"
+    with wave.open(str(voice_wav), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(struct.pack(f"<{len(pcm_samples)}h", *pcm_samples))
+
+    source_video = tmp_path / "source.mp4"
+    InspectionRunner.generate_synthetic_source_video(source_video, duration=total_duration, bg_hex="#1e293b")
+
+    avatar_video = tmp_path / "avatar.mp4"
+    AudioReactiveAvatarAnimator().generate_avatar_video(voice_wav, avatar_video)
+
+    ass_path = tmp_path / "karaoke.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text="Você não sabia.",
+            total_duration=total_duration,
+            output_path=ass_path,
+            word_timestamps=[
+                {"word": "Você", "start": 0.15, "end": 0.55, "duration": 0.40},
+                {"word": "não", "start": 0.90, "end": 1.30, "duration": 0.40},
+                {"word": "sabia.", "start": 1.65, "end": 2.15, "duration": 0.50},
+            ],
+        )
+    )
+
+    final_mp4 = tmp_path / "final_karaoke.mp4"
+    renderer = ReactionVideoRenderer()
+    renderer.render(
+        source_video_path=source_video,
+        avatar_video_path=avatar_video,
+        voice_audio_path=voice_wav,
+        ass_subtitle_path=ass_path,
+        output_path=final_mp4,
+    )
+    assert final_mp4.exists()
+
+    # Decodifica a trilha AAC do MP4 composto de volta para PCM s16le 24kHz
+    decoded_pcm_path = tmp_path / "decoded_audio.pcm"
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-i", str(final_mp4),
+            "-vn",
+            "-c:a", "pcm_s16le",
+            "-ar", str(sample_rate),
+            "-ac", "1",
+            "-f", "s16le",
+            str(decoded_pcm_path),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    floats = pcm_bytes_to_floats(decoded_pcm_path.read_bytes())
+    assert len(floats) > sample_rate * 2
+
+    def _window_rms(center_sec: float, half_win_sec: float = 0.025) -> float:
+        i0 = max(0, int((center_sec - half_win_sec) * sample_rate))
+        i1 = min(len(floats), int((center_sec + half_win_sec) * sample_rate))
+        return compute_audio_rms(floats[i0:i1])
+
+    def _sample_video_subtitle_zone(ts: float) -> dict:
+        raw_path = tmp_path / f"e2e_frame_{ts:.2f}.raw"
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-ss", f"{ts:.2f}",
+                "-i", str(final_mp4),
+                "-vframes", "1",
+                "-f", "rawvideo",
+                "-pix_fmt", "rgb24",
+                str(raw_path),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        raw_bytes = raw_path.read_bytes()
+        assert len(raw_bytes) == 1080 * 1920 * 3
+
+        yellow_xs: list[int] = []
+        dark_box_count = 0
+        white_count = 0
+        for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
+            for x in range(120, 960):
+                idx = (y * 1080 + x) * 3
+                r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+                if r <= 25 and g <= 25 and b <= 25:
+                    dark_box_count += 1
+                elif r > 180 and g > 140 and b < 90 and (r - b) > 100:
+                    yellow_xs.append(x)
+                elif r > 190 and g > 190 and b > 190:
+                    white_count += 1
+
+        clusters = 0
+        if yellow_xs:
+            sorted_x = sorted(set(yellow_xs))
+            clusters = 1
+            for k in range(1, len(sorted_x)):
+                if sorted_x[k] - sorted_x[k - 1] > 35:
+                    clusters += 1
+
+        return {
+            "yellow_count": len(yellow_xs),
+            "yellow_cx": (sum(yellow_xs) / len(yellow_xs)) if yellow_xs else None,
+            "yellow_clusters": clusters,
+            "white_count": white_count,
+            "dark_box_count": dark_box_count,
+        }
+
+    burst_centroids: list[float] = []
+    for _, _, _, peak_t in bursts:
+        rms = _window_rms(peak_t)
+        assert rms > 0.04, f"Esperado pico de RMS > 0.04 no instante {peak_t}s; obtido {rms:.4f}"
+        frame_stats = _sample_video_subtitle_zone(peak_t)
+        assert frame_stats["dark_box_count"] > 1000
+        assert frame_stats["yellow_count"] > 40, f"Sem destaque amarelo em pico acústico t={peak_t}s: {frame_stats}"
+        assert frame_stats["yellow_clusters"] == 1, f"Mais de 1 palavra em amarelo em t={peak_t}s: {frame_stats}"
+        burst_centroids.append(frame_stats["yellow_cx"])
+
+    assert burst_centroids[0] < burst_centroids[1] < burst_centroids[2], (
+        f"Centroide amarelo não acompanhou a sequência das palavras faladas: {burst_centroids}"
+    )
+
+    for sil_t in silences:
+        sil_rms = _window_rms(sil_t)
+        assert sil_rms < 0.015, f"Esperado silêncio RMS < 0.015 em t={sil_t}s; obtido {sil_rms:.4f}"
+        sil_stats = _sample_video_subtitle_zone(sil_t)
+        assert sil_stats["dark_box_count"] > 1000, f"Caixa opaca falhou na pausa t={sil_t}s"
+        assert sil_stats["white_count"] > 100, f"Texto branco ausente na pausa t={sil_t}s"
+        assert sil_stats["yellow_count"] == 0, f"Destaque amarelo indevido durante silêncio t={sil_t}s: {sil_stats}"
+
 
