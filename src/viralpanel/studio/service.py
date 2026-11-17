@@ -15,7 +15,7 @@ from viralpanel.studio.renderer import (
     has_video_stream,
 )
 from viralpanel.studio.subtitles import SubtitleJobConfig, generate_subtitles
-from viralpanel.studio.voice import BaseVoiceSynthesizer
+from viralpanel.studio.voice import BaseVoiceSynthesizer, load_and_validate_word_timestamps
 
 
 class StudioService:
@@ -105,13 +105,24 @@ class StudioService:
             )
             db.flush()
 
-            # 3. Legendas ASS sincronizadas
+            # 3. Legendas ASS sincronizadas (Active Word Highlight quando timestamps disponíveis)
+            word_timestamps = getattr(self.voice_synthesizer, "last_word_timestamps", None) or None
+            if word_timestamps is None:
+                word_timestamps = load_and_validate_word_timestamps(
+                    voice_path.with_suffix(".words.json"),
+                    expected_text=script_text,
+                    expected_duration=voice_duration,
+                    expected_audio_path=voice_path,
+                )
+
             subtitles_path = assets_dir / "captions.ass"
             job_config = SubtitleJobConfig(
                 script_text=script_text,
                 total_duration=voice_duration,
                 output_path=subtitles_path,
                 margin_v=SafeZones9x16.SUBTITLE_MARGIN_V,
+                timing_mode="word_timestamp_aligned" if word_timestamps else "proportional_character_estimate",
+                word_timestamps=word_timestamps,
             )
             generate_subtitles(job_config)
 

@@ -633,5 +633,120 @@ def test_reaction_renderer_output_specs_and_encoding_flags(tmp_path, monkeypatch
     assert lavfi_input.startswith("color=c=#0f172a:s=1080x1920:r=24:d=2.5")
 
 
+def test_karaoke_subtitles_rendered_pixel_inspection(tmp_path: Path):
+    """Renderiza clipe com FFmpeg libass e comprova deslocamento de amarelo, pausa em branco e caixa opaca contínua."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg não disponível para inspeção visual de legendas")
+
+    proc_check = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
+    if "ass" not in proc_check.stdout:
+        pytest.skip("FFmpeg sem suporte ao filtro libass (ass)")
+
+    ass_path = tmp_path / "karaoke_pixels.ass"
+    job_cfg = SubtitleJobConfig(
+        script_text="Você não sabia.",
+        total_duration=2.0,
+        output_path=ass_path,
+        word_timestamps=[
+            {"word": "Você", "start": 0.1, "end": 0.5, "duration": 0.4},
+            {"word": "não", "start": 0.6, "end": 1.0, "duration": 0.4},
+            {"word": "sabia.", "start": 1.4, "end": 1.9, "duration": 0.5},
+        ],
+    )
+    generate_subtitles(job_cfg)
+    assert ass_path.exists()
+
+    escaped_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+    clip_mp4 = tmp_path / "karaoke_clip.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f", "lavfi",
+            "-i", "color=c=magenta:s=1080x1920:r=24:d=2.0",
+            "-vf", f"ass='{escaped_ass}'",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-r", "24",
+            str(clip_mp4),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    assert clip_mp4.exists()
+
+    def _inspect_frame(ts: float) -> dict:
+        raw_path = tmp_path / f"frame_{ts:.1f}.raw"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss", f"{ts:.2f}",
+                "-i", str(clip_mp4),
+                "-vframes", "1",
+                "-f", "rawvideo",
+                "-pix_fmt", "rgb24",
+                str(raw_path),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        raw_bytes = raw_path.read_bytes()
+        assert len(raw_bytes) == 1080 * 1920 * 3
+
+        yellow_xs: list[int] = []
+        white_count = 0
+        dark_box_count = 0
+        # Região Safe Zone das legendas (Y ~ 1030..1250)
+        for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
+            for x in range(120, 960):
+                idx = (y * 1080 + x) * 3
+                r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+                if r <= 25 and g <= 25 and b <= 25:
+                    dark_box_count += 1
+                elif r > 180 and g > 140 and b < 90 and (r - b) > 100:
+                    yellow_xs.append(x)
+                elif r > 190 and g > 190 and b > 190:
+                    white_count += 1
+
+        # Agrupa coordenadas X de pixels amarelos separadas por mais de 35px para checar exclusividade de 1 palavra
+        clusters = 0
+        if yellow_xs:
+            sorted_x = sorted(set(yellow_xs))
+            clusters = 1
+            for k in range(1, len(sorted_x)):
+                if sorted_x[k] - sorted_x[k - 1] > 35:
+                    clusters += 1
+
+        return {
+            "yellow_count": len(yellow_xs),
+            "yellow_cx": (sum(yellow_xs) / len(yellow_xs)) if yellow_xs else None,
+            "yellow_clusters": clusters,
+            "white_count": white_count,
+            "dark_box_count": dark_box_count,
+        }
+
+    f_word1 = _inspect_frame(0.3)
+    f_word2 = _inspect_frame(0.8)
+    f_pause = _inspect_frame(1.2)
+    f_word3 = _inspect_frame(1.6)
+
+    for label, stats in [("t=0.3s", f_word1), ("t=0.8s", f_word2), ("t=1.2s(pausa)", f_pause), ("t=1.6s", f_word3)]:
+        assert stats["dark_box_count"] > 1000, f"Caixa preta ausente/instável em {label}: {stats}"
+        assert stats["white_count"] > 100, f"Texto branco ausente em {label}: {stats}"
+
+    for label, stats in [("Você", f_word1), ("não", f_word2), ("sabia.", f_word3)]:
+        assert stats["yellow_count"] > 40, f"Palavra ativa '{label}' sem destaque amarelo: {stats}"
+        assert stats["yellow_clusters"] == 1, f"Esperado apenas 1 aglomerado amarelo em '{label}': {stats}"
+
+    assert f_pause["yellow_count"] == 0, f"Pausa t=1.2s deve estar 100% em branco (zero amarelo): {f_pause}"
+    assert f_word1["yellow_cx"] < f_word2["yellow_cx"] < f_word3["yellow_cx"], (
+        f"Centroide amarelo deve avançar para a direita: {f_word1['yellow_cx']} < {f_word2['yellow_cx']} < {f_word3['yellow_cx']}"
+    )
+
+
+
 
 

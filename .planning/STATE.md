@@ -6,17 +6,17 @@ current_phase: 13
 current_phase_name: Validação Técnica Automatizada e Inspeção Audiovisual E2E
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 complete, ready to plan Phase 13
-last_updated: "2026-11-14T00:45:00.137Z"
-last_activity: 2026-11-13
-state_head: a3f610f525a51c53322d324308afbac0351afe39
+stopped_at: Phase 13.1 complete, ready to plan Phase 13
+last_updated: "2026-11-17T07:05:05.619Z"
+last_activity: 2026-11-17
+last_activity_desc: Phase 13.1 complete, transitioned to Phase 13
+state_head: adfdf50e557ee76bd104d21f3ab5974d187803b7
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 13
-  completed_plans: 12
-  percent: 75
-last_activity_desc: Phase 14 complete, transitioned to Phase 13
+  total_phases: 9
+  completed_phases: 7
+  total_plans: 15
+  completed_plans: 13
+  percent: 78
 ---
 
 # Project State
@@ -26,7 +26,7 @@ last_activity_desc: Phase 14 complete, transitioned to Phase 13
 See: [.planning/PROJECT.md](file:///.planning/PROJECT.md) (updated 2026-11-06)
 
 **Core value:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.  
-**Current focus:** Phase 13 — Validação Técnica Automatizada e Inspeção Audiovisual E2E
+**Current focus:** Phase 13.1 — Word-by-Word Karaoke Captions
 
 ## Current Position
 
@@ -34,9 +34,9 @@ Phase: 13 — Validação Técnica Automatizada e Inspeção Audiovisual E2E
 Current Plan: Not started
 Total Plans in Phase: 2
 Status: Ready to plan
-Last activity: 2026-11-13
+Last activity: 2026-11-17 — Phase 13.1 complete, transitioned to Phase 13
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -97,6 +97,10 @@ Progress: [████████░░] 75%
 - [Phase 12-refatoracao-do-video-composer-ffmpeg-e-integracao]: Preservação integral da assinatura pública StudioService.produce(self, db: Session, run_id: str, script: Script) -> Asset e persistência atômica dos 3 assets ('audio', 'avatar', 'final_video')
 - [Phase 12-refatoracao-do-video-composer-ffmpeg-e-integracao]: Ordenação de camadas FFmpeg mantida: base [0:v] -> overlay avatar PIP [1:v] -> legendas ASS com caixa opaca [composed] -> saída [vout] com -shortest
 
+### Roadmap Evolution
+
+- Phase 13.1 inserted after Phase 13: Word-by-Word Karaoke Captions (URGENT)
+
 ## Accumulated Context
 
 ### Decisions
@@ -148,5 +152,5 @@ None yet.
 ## Session
 
 **Last session:** 2026-11-12T03:10:35.498Z
-**Stopped at:** Phase 14 complete, ready to plan Phase 13
+**Stopped at:** Phase 13.1 complete, ready to plan Phase 13
 **Resume file:** None

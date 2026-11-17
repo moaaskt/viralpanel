@@ -13,6 +13,127 @@ from viralpanel.config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def compute_file_sha256(path: Path) -> str:
+    """Calcula o hash SHA-256 de um arquivo em blocos de 64KB."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as file_handle:
+        while chunk := file_handle.read(65536):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _normalize_sha256(value: str | None) -> str | None:
+    if value is None or not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if cleaned.startswith("sha256:"):
+        cleaned = cleaned[len("sha256:") :]
+    return cleaned.lower()
+
+
+def load_and_validate_word_timestamps(
+    sidecar_path: Path,
+    expected_text: str | None = None,
+    expected_duration: float | None = None,
+    expected_audio_path: Path | None = None,
+) -> list[dict] | None:
+    """Valida e carrega timestamps de fala de um arquivo sidecar .words.json.
+
+    Verifica integridade estrutural, text_hash, audio_hash e coerência de duração.
+    Retorna None com log de aviso se qualquer validação falhar, acionando fallback proporcional.
+    """
+    sidecar = Path(sidecar_path)
+    if not sidecar.is_file():
+        return None
+
+    try:
+        raw_text = sidecar.read_text(encoding="utf-8")
+        if not raw_text.strip():
+            logger.warning("Sidecar %s está vazio. Acionando fallback proporcional.", sidecar)
+            return None
+        data = json.loads(raw_text)
+    except Exception as exc:
+        logger.warning("Erro ao ler sidecar %s: %s. Acionando fallback proporcional.", sidecar, exc)
+        return None
+
+    if isinstance(data, list):
+        timestamps = data
+        stored_duration = None
+        stored_text_hash = None
+        stored_audio_hash = None
+    elif isinstance(data, dict):
+        timestamps = data.get("timestamps")
+        stored_duration = data.get("audio_duration_sec")
+        stored_text_hash = _normalize_sha256(data.get("text_hash"))
+        stored_audio_hash = _normalize_sha256(data.get("audio_hash"))
+    else:
+        logger.warning("Sidecar %s possui formato JSON inválido. Acionando fallback proporcional.", sidecar)
+        return None
+
+    if not isinstance(timestamps, list) or len(timestamps) == 0:
+        logger.warning("Sidecar %s possui lista de timestamps vazia ou inválida. Acionando fallback proporcional.", sidecar)
+        return None
+
+    if expected_text is not None and stored_text_hash is not None:
+        expected_text_hash = hashlib.sha256(expected_text.encode("utf-8")).hexdigest().lower()
+        if stored_text_hash != expected_text_hash:
+            logger.warning(
+                "Sidecar %s possui text_hash divergente do roteiro esperado. "
+                "Descartando sidecar e acionando fallback proporcional.",
+                sidecar,
+            )
+            return None
+
+    if expected_audio_path is not None and stored_audio_hash is not None:
+        audio_p = Path(expected_audio_path)
+        if audio_p.is_file():
+            actual_audio_hash = compute_file_sha256(audio_p).lower()
+            if stored_audio_hash != actual_audio_hash:
+                logger.warning(
+                    "Sidecar %s possui audio_hash divergente do áudio real. "
+                    "Descartando sidecar e acionando fallback proporcional.",
+                    sidecar,
+                )
+                return None
+
+    if expected_duration is not None and stored_duration is not None:
+        try:
+            dur_diff = abs(float(expected_duration) - float(stored_duration))
+        except (TypeError, ValueError):
+            logger.warning("Sidecar %s possui audio_duration_sec inválido. Acionando fallback.", sidecar)
+            return None
+        if dur_diff > 0.15:
+            logger.warning(
+                "Divergência temporal excessiva no sidecar %s (%.3fs vs %.3fs). "
+                "Descartando sidecar e acionando fallback proporcional.",
+                sidecar,
+                float(stored_duration),
+                float(expected_duration),
+            )
+            return None
+
+    validated: list[dict] = []
+    for item in timestamps:
+        if not isinstance(item, dict):
+            logger.warning("Item inválido no sidecar %s. Acionando fallback.", sidecar)
+            return None
+        if "word" not in item or "start" not in item or "end" not in item:
+            logger.warning("Campos obrigatórios ausentes em item do sidecar %s. Acionando fallback.", sidecar)
+            return None
+        try:
+            start_val = float(item["start"])
+            end_val = float(item["end"])
+        except (TypeError, ValueError):
+            logger.warning("Timestamps não numéricos no sidecar %s. Acionando fallback.", sidecar)
+            return None
+        if start_val < 0.0 or end_val <= start_val:
+            logger.warning("Intervalo temporal inválido no sidecar %s (%s..%s). Acionando fallback.", sidecar, start_val, end_val)
+            return None
+        validated.append(item)
+
+    return validated
+
+
 def probe_duration(media_path: Path) -> float:
     """Retorna a duração em segundos de um arquivo de áudio/vídeo usando ffprobe."""
     if not media_path.exists():
@@ -39,6 +160,8 @@ def probe_duration(media_path: Path) -> float:
 
 
 class BaseVoiceSynthesizer(ABC):
+    last_word_timestamps: list[dict] | None = None
+
     @abstractmethod
     def synthesize(
         self,
@@ -63,6 +186,7 @@ class XTTSVoiceSynthesizer(BaseVoiceSynthesizer):
         self.language = language
         self.default_speaker_wav = Path(default_speaker_wav) if default_speaker_wav else None
         self._tts = None
+        self.last_word_timestamps: list[dict] | None = None
 
     def _load(self):
         if self._tts is None:
@@ -77,6 +201,8 @@ class XTTSVoiceSynthesizer(BaseVoiceSynthesizer):
         output_path: Path,
         speaker_wav: Path | None = None,
     ) -> tuple[Path, float]:
+        self.last_word_timestamps = None
+        output_path.with_suffix(".words.json").unlink(missing_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         ref_wav = speaker_wav or self.default_speaker_wav
         tts = self._load()
@@ -94,6 +220,7 @@ class MockVoiceSynthesizer(BaseVoiceSynthesizer):
         self.words_per_second = words_per_second
         self.min_duration = min_duration
         self.max_duration = max_duration
+        self.last_word_timestamps: list[dict] | None = None
 
     def estimate_duration(self, text: str) -> float:
         words = max(len(text.split()), 1)
@@ -106,6 +233,8 @@ class MockVoiceSynthesizer(BaseVoiceSynthesizer):
         output_path: Path,
         speaker_wav: Path | None = None,
     ) -> tuple[Path, float]:
+        self.last_word_timestamps = None
+        output_path.with_suffix(".words.json").unlink(missing_ok=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         duration = self.estimate_duration(text)
         if shutil.which("ffmpeg"):
@@ -141,6 +270,7 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
         settings = get_settings()
         self.voice = voice or settings.edge_tts_voice
         self.rate = rate or settings.edge_tts_rate
+        self.last_word_timestamps: list[dict] | None = None
 
     def synthesize(
         self,
@@ -150,19 +280,45 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
     ) -> tuple[Path, float]:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         temp_mp3 = output_path.with_suffix(".edge.temp.mp3")
+        sidecar_path = output_path.with_suffix(".words.json")
+
+        # Limpeza preemptiva para impedir reuso de estado ou sidecar obsoleto
+        self.last_word_timestamps = None
+        sidecar_path.unlink(missing_ok=True)
+        word_timestamps: list[dict] = []
+
         try:
             import edge_tts
 
             async def _run():
-                communicate = edge_tts.Communicate(text, self.voice, rate=self.rate)
-                await communicate.save(str(temp_mp3))
+                communicate = edge_tts.Communicate(
+                    text,
+                    self.voice,
+                    rate=self.rate,
+                    boundary="WordBoundary",
+                )
+                with open(temp_mp3, "wb") as mp3_file:
+                    async for chunk in communicate.stream():
+                        chunk_type = chunk.get("type")
+                        if chunk_type == "audio":
+                            mp3_file.write(chunk["data"])
+                        elif chunk_type == "WordBoundary":
+                            start_sec = float(chunk["offset"]) / 10_000_000.0
+                            dur_sec = float(chunk["duration"]) / 10_000_000.0
+                            end_sec = start_sec + dur_sec
+                            word_timestamps.append({
+                                "word": str(chunk["text"]),
+                                "start": round(start_sec, 4),
+                                "end": round(end_sec, 4),
+                                "duration": round(dur_sec, 4),
+                            })
 
             asyncio.run(_run())
 
             if not shutil.which("ffmpeg"):
                 raise RuntimeError("FFmpeg é obrigatório para converter a síntese Edge-TTS MP3 para WAV.")
 
-            if temp_mp3.exists():
+            if temp_mp3.exists() and temp_mp3.stat().st_size > 0:
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -187,6 +343,25 @@ class EdgeTTSVoiceSynthesizer(BaseVoiceSynthesizer):
             duration = probe_duration(output_path)
             if duration <= 0.0:
                 raise RuntimeError(f"FFprobe retornou duração inválida ({duration}s) para {output_path}")
+
+            if word_timestamps:
+                self.last_word_timestamps = word_timestamps
+                metadata = {
+                    "schema_version": "1.0",
+                    "audio_file": output_path.name,
+                    "audio_duration_sec": round(duration, 3),
+                    "audio_hash": compute_file_sha256(output_path),
+                    "text_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                    "word_count": len(word_timestamps),
+                    "timestamps": word_timestamps,
+                }
+                sidecar_path.write_text(
+                    json.dumps(metadata, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            else:
+                logger.warning("Síntese Edge-TTS concluída sem eventos WordBoundary; fallback proporcional será usado.")
+
             return output_path, duration
         finally:
             if temp_mp3.exists():
@@ -212,6 +387,7 @@ class PreSynthesizedVoice(BaseVoiceSynthesizer):
         self.sha256_hash = sha256_hash
         self.expected_text = expected_text.strip()
         self.delivered_copies: list[dict[str, Any]] = []
+        self.last_word_timestamps: list[dict] | None = None
         self._validate_master_wav()
 
     def _validate_master_wav(self) -> None:
@@ -268,11 +444,27 @@ class PreSynthesizedVoice(BaseVoiceSynthesizer):
 
         target = Path(output_path).resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
+        target_sidecar = target.with_suffix(".words.json")
+        target_sidecar.unlink(missing_ok=True)
+        self.last_word_timestamps = None
+
         shutil.copy2(self.master_audio_path, target)
 
         delivered_hash = hashlib.sha256(target.read_bytes()).hexdigest()
         if delivered_hash != self.sha256_hash:
             raise ValueError(f"Corrupção de integridade na entrega do áudio copiado para {target}")
+
+        master_sidecar = self.master_audio_path.with_suffix(".words.json")
+        if master_sidecar.is_file():
+            validated_ts = load_and_validate_word_timestamps(
+                master_sidecar,
+                expected_text=text,
+                expected_duration=self.duration,
+                expected_audio_path=self.master_audio_path,
+            )
+            if validated_ts is not None:
+                shutil.copy2(master_sidecar, target_sidecar)
+                self.last_word_timestamps = validated_ts
 
         self.delivered_copies.append({
             "path": str(target),
@@ -286,6 +478,7 @@ class FallbackVoiceSynthesizer(BaseVoiceSynthesizer):
     """Cadeia de sintetizadores: XTTS v2 (se configurado e com voz de referência) -> Edge-TTS pt-BR -> Mock."""
 
     def __init__(self, synthesizers: list[BaseVoiceSynthesizer] | None = None):
+        self.last_word_timestamps: list[dict] | None = None
         if synthesizers is not None:
             self.synthesizers = synthesizers
         else:
@@ -314,12 +507,14 @@ class FallbackVoiceSynthesizer(BaseVoiceSynthesizer):
         output_path: Path,
         speaker_wav: Path | None = None,
     ) -> tuple[Path, float]:
+        self.last_word_timestamps = None
         errors = []
         for syn in self.synthesizers:
             name = syn.__class__.__name__
             try:
                 logger.info("Tentando síntese de voz com %s...", name)
                 out, dur = syn.synthesize(text, output_path, speaker_wav=speaker_wav)
+                self.last_word_timestamps = getattr(syn, "last_word_timestamps", None)
                 logger.info("Voz sintetizada com sucesso via %s (duração: %.2fs)", name, dur)
                 return out, dur
             except Exception as exc:
