@@ -503,5 +503,156 @@ def test_dialogue_events_contain_single_yellow_word_per_event():
         assert r"\k" not in text_part and r"\kf" not in text_part
 
 
+def test_generate_subtitles_with_word_timestamps_produces_karaoke_events(tmp_path: Path):
+    """generate_subtitles com word_timestamps gera eventos sequenciais sem tags \\k/\\kf."""
+    out_file = tmp_path / "karaoke.ass"
+    timestamps = [
+        {"word": "Você", "start": 0.1, "end": 0.5, "duration": 0.4},
+        {"word": "não", "start": 0.55, "end": 0.9, "duration": 0.35},
+        {"word": "sabia.", "start": 0.95, "end": 1.6, "duration": 0.65},
+    ]
+    config = SubtitleJobConfig(
+        script_text="Você não sabia.",
+        total_duration=2.0,
+        output_path=out_file,
+        word_timestamps=timestamps,
+    )
+
+    result = generate_subtitles(config)
+    assert result == out_file and out_file.exists()
+    content = out_file.read_text(encoding="utf-8")
+    dialogues = [l for l in content.splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogues) == 3
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    for line in dialogues:
+        assert line.count(f"\\c{yellow}") == 1
+        assert r"\k" not in line and r"\kf" not in line
+
+
+def test_generate_subtitles_fallback_when_word_timestamps_none(tmp_path: Path):
+    """generate_subtitles com word_timestamps=None aciona fallback proporcional válido."""
+    out_file = tmp_path / "fallback.ass"
+    config = SubtitleJobConfig(
+        script_text="Foco constante gera transformação diária real.",
+        total_duration=4.0,
+        output_path=out_file,
+        word_timestamps=None,
+    )
+
+    generate_subtitles(config)
+    assert out_file.exists()
+    content = out_file.read_text(encoding="utf-8")
+    dialogues = [l for l in content.splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogues) >= 1
+    assert r"\k" not in content and r"\kf" not in content
+
+
+def test_subtitle_service_wiring_and_sidecar_validation(tmp_path: Path):
+    """StudioService repassa word_timestamps ao SubtitleJobConfig e rejeita sidecar obsoleto."""
+    import hashlib
+    import json
+    import wave
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    from viralpanel.database import Base
+    from viralpanel.models import Script, SourceVideo
+    from viralpanel.storage import StorageManager
+    from viralpanel.studio.avatar import MockAvatarAnimator
+    from viralpanel.studio.renderer import StudioRenderRequest
+    from viralpanel.studio.service import StudioService
+    from viralpanel.studio.voice import BaseVoiceSynthesizer, compute_file_sha256
+
+    def _write_valid_wav(path: Path, seconds: float = 2.0) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(8000)
+            wf.writeframes(b"\x00\x00" * int(8000 * seconds))
+
+    eng = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(eng)
+    factory = sessionmaker(bind=eng, expire_on_commit=False)
+
+    class WordBoundarySpyVoice(BaseVoiceSynthesizer):
+        def __init__(self, emit_timestamps: bool):
+            self.emit_timestamps = emit_timestamps
+            self.last_word_timestamps = None
+
+        def synthesize(self, text, output_path, speaker_wav=None):
+            _write_valid_wav(output_path, seconds=2.0)
+            if self.emit_timestamps:
+                self.last_word_timestamps = [
+                    {"word": "Foco", "start": 0.1, "end": 0.5, "duration": 0.4},
+                    {"word": "total", "start": 0.6, "end": 1.1, "duration": 0.5},
+                    {"word": "agora.", "start": 1.2, "end": 1.8, "duration": 0.6},
+                ]
+            else:
+                self.last_word_timestamps = None
+            return output_path, 2.0
+
+    class DummyRenderer:
+        def render_from_request(self, request: StudioRenderRequest):
+            request.output_path.parent.mkdir(parents=True, exist_ok=True)
+            request.output_path.write_bytes(b"MP4")
+            return request.output_path, 2.0
+
+    with factory() as db:
+        src = SourceVideo(url="https://tiktok.com/@z/1", author="z", score=99.0)
+        db.add(src)
+        db.flush()
+        script = Script(source_video_id=src.id, hook="Foco", script_text="Foco total agora.", version=1)
+        db.add(script)
+        db.commit()
+
+        # Cenário 1: voz com WordBoundary -> 3 eventos karaoke
+        storage = StorageManager(tmp_path / "s1")
+        svc1 = StudioService(
+            voice_synthesizer=WordBoundarySpyVoice(emit_timestamps=True),
+            avatar_animator=MockAvatarAnimator(),
+            renderer=DummyRenderer(),  # type: ignore[arg-type]
+            storage=storage,
+        )
+        svc1.produce(db=db, run_id="run-ts", script=script)
+        ass1 = (tmp_path / "s1" / "runs" / "run-ts" / "assets" / "captions.ass").read_text(encoding="utf-8")
+        assert len([l for l in ass1.splitlines() if l.startswith("Dialogue:")]) == 3
+
+        # Cenário 2: sidecar com text_hash de outro roteiro -> rejeitado -> fallback proporcional (1 cue)
+        storage2 = StorageManager(tmp_path / "s2")
+        bad_run_dir = storage2.get_run_dir("run-bad-sidecar")
+        bad_sidecar = bad_run_dir / "narration.words.json"
+
+        class SidecarOnlyVoice(BaseVoiceSynthesizer):
+            def synthesize(self, text, output_path, speaker_wav=None):
+                _write_valid_wav(output_path, seconds=2.0)
+                bad_sidecar.write_text(
+                    json.dumps({
+                        "schema_version": "1.0",
+                        "audio_duration_sec": 2.0,
+                        "audio_hash": compute_file_sha256(output_path),
+                        "text_hash": hashlib.sha256(b"Outro texto completamente diferente").hexdigest(),
+                        "timestamps": [
+                            {"word": "Outro", "start": 0.0, "end": 0.5},
+                            {"word": "texto", "start": 0.5, "end": 1.0},
+                        ],
+                    }),
+                    encoding="utf-8",
+                )
+                return output_path, 2.0
+
+        svc2 = StudioService(
+            voice_synthesizer=SidecarOnlyVoice(),
+            avatar_animator=MockAvatarAnimator(),
+            renderer=DummyRenderer(),  # type: ignore[arg-type]
+            storage=storage2,
+        )
+        svc2.produce(db=db, run_id="run-bad-sidecar", script=script)
+        ass2 = (bad_run_dir / "captions.ass").read_text(encoding="utf-8")
+        # Fallback proporcional de 3 palavras gera 1 bloco estático com destaque heurístico ("agora")
+        assert len([l for l in ass2.splitlines() if l.startswith("Dialogue:")]) == 1
+
+
+
 
 

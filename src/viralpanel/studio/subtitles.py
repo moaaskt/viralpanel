@@ -501,6 +501,54 @@ def format_ass_dialogue_line(cue: SubtitleCue) -> str:
     return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{formatted_text}"
 
 
+def _segment_words_into_chunks(
+    words: list[str],
+    min_words: int = 3,
+    max_words: int = 5,
+) -> list[list[str]]:
+    """Segmenta palavras do roteiro em blocos rítmicos de 3 a 5 palavras sensíveis à pontuação."""
+    chunks: list[list[str]] = []
+    current_chunk: list[str] = []
+
+    for i, word in enumerate(words):
+        current_chunk.append(word)
+        has_strong_punct = bool(re.search(r"[.!?]+$", word))
+        has_pause_punct = bool(re.search(r"[,;:]+$", word))
+        words_left = len(words) - (i + 1)
+
+        if words_left == 0:
+            break
+
+        next_word = words[i + 1]
+        next_has_strong = bool(re.search(r"[.!?]+$", next_word))
+
+        if len(current_chunk) >= max_words:
+            if next_has_strong and len(current_chunk) < max_words + 2:
+                continue
+            chunks.append(current_chunk)
+            current_chunk = []
+        elif has_strong_punct and len(current_chunk) >= min_words:
+            chunks.append(current_chunk)
+            current_chunk = []
+        elif has_pause_punct and len(current_chunk) >= min_words and words_left >= min_words:
+            chunks.append(current_chunk)
+            current_chunk = []
+        elif has_strong_punct and len(current_chunk) >= 2 and words_left >= min_words:
+            chunks.append(current_chunk)
+            current_chunk = []
+
+    if current_chunk:
+        if len(current_chunk) < min_words and chunks:
+            if len(chunks[-1]) + len(current_chunk) <= max_words + 2:
+                chunks[-1].extend(current_chunk)
+            else:
+                chunks.append(current_chunk)
+        else:
+            chunks.append(current_chunk)
+
+    return chunks if chunks else [words]
+
+
 def split_script_into_cues(
     script_text: str,
     total_duration: float,
@@ -527,52 +575,15 @@ def split_script_into_cues(
         ]
 
     # 1. Segmentação em blocos rítmicos orientados a pontuação
-    chunks: list[list[str]] = []
-    current_chunk: list[str] = []
-
-    for i, word in enumerate(words):
-        current_chunk.append(word)
-        has_strong_punct = bool(re.search(r"[.!?]+$", word))
-        has_pause_punct = bool(re.search(r"[,;:]+$", word))
-        words_left = len(words) - (i + 1)
-
-        if words_left == 0:
-            break
-
-        # Próxima palavra tem pontuação forte ou moderada?
-        next_word = words[i + 1]
-        next_has_strong = bool(re.search(r"[.!?]+$", next_word))
-
-        if len(current_chunk) >= max_words:
-            # Se a próxima palavra fecha uma frase imediatamente e o chunk ainda cabe com +1, junta
-            if next_has_strong and len(current_chunk) < max_words + 2:
-                continue
-            chunks.append(current_chunk)
-            current_chunk = []
-        elif has_strong_punct and len(current_chunk) >= min_words:
-            chunks.append(current_chunk)
-            current_chunk = []
-        elif has_pause_punct and len(current_chunk) >= min_words and words_left >= min_words:
-            chunks.append(current_chunk)
-            current_chunk = []
-        elif has_strong_punct and len(current_chunk) >= 2 and words_left >= min_words:
-            chunks.append(current_chunk)
-            current_chunk = []
-
-    if current_chunk:
-        if len(current_chunk) < min_words and chunks:
-            if len(chunks[-1]) + len(current_chunk) <= max_words + 2:
-                chunks[-1].extend(current_chunk)
-            else:
-                chunks.append(current_chunk)
-        else:
-            chunks.append(current_chunk)
-
-    if not chunks:
-        chunks = [words]
+    chunks = _segment_words_into_chunks(words, min_words=min_words, max_words=max_words)
 
     # 2. Alinhamento temporal com word_timestamps (quando disponível)
-    if word_timestamps and len(word_timestamps) >= len(words):
+    if word_timestamps:
+        aligned_ts = (
+            word_timestamps
+            if len(word_timestamps) >= len(words)
+            else align_words_with_timestamps(words, word_timestamps, total_duration=total_duration)
+        )
         logger.info(
             "Alinhando cues com word timestamps explícitos (timing_mode='word_timestamp_aligned')"
         )
@@ -582,11 +593,11 @@ def split_script_into_cues(
 
         for chunk_idx, chunk in enumerate(chunks):
             chunk_len = len(chunk)
-            chunk_ts = word_timestamps[word_idx : word_idx + chunk_len]
+            chunk_ts = aligned_ts[word_idx : word_idx + chunk_len]
             word_idx += chunk_len
 
-            start = chunk_ts[0].get("start", current_start)
-            end = chunk_ts[-1].get("end", start + 1.0)
+            start = float(chunk_ts[0].get("start", current_start))
+            end = float(chunk_ts[-1].get("end", start + 1.0))
 
             # Manter contiguidade estrita
             start = round(max(start, current_start), 2)
@@ -683,17 +694,48 @@ def write_ass_subtitles(cues: list[SubtitleCue], output_path: Path) -> Path:
 
 def generate_subtitles(config: SubtitleJobConfig) -> Path:
     """Gera o arquivo de legendas .ass estruturado a partir da configuração de job."""
-    cues = split_script_into_cues(
-        script_text=config.script_text,
-        total_duration=config.total_duration,
-        min_words=config.min_words_per_cue,
-        max_words=config.max_words_per_cue,
-        word_timestamps=config.word_timestamps,
-    )
     config.output_path.parent.mkdir(parents=True, exist_ok=True)
     header = build_ass_header(config)
     lines = [header.rstrip()]
-    for cue in cues:
-        lines.append(format_ass_dialogue_line(cue))
+
+    words = [w.strip() for w in config.script_text.replace("\n", " ").split() if w.strip()]
+    if words and config.word_timestamps:
+        aligned_words = align_words_with_timestamps(
+            words,
+            config.word_timestamps,
+            total_duration=config.total_duration,
+        )
+        chunks = _segment_words_into_chunks(
+            words,
+            min_words=config.min_words_per_cue,
+            max_words=config.max_words_per_cue,
+        )
+        yellow_ass = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+        white_ass = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+
+        word_offset = 0
+        for chunk in chunks:
+            chunk_len = len(chunk)
+            cue_words = aligned_words[word_offset : word_offset + chunk_len]
+            word_offset += chunk_len
+            lines.extend(
+                generate_word_karaoke_dialogue_events(
+                    cue_words=cue_words,
+                    yellow_ass_color=yellow_ass,
+                    white_ass_color=white_ass,
+                    total_audio_duration=config.total_duration,
+                )
+            )
+    else:
+        cues = split_script_into_cues(
+            script_text=config.script_text,
+            total_duration=config.total_duration,
+            min_words=config.min_words_per_cue,
+            max_words=config.max_words_per_cue,
+            word_timestamps=config.word_timestamps,
+        )
+        for cue in cues:
+            lines.append(format_ass_dialogue_line(cue))
+
     config.output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config.output_path
