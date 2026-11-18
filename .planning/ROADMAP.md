@@ -137,7 +137,7 @@ Plans:
 
 ### Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)
 
-**Goal:** Implementar a composição visual "Cinematic Backdrop & Stage 9:16" no `ReactionVideoRenderer`, preservando 100% da área do footage original (sem cortes laterais destrutivos) através de foreground nítido e background ampliado com desfoque e escurecimento, reposicionar as legendas dinâmicas no terço inferior ($MarginV \approx 420$) com reserva de margem horizontal ($MarginR \ge 380$) para desvio do mascote, calibrar o avatar contra a safe zone de botões de engajamento mobile e estabelecer testes geométricos de não-sobreposição.
+**Goal:** Implementar a composição visual "Cinematic Backdrop & Stage 9:16" no `ReactionVideoRenderer`, preservando 100% da área do footage original (sem cortes laterais destrutivos) através de foreground dinâmico nítido e background ampliado com desfoque e escurecimento, reposicionar as legendas dinâmicas no terço inferior ($MarginV \approx 420$) com reserva de margem horizontal configurável ($MarginR \ge 440$) garantindo separação física estrita de no mínimo 24px com contorno em relação ao mascote ($X \ge 680$), calibrar o avatar contra a safe zone de botões de engajamento mobile ($X \le 940$), especificar composições para Landscape, Portrait e Square/4:5, e validar visualmente com footage real.
 **Requirements**: COMP-04, COMP-05, SUB-04, AVTR-04, QUAL-03
 **Depends on:** Phase 13.1
 **Plans:** 1 plan

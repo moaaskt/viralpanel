@@ -9,7 +9,7 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 - [x] **SUB-01**: Eliminação definitiva de qualquer duplicação de legendas e unificação clara de responsabilidades entre transcrição, formatação de legenda e renderizador.
 - [x] **SUB-02**: Sincronização temporal milimétrica com a locução gerada (XTTS/Voice), garantindo que as palavras acompanhem a cadência do áudio.
 - [x] **SUB-03**: Estilização visual no padrão ZUNTO! com tipografia marcante de alta legibilidade para mobile, quebra inteligente de linhas e destaque de palavras-chave.
-- [ ] **SUB-04**: Reposicionamento das legendas dinâmicas no terço inferior ($MarginV \approx 420$) com margens assimétricas ($MarginR \ge 380$, $MarginL \ge 80$) para desvio físico do mascote e respeito às safe zones mobile.
+- [ ] **SUB-04**: Reposicionamento das legendas dinâmicas no terço inferior ($MarginV \approx 420$) com margens assimétricas configuráveis ($MarginR \ge 440$, $MarginL \ge 80$, garantindo folga com contorno/padding) para desvio físico do mascote e respeito às safe zones mobile.
 
 ### Composição do Avatar (AVTR)
 
@@ -40,7 +40,7 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 - [ ] **QUAL-01**: Validador técnico automatizado pós-renderização que inspeciona dimensões exatas (1080x1920), aspect ratio (9:16), duração, streams A/V e integridade do arquivo.
 - [ ] **QUAL-02**: Testes de regressão audiovisual ponta a ponta com geração de vídeos reais inspecionados visualmente (ausência de legendas duplicadas, artefatos no avatar e safe zones).
-- [ ] **QUAL-03**: Critérios multidimensionais de qualidade de vídeo e teste geométrico determinístico de não-sobreposição entre bounding box de legendas e avatar.
+- [ ] **QUAL-03**: Critérios contextuais de qualidade de vídeo (bpp informativo priorizando stream de vídeo) e teste geométrico determinístico de não-sobreposição com contorno entre legendas e avatar.
 
 ### Coleta e Scraper (DISC)
 
