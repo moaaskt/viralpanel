@@ -2,10 +2,12 @@ from pathlib import Path
 import pytest
 
 from viralpanel.branding import (
+    ResolvedFont,
     SafeZones9x16,
     ZuntoPalette,
     ZuntoTypography,
     hex_to_ass_color,
+    resolve_typography_font,
 )
 from viralpanel.studio.subtitles import (
     SubtitleCue,
@@ -34,8 +36,13 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
     assert config.brand_style == "ZUNTO"
     assert config.max_words_per_cue == 5
     assert config.min_words_per_cue == 3
-    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 690
-    assert config.margin_v == 690
+    assert config.margin_l == SafeZones9x16.SUBTITLE_MARGIN_LEFT  # 80
+    assert config.margin_l == 80
+    assert config.margin_r == SafeZones9x16.SUBTITLE_MARGIN_RIGHT  # 440
+    assert config.margin_r == 440
+    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 420
+    assert config.margin_v == 420
+    assert config.resolved_font is None
     assert config.box_padding == 16
     assert config.font_size == ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
     assert config.font_name == ZuntoTypography.PRIMARY_FONT  # Montserrat
@@ -45,7 +52,7 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
 
 
 def test_ass_header_zunto_style():
-    """Valida que o cabeçalho ASS possui BorderStyle=3, MarginV=690 e cores ZUNTO!."""
+    """Valida que o cabeçalho ASS possui BorderStyle=3, margens assimétricas (80,440,420) e cores ZUNTO!."""
     header = build_ass_header()
 
     assert "PlayResX: 1080" in header
@@ -66,21 +73,8 @@ def test_ass_header_zunto_style():
     assert len(style_lines) == 1
     style = style_lines[0]
 
-    # Style: Default,Montserrat,64,&H00FFFFFF,&H0015CCFA,&H000A0A0A,&H000A0A0A,-1,0,0,0,100,100,0,0,3,16,0,2,80,80,640,1
+    # Style: Default,Montserrat,64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,80,440,420,1
     tokens = style.replace("Style: ", "").split(",")
-    # Formato dos campos:
-    # 0: Name (Default)
-    # 1: Fontname (Montserrat)
-    # 2: Fontsize (64)
-    # 3: PrimaryColour (&H00FFFFFF&)
-    # 4: SecondaryColour (&H0015CCFA&)
-    # 5: OutlineColour (&H000A0A0A&)
-    # 6: BackColour (&H000A0A0A&)
-    # 15: BorderStyle (3)
-    # 16: Outline (16)
-    # 17: Shadow (0)
-    # 18: Alignment (2)
-    # 21: MarginV (690)
     assert tokens[0] == "Default"
     assert tokens[2] == "64"
     assert tokens[3] == expected_primary
@@ -91,7 +85,9 @@ def test_ass_header_zunto_style():
     assert tokens[16] == "16"  # Outline=16 (padding)
     assert tokens[17] == "0"  # Shadow=0
     assert tokens[18] == "2"  # Alignment=2 (Bottom-center)
-    assert tokens[21] == "690"  # MarginV=690
+    assert tokens[19] == "80"  # MarginL=80
+    assert tokens[20] == "440"  # MarginR=440
+    assert tokens[21] == "420"  # MarginV=420
 
 
 def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
@@ -113,7 +109,10 @@ def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
     assert "PlayResY: 1920" in content
     assert "[V4+ Styles]" in content
     assert "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV" in content
-    assert f",3,16,0,2,80,80,{SafeZones9x16.SUBTITLE_MARGIN_V},1" in content
+    assert (
+        f",3,16,0,2,{SafeZones9x16.SUBTITLE_MARGIN_LEFT},"
+        f"{SafeZones9x16.SUBTITLE_MARGIN_RIGHT},{SafeZones9x16.SUBTITLE_MARGIN_V},1"
+    ) in content
     assert "Dialogue: 0," in content
 
 
@@ -651,6 +650,67 @@ def test_subtitle_service_wiring_and_sidecar_validation(tmp_path: Path):
         ass2 = (bad_run_dir / "captions.ass").read_text(encoding="utf-8")
         # Fallback proporcional de 3 palavras gera 1 bloco estático com destaque heurístico ("agora")
         assert len([l for l in ass2.splitlines() if l.startswith("Dialogue:")]) == 1
+
+
+def test_ass_header_contains_asymmetric_margins():
+    """Valida que build_ass_header emite Alignment=2, MarginL=80, MarginR=440, MarginV=420."""
+    header = build_ass_header()
+    assert ",2,80,440,420,1" in header
+
+
+def test_subtitle_job_config_custom_margins(tmp_path: Path):
+    """Valida que customizações em margin_l, margin_r e margin_v são refletidas no arquivo .ass."""
+    out = tmp_path / "custom_margins.ass"
+    config = SubtitleJobConfig(
+        script_text="Margens customizadas em produção.",
+        total_duration=3.0,
+        output_path=out,
+        margin_l=96,
+        margin_r=460,
+        margin_v=435,
+    )
+    generate_subtitles(config)
+    content = out.read_text(encoding="utf-8")
+    assert ",2,96,460,435,1" in content
+
+
+def test_build_ass_header_derives_font_name_from_resolved_font(tmp_path: Path):
+    """Valida sincronização determinística do Fontname ASS com ResolvedFont e resolve_typography_font()."""
+    resolved_default = resolve_typography_font()
+    header_default = build_ass_header()
+    assert f"Style: Default,{resolved_default.font_name}," in header_default
+
+    # Mesmo passando font_name desacoplado, build_ass_header deriva do resolved_font/resolve_typography_font
+    custom_ttf = tmp_path / "DejaVuSans-Bold.ttf"
+    custom_ttf.write_bytes(b"DUMMY")
+    custom_resolved = ResolvedFont(
+        font_path=custom_ttf,
+        fonts_dir=tmp_path,
+        font_name="DejaVu Sans",
+        variant="dejavu_sans",
+    )
+    cfg = SubtitleJobConfig(
+        script_text="Teste de fonte resolvida.",
+        total_duration=2.0,
+        output_path=tmp_path / "out.ass",
+        font_name="Arial",
+        resolved_font=custom_resolved,
+    )
+    assert cfg.font_name == "DejaVu Sans"
+    header_custom = build_ass_header(cfg)
+    assert "Style: Default,DejaVu Sans," in header_custom
+
+    # Sem resolved_font explícito, string estática arbitrária não prevalece sobre resolve_typography_font()
+    cfg_uncoupled = SubtitleJobConfig(
+        script_text="Teste sem bypass.",
+        total_duration=2.0,
+        output_path=tmp_path / "out2.ass",
+        font_name="Comic Sans MS",
+    )
+    header_uncoupled = build_ass_header(cfg_uncoupled)
+    assert f"Style: Default,{resolved_default.font_name}," in header_uncoupled
+    assert "Comic Sans MS" not in header_uncoupled
+
 
 
 

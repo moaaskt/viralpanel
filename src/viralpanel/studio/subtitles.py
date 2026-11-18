@@ -7,10 +7,12 @@ from typing import Final, Literal
 from pydantic import BaseModel, Field
 
 from viralpanel.branding import (
+    ResolvedFont,
     SafeZones9x16,
     ZuntoPalette,
     ZuntoTypography,
     hex_to_ass_color,
+    resolve_typography_font,
 )
 
 logger = logging.getLogger(__name__)
@@ -285,7 +287,7 @@ class SubtitleCue(BaseModel):
 
 @dataclass(frozen=True)
 class SubtitleJobConfig:
-    """Configuração de geração e estilização do arquivo ASS (Phase 10)."""
+    """Configuração de geração e estilização do arquivo ASS (Phase 10 / Phase 13.2)."""
 
     script_text: str
     total_duration: float
@@ -295,23 +297,38 @@ class SubtitleJobConfig:
     min_words_per_cue: int = 3
     play_res_x: int = SafeZones9x16.WIDTH
     play_res_y: int = SafeZones9x16.HEIGHT
-    margin_v: int = SafeZones9x16.SUBTITLE_MARGIN_V  # 690
+    margin_l: int = SafeZones9x16.SUBTITLE_MARGIN_LEFT
+    margin_r: int = SafeZones9x16.SUBTITLE_MARGIN_RIGHT
+    margin_v: int = SafeZones9x16.SUBTITLE_MARGIN_V
     box_padding: int = 16  # Outline no BorderStyle=3
     font_size: int = ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
     font_name: str = ZuntoTypography.PRIMARY_FONT  # Montserrat
     fallback_font: str = ZuntoTypography.FALLBACK_FONT  # DejaVu Sans
+    resolved_font: ResolvedFont | None = None
     timing_mode: str = "proportional_character_estimate"
     word_timestamps: list[dict] | None = None
+
+    def __post_init__(self) -> None:
+        if self.resolved_font is not None:
+            object.__setattr__(self, "font_name", self.resolved_font.font_name)
 
 
 def build_ass_header(config: SubtitleJobConfig | None = None) -> str:
     """Gera o cabeçalho e estilos ASS v4+ segundo a configuração e branding ZUNTO!."""
     play_res_x = config.play_res_x if config else SafeZones9x16.WIDTH
     play_res_y = config.play_res_y if config else SafeZones9x16.HEIGHT
+    margin_l = config.margin_l if config else SafeZones9x16.SUBTITLE_MARGIN_LEFT
+    margin_r = config.margin_r if config else SafeZones9x16.SUBTITLE_MARGIN_RIGHT
     margin_v = config.margin_v if config else SafeZones9x16.SUBTITLE_MARGIN_V
     box_padding = config.box_padding if config else 16
     font_size = config.font_size if config else ZuntoTypography.SUBTITLE_FONT_SIZE
-    font_name = config.font_name if config else ZuntoTypography.PRIMARY_FONT
+
+    resolved = (
+        config.resolved_font
+        if (config is not None and config.resolved_font is not None)
+        else resolve_typography_font()
+    )
+    font_name = resolved.font_name
 
     primary_color = hex_to_ass_color(ZuntoPalette.PURE_WHITE)       # &H00FFFFFF&
     box_color = hex_to_ass_color(ZuntoPalette.DEEP_BLACK)           # &H000A0A0A&
@@ -320,7 +337,7 @@ def build_ass_header(config: SubtitleJobConfig | None = None) -> str:
     style_line = (
         f"Style: Default,{font_name},{font_size},"
         f"{primary_color},{secondary_color},{box_color},{box_color},"
-        f"-1,0,0,0,100,100,0,0,3,{box_padding},0,2,80,80,{margin_v},1"
+        f"-1,0,0,0,100,100,0,0,3,{box_padding},0,2,{margin_l},{margin_r},{margin_v},1"
     )
 
     return f"""[Script Info]
