@@ -6,10 +6,10 @@ import logging
 from pathlib import Path
 import shutil
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 import uuid
 
-from viralpanel.branding import SafeZones9x16
+from viralpanel.branding import FontResolutionError, SafeZones9x16, resolve_typography_font
 from viralpanel.studio.voice import probe_duration
 
 if TYPE_CHECKING:
@@ -115,6 +115,130 @@ def has_video_stream(media_path: Path) -> bool:
         return False
 
 
+def classify_stage_strategy(
+    source_width: int,
+    source_height: int,
+) -> Literal["landscape", "square", "portrait"]:
+    """Classifica deterministicamente a estratégia de composição conforme o Aspect Ratio."""
+    if source_width <= 0 or source_height <= 0:
+        raise ValueError(
+            f"Dimensões da fonte devem ser positivas: {source_width}x{source_height}"
+        )
+    ar = source_width / source_height
+    if ar >= 1.25:
+        return "landscape"
+    if ar <= 0.75:
+        return "portrait"
+    return "square"
+
+
+def calculate_stage_foreground_dimensions(
+    source_width: int,
+    source_height: int,
+    target_width: int = SafeZones9x16.WIDTH,
+    target_height: int = SafeZones9x16.HEIGHT,
+    max_square_height: int = SafeZones9x16.STAGE_FG_MAX_H,
+) -> tuple[Literal["landscape", "square", "portrait"], int, int]:
+    """Calcula estratégia e dimensões pares do foreground para o stage 9:16."""
+    strategy = classify_stage_strategy(source_width, source_height)
+    ar = source_width / source_height
+
+    if strategy == "landscape":
+        fg_h = max(2, int(round(target_width / ar / 2) * 2))
+        return strategy, target_width, fg_h
+
+    if strategy == "portrait":
+        return strategy, target_width, target_height
+
+    # Square / 4:5 / 5:4 (0.75 < AR < 1.25) confinado em target_width x max_square_height
+    if ar <= (target_width / max_square_height):
+        fg_h = min(max_square_height, max(2, int((target_width / ar) // 2) * 2))
+        fg_w = min(target_width, max(2, int((fg_h * ar) // 2) * 2))
+    else:
+        fg_h = min(max_square_height, max(2, int((target_width / ar) // 2) * 2))
+        fg_w = min(target_width, max(2, int((fg_h * ar) // 2) * 2))
+    return strategy, fg_w, fg_h
+
+
+def build_reaction_filter_complex(
+    composition: ReactionCompositionSpec,
+    avatar_size: int,
+    escaped_ass: str,
+    source_width: int,
+    source_height: int,
+    has_video: bool,
+    fonts_dir: Path | str | None,
+) -> str:
+    """Constrói grafo de filtros FFmpeg single-pass adaptativo com fontsdir obrigatório (fail-closed)."""
+    if fonts_dir is None or not str(fonts_dir).strip():
+        raise FontResolutionError(
+            "O diretório de fontes fonts_dir é obrigatório para renderização e não pode ser omitido."
+        )
+
+    escaped_fontsdir = (
+        str(Path(fonts_dir).resolve()).replace("\\", "/").replace(":", "\\:")
+    )
+    target_w = composition.target_width
+    target_h = composition.target_height
+
+    avatar_filter = (
+        f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=decrease:flags=lanczos,format=rgba[pip];"
+    )
+    overlay_pip = (
+        f"overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:"
+        f"H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:"
+        f"shortest=1:format=yuv420:alpha=straight[composed];"
+    )
+    ass_filter = f"[composed]ass='{escaped_ass}':fontsdir='{escaped_fontsdir}'[vout]"
+
+    if not has_video:
+        return f"[0:v]setsar=1[bg];{avatar_filter}[bg][pip]{overlay_pip}{ass_filter}"
+
+    strategy = classify_stage_strategy(source_width, source_height)
+
+    if strategy == "landscape":
+        return (
+            f"[0:v]split=2[raw_bg][raw_fg];"
+            f"[raw_bg]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+            f"crop={target_w}:{target_h},"
+            f"boxblur={SafeZones9x16.STAGE_BACKDROP_BLUR},"
+            f"eq=brightness={SafeZones9x16.STAGE_BACKDROP_BRIGHTNESS}:contrast={SafeZones9x16.STAGE_BACKDROP_CONTRAST},"
+            f"setsar=1[bg];"
+            f"[raw_fg]scale={target_w}:-2:flags=lanczos[fg];"
+            f"[bg][fg]overlay=(W-w)/2:{SafeZones9x16.STAGE_FG_Y_TOP}[stage];"
+            f"{avatar_filter}"
+            f"[stage][pip]{overlay_pip}"
+            f"{ass_filter}"
+        )
+
+    if strategy == "square":
+        max_h = SafeZones9x16.STAGE_FG_MAX_H
+        return (
+            f"[0:v]split=2[raw_bg][raw_fg];"
+            f"[raw_bg]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+            f"crop={target_w}:{target_h},"
+            f"boxblur={SafeZones9x16.STAGE_BACKDROP_BLUR},"
+            f"eq=brightness={SafeZones9x16.STAGE_BACKDROP_BRIGHTNESS}:contrast={SafeZones9x16.STAGE_BACKDROP_CONTRAST},"
+            f"setsar=1[bg];"
+            f"[raw_fg]scale=w='min({target_w},trunc({max_h}*a/2)*2)':"
+            f"h='min({max_h},trunc({target_w}/a/2)*2)':"
+            f"force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos[fg];"
+            f"[bg][fg]overlay=(W-w)/2:{SafeZones9x16.STAGE_FG_Y_TOP}[stage];"
+            f"{avatar_filter}"
+            f"[stage][pip]{overlay_pip}"
+            f"{ass_filter}"
+        )
+
+    # Portrait nativo (AR <= 0.75): preenchimento vertical direto (com possível crop de enquadramento)
+    return (
+        f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"crop={target_w}:{target_h},setsar=1[bg];"
+        f"{avatar_filter}"
+        f"[bg][pip]{overlay_pip}"
+        f"{ass_filter}"
+    )
+
+
 class ReactionVideoRenderer:
     """Compõe vídeo vertical 9:16 (1080x1920) com vídeo base, avatar em PIP e legendas ASS."""
 
@@ -148,14 +272,19 @@ class ReactionVideoRenderer:
             return request.output_path, duration
 
         composition = request.composition
+        resolved_font = resolve_typography_font()
+        has_video = has_video_stream(request.source_video_path)
 
-        if has_video_stream(request.source_video_path):
+        if has_video:
             source_inputs = ["-stream_loop", "-1", "-i", str(request.source_video_path)]
+            source_width, source_height = probe_video_dimensions(request.source_video_path)
         else:
             logger.info(
                 "Source %s sem stream de vídeo. Injetando lavfi inline 9:16 diretamente em [0:v].",
                 request.source_video_path,
             )
+            source_width = composition.target_width
+            source_height = composition.target_height
             source_inputs = [
                 "-f",
                 "lavfi",
@@ -167,12 +296,14 @@ class ReactionVideoRenderer:
         escaped_ass = str(request.ass_subtitle_path.resolve()).replace("\\", "/").replace(":", "\\:")
         avatar_size = request.avatar_config.size if request.avatar_config else self.avatar_size
 
-        filter_complex = (
-            f"[0:v]scale={composition.target_width}:{composition.target_height}:force_original_aspect_ratio=increase,"
-            f"crop={composition.target_width}:{composition.target_height},setsar=1[bg];"
-            f"[1:v]scale={avatar_size}:{avatar_size}:force_original_aspect_ratio=decrease:flags=lanczos,format=rgba[pip];"
-            f"[bg][pip]overlay=W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}:H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}:shortest=1:format=yuv420:alpha=straight[composed];"
-            f"[composed]ass='{escaped_ass}'[vout]"
+        filter_complex = build_reaction_filter_complex(
+            composition=composition,
+            avatar_size=avatar_size,
+            escaped_ass=escaped_ass,
+            source_width=source_width,
+            source_height=source_height,
+            has_video=has_video,
+            fonts_dir=resolved_font.fonts_dir,
         )
 
         cmd = [
