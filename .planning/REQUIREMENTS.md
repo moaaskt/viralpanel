@@ -9,18 +9,22 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 - [x] **SUB-01**: Eliminação definitiva de qualquer duplicação de legendas e unificação clara de responsabilidades entre transcrição, formatação de legenda e renderizador.
 - [x] **SUB-02**: Sincronização temporal milimétrica com a locução gerada (XTTS/Voice), garantindo que as palavras acompanhem a cadência do áudio.
 - [x] **SUB-03**: Estilização visual no padrão ZUNTO! com tipografia marcante de alta legibilidade para mobile, quebra inteligente de linhas e destaque de palavras-chave.
+- [ ] **SUB-04**: Reposicionamento das legendas dinâmicas no terço inferior ($MarginV \approx 420$) com margens assimétricas configuráveis ($MarginR \ge 440$, $MarginL \ge 80$, garantindo folga com contorno/padding) para desvio físico do mascote e respeito às safe zones mobile.
 
 ### Composição do Avatar (AVTR)
 
 - [x] **AVTR-01**: Eliminação da aparência de "imagem quadrada" no avatar reaction, tratando recorte e transparência a partir de diagnóstico dos assets reais de forma orgânica.
 - [x] **AVTR-02**: Calibração precisa de posicionamento e dimensionamento no layout vertical 9:16 para evitar que o avatar cubra pontos focais ou legendas essenciais.
 - [x] **AVTR-03**: Preservação de proporção, nitidez, sincronização e qualidade visual na sobreposição do avatar, respeitando a taxa de quadros esperada pelo pipeline.
+- [ ] **AVTR-04**: Calibração do posicionamento e dimensões do avatar reaction contra a safe zone lateral direita de botões de interação das plataformas ($X \le 940\text{ px}$).
 
 ### Refatoração do Renderer (COMP)
 
 - [x] **COMP-01**: Arquitetura modular de renderização FFmpeg em camadas explícitas com composição integrada em grafo de filtros single-pass e codificação final única sempre que tecnicamente viável.
 - [ ] **COMP-02**: Padronização estrita de saída vertical 9:16 em 1080x1920 (Full HD vertical) com sincronização A/V consistente.
 - [ ] **COMP-03**: Compatibilidade integral com os contratos de interface do Celery, tasks assíncronas e esteira de publicação nas APIs oficiais.
+- [ ] **COMP-04**: Composição visual "Cinematic Backdrop & Stage 9:16" preservando 100% da área do footage horizontal através de foreground nítido e background expandido, desfocado e escurecido.
+- [ ] **COMP-05**: Seleção determinística da estratégia de composição por aspect ratio do vídeo de entrada (Landscape 16:9, Portrait 9:16 nativo e Square 1:1/4:5).
 
 ### Identidade Visual ZUNTO! (BRND)
 
@@ -36,6 +40,7 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 
 - [ ] **QUAL-01**: Validador técnico automatizado pós-renderização que inspeciona dimensões exatas (1080x1920), aspect ratio (9:16), duração, streams A/V e integridade do arquivo.
 - [ ] **QUAL-02**: Testes de regressão audiovisual ponta a ponta com geração de vídeos reais inspecionados visualmente (ausência de legendas duplicadas, artefatos no avatar e safe zones).
+- [ ] **QUAL-03**: Critérios contextuais de qualidade de vídeo (bpp informativo priorizando stream de vídeo) e teste geométrico determinístico de não-sobreposição com contorno entre legendas e avatar.
 
 ### Coleta e Scraper (DISC)
 
@@ -76,18 +81,23 @@ Refatoração e aprimoramento do pipeline de geração e composição audiovisua
 | SUB-01 | Phase 8, Phase 10 | Complete |
 | SUB-02 | Phase 10 | Complete |
 | SUB-03 | Phase 10 | Complete |
+| SUB-04 | Phase 13.2 | Planned |
 | AVTR-01 | Phase 8, Phase 11 | Complete |
 | AVTR-02 | Phase 11 | Complete |
 | AVTR-03 | Phase 11 | Complete |
+| AVTR-04 | Phase 13.2 | Planned |
 | COMP-01 | Phase 8, Phase 12 | Mapped |
 | COMP-02 | Phase 12 | Mapped |
 | COMP-03 | Phase 12 | Mapped |
+| COMP-04 | Phase 13.2 | Planned |
+| COMP-05 | Phase 13.2 | Planned |
 | BRND-01 | Phase 9, Phase 10, Phase 12 | Complete |
 | BRND-02 | Phase 9, Phase 11, Phase 12 | Complete |
 | SCRP-01 | Phase 9 | Complete |
 | SCRP-02 | Phase 9 | Complete |
 | QUAL-01 | Phase 13 | Mapped |
 | QUAL-02 | Phase 13 | Mapped |
+| QUAL-03 | Phase 13.2 | Planned |
 | DISC-04 | Phase 14 | Complete |
 | DISC-05 | Phase 14 | Complete |
 | MIGR-01 | Phase 15 | Planned |

@@ -16,6 +16,7 @@
 - [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
 - [x] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** - Active Word Highlight palavra por palavra sincronizado com WordBoundary real da narração (completed 2026-11-17)
+- [ ] **Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)** - Composição visual 9:16 preservando 100% do footage original com fundo desfocado e legendas no terço inferior sem colisão com o mascote
 - [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
 - [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
 
@@ -134,6 +135,19 @@ Plans:
 - [x] 13-01-PLAN.md
 - [ ] 13-02-PLAN.md
 
+### Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)
+
+**Goal:** Implementar a composição visual "Cinematic Backdrop & Stage 9:16" no `ReactionVideoRenderer`, preservando 100% da área do footage original (sem cortes laterais destrutivos) através de foreground dinâmico nítido e background ampliado com desfoque e escurecimento, reposicionar as legendas dinâmicas no terço inferior ($MarginV \approx 420$) com reserva de margem horizontal configurável ($MarginR \ge 440$) garantindo separação física estrita de no mínimo 24px com contorno em relação ao mascote ($X \ge 680$), calibrar o avatar contra a safe zone de botões de engajamento mobile ($X \le 940$), especificar composições para Landscape, Portrait e Square/4:5, e validar visualmente com footage real.
+**Requirements**: COMP-04, COMP-05, SUB-04, AVTR-04, QUAL-03
+**Depends on:** Phase 13.1
+**Plans:** 1 plan
+
+Plans:
+
+**Wave 1:**
+
+- [ ] 13.2-01-PLAN.md — Cinematic Backdrop 9:16, Adaptação por Aspect Ratio, Reposicionamento de Legendas e Calibração de Safe Zones
+
 ### Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)
 
 **Goal:** Implementar legendas dinâmicas Active Word Highlight palavra por palavra sincronizadas com timestamps reais da fala (`WordBoundary`), mantendo branco puro (`#FFFFFF`) para palavras passadas/futuras, amarelo de impacto (`#FACC15`) apenas na palavra pronunciada, continuidade da caixa opaca sem flicker e fallback proporcional.
@@ -156,8 +170,9 @@ Plans:
 | Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
 | Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
 | Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
-| Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | Not started | - |
+| Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | In progress | - |
 | Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
+| Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 0/1 | Planned | - |
 | Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
 | Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
