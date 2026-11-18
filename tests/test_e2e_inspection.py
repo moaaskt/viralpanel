@@ -16,7 +16,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from viralpanel.branding import SafeZones9x16, ZuntoPalette
+from viralpanel.branding import SafeZones9x16, ZuntoPalette, resolve_typography_font
 from viralpanel.cli import main as cli_main
 from viralpanel.database import Base
 from viralpanel.models import Asset, Script, SourceVideo
@@ -407,7 +407,9 @@ def test_avatar_alpha_channel_isolation(tmp_path: Path):
     animator.generate_avatar_video(audio_path, avatar_mov)
     assert avatar_mov.exists()
 
-    # Extrai o frame em rawvideo rgba (300x300x4 = 360.000 bytes)
+    # Extrai o frame em rawvideo rgba
+    size = SafeZones9x16.AVATAR_SIZE
+    center = size // 2
     raw_path = tmp_path / "avatar_frame.raw"
     subprocess.run(
         [
@@ -419,25 +421,24 @@ def test_avatar_alpha_channel_isolation(tmp_path: Path):
         capture_output=True,
     )
     raw_bytes = raw_path.read_bytes()
-    assert len(raw_bytes) == 300 * 300 * 4
+    assert len(raw_bytes) == size * size * 4
 
     def get_rgba(x: int, y: int) -> tuple[int, int, int, int]:
-        idx = (y * 300 + x) * 4
+        idx = (y * size + x) * 4
         return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2], raw_bytes[idx + 3]
 
-    # A) Fora do círculo (hypot > 151.5) nos 4 cantos da caixa 300x300
-    for corner_x, corner_y in [(10, 10), (290, 10), (10, 290), (290, 290)]:
+    # A) Fora do círculo nos 4 cantos da caixa calibrada
+    for corner_x, corner_y in [(10, 10), (size - 10, 10), (10, size - 10), (size - 10, size - 10)]:
         r, g, b, a = get_rgba(corner_x, corner_y)
         assert a == 0, f"Canal alfa em ({corner_x}, {corner_y}) deve ser 0 (transparência total). Obtido: {a}"
         assert (r, g, b) == (0, 0, 0), f"RGB fora do círculo deve ser 0. Obtido: {(r, g, b)}"
 
-    # B) Borda externa de transição suave (antialiasing de 2px, hypot ≈ 150)
-    # Em x=150, y=0 (distância 150):
-    r_edge, g_edge, b_edge, a_edge = get_rgba(150, 0)
+    # B) Borda externa de transição suave (antialiasing de 2px)
+    r_edge, g_edge, b_edge, a_edge = get_rgba(center, 0)
     assert 0 < a_edge <= 255, f"Canal alfa na borda externa deve estar na rampa de antialiasing. Obtido: {a_edge}"
 
-    # C) Dentro do círculo do avatar (hypot < 144)
-    r_in, g_in, b_in, a_in = get_rgba(150, 150)
+    # C) Dentro do círculo do avatar
+    r_in, g_in, b_in, a_in = get_rgba(center, center)
     assert a_in == 255, f"Canal alfa no centro deve ser 255 (opacidade total). Obtido: {a_in}"
 
 
@@ -511,9 +512,17 @@ def test_composed_avatar_transparency_and_no_leak(tmp_path: Path):
         idx = (y * 1080 + x) * 3
         return ref_bytes[idx], ref_bytes[idx + 1], ref_bytes[idx + 2]
 
-    # Avatar bounding box: X=726..1026, Y=1300..1600 (cx=876, cy=1450, r=150)
-    # Cantos da bounding box (distância do centro = hypot(150, 150) = 212px > 151px)
-    corners = [(735, 1310), (1015, 1310), (735, 1590), (1015, 1590)]
+    # Avatar bounding box calibrada: SafeZones9x16 (X=680..940, Y=1360..1620)
+    box_x0 = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
+    box_y0 = SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_BOTTOM
+    box_x1 = box_x0 + SafeZones9x16.AVATAR_SIZE
+    box_y1 = box_y0 + SafeZones9x16.AVATAR_SIZE
+    corners = [
+        (box_x0 + 9, box_y0 + 10),
+        (box_x1 - 11, box_y0 + 10),
+        (box_x0 + 9, box_y1 - 10),
+        (box_x1 - 11, box_y1 - 10),
+    ]
     for x, y in corners:
         comp_rgb = get_comp_rgb(x, y)
         ref_rgb = get_ref_rgb(x, y)
@@ -579,9 +588,12 @@ def test_avatar_yellow_border_integrity_h264(tmp_path: Path):
         idx = (y * 1080 + x) * 3
         return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
 
-    # Centro do avatar no frame 1080x1920: cx=876, cy=1450
-    # Raio médio da borda de 6px (r=144 a 150): r_mid = 147
-    cx, cy, r_mid = 876, 1450, 147
+    # Centro do avatar no frame 1080x1920 conforme SafeZones9x16
+    box_x0 = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
+    box_y0 = SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_BOTTOM
+    cx = box_x0 + SafeZones9x16.AVATAR_SIZE // 2
+    cy = box_y0 + SafeZones9x16.AVATAR_SIZE // 2
+    r_mid = (SafeZones9x16.AVATAR_SIZE / 2.0) - 3.0
     angles_deg = [0, 45, 90, 135, 180, 225, 270, 315]
 
     for deg in angles_deg:
@@ -653,11 +665,14 @@ def test_avatar_no_green_artifacts_synthetic(tmp_path: Path):
         idx = (y * 1080 + x) * 3
         return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
 
-    # Região de interseção do busto do avatar padrão com o waveform:
-    # Avatar Y = 1300..1600. Waveform Y=200..280 (no frame 1080x1920: Y ≈ 1450..1550, X ≈ 780..970)
+    # Região de interseção do busto do avatar padrão com o waveform calibrada via SafeZones9x16
+    box_x0 = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
+    box_y0 = SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_BOTTOM
+    box_x1 = box_x0 + SafeZones9x16.AVATAR_SIZE
+    box_y1 = box_y0 + SafeZones9x16.AVATAR_SIZE
     green_artifact_pixels = []
-    for y in range(1450, 1550, 2):
-        for x in range(780, 970, 2):
+    for y in range(box_y0 + 140, box_y1 - 25, 2):
+        for x in range(box_x0 + 40, box_x1 - 40, 2):
             r, g, b = get_comp_rgb(x, y)
             # Assinatura de artefato verde ZUNTO: G desproporcionalmente dominante sobre R e B
             if g > r * 1.3 and g > b * 1.3 and g > 70:
@@ -670,9 +685,15 @@ def test_avatar_no_green_artifacts_synthetic(tmp_path: Path):
 
 
 def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
-    """Valida empiricamente que legendas com 1, 2, 3 linhas e textos longos preservam distância >= 40px ao avatar e respeitam safe zones."""
+    """Valida empiricamente que legendas no terço inferior preservam separação horizontal >= 24px ao avatar e safe zones."""
     if shutil.which("ffmpeg") is None:
         pytest.skip("FFmpeg necessário para validação de safe zones de legenda")
+
+    resolved_font = resolve_typography_font()
+    escaped_fontsdir = str(resolved_font.fonts_dir).replace("\\", "/").replace(":", "\\:")
+    avatar_left_x = (
+        SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
+    )  # 680
 
     test_cases = [
         ("FOCO TOTAL", "1_linha"),
@@ -686,6 +707,7 @@ def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
             script_text=script_text,
             total_duration=3.0,
             output_path=ass_path,
+            resolved_font=resolved_font,
         )
         generate_subtitles(job_cfg)
         escaped_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
@@ -695,7 +717,7 @@ def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
             [
                 "ffmpeg", "-y", "-f", "lavfi",
                 "-i", "color=c=magenta:s=1080x1920:d=0.1",
-                "-vf", f"ass='{escaped_ass}'",
+                "-vf", f"ass='{escaped_ass}':fontsdir='{escaped_fontsdir}'",
                 "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24",
                 str(raw_path),
             ],
@@ -707,8 +729,8 @@ def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
         # Encontra a caixa opaca preta da legenda (RGB <= 25)
         box_y_coords = []
         box_x_coords = []
-        for y in range(0, 1920, 4):
-            for x in range(0, 1080, 8):
+        for y in range(0, 1920, 2):
+            for x in range(0, 1080, 2):
                 idx = (y * 1080 + x) * 3
                 r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
                 if r <= 25 and g <= 25 and b <= 25:
@@ -719,22 +741,25 @@ def test_subtitle_avatar_clearance_and_multi_line_safe_zones(tmp_path: Path):
         min_y = min(box_y_coords)
         max_y = max(box_y_coords)
         min_x = min(box_x_coords)
+        max_x = max(box_x_coords)
 
-        # 1. Distância ao Avatar (Topo do avatar em Y=1300)
-        avatar_top_y = 1300
-        clearance = avatar_top_y - max_y
-        assert clearance >= 40, (
-            f"Caso {label}: folga vertical até o avatar deve ser >= 40px. "
-            f"Base da legenda: Y={max_y}, Avatar: Y={avatar_top_y}, Folga={clearance}px"
+        # 1. Separação física horizontal estrita até o Avatar (X_avatar_min = 680px, folga >= 24px)
+        horizontal_clearance = avatar_left_x - max_x
+        assert horizontal_clearance >= 24, (
+            f"Caso {label}: folga horizontal até o avatar deve ser >= 24px. "
+            f"Direita da legenda: X={max_x}, Avatar: X={avatar_left_x}, Folga={horizontal_clearance}px"
         )
 
-        # 2. Respeito ao cabeçalho mobile (SafeZone Top >= 220)
+        # 2. Respeito ao cabeçalho e barra inferior mobile
         assert min_y >= SafeZones9x16.TOP_MARGIN, (
             f"Caso {label}: legenda invadiu a safe zone superior. Topo: Y={min_y} < {SafeZones9x16.TOP_MARGIN}"
         )
+        assert max_y <= SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_MARGIN_BOTTOM, (
+            f"Caso {label}: legenda invadiu a safe zone inferior. Base: Y={max_y}"
+        )
 
-        # 3. Respeito às margens laterais
-        assert min_x >= SafeZones9x16.LEFT_MARGIN - 20, (
+        # 3. Respeito à margem lateral esquerda
+        assert min_x >= SafeZones9x16.SUBTITLE_MARGIN_LEFT - 24, (
             f"Caso {label}: margem lateral esquerda violada. min_x={min_x}"
         )
 
@@ -856,7 +881,7 @@ def test_mp4_karaoke_audio_energy_cross_validation(tmp_path: Path):
         dark_box_count = 0
         white_count = 0
         for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
-            for x in range(120, 960):
+            for x in range(SafeZones9x16.SUBTITLE_MARGIN_LEFT, 657):
                 idx = (y * 1080 + x) * 3
                 r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
                 if r <= 25 and g <= 25 and b <= 25:

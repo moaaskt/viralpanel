@@ -22,8 +22,8 @@ class AvatarConfig:
     crop_mode: Literal["circle_alpha", "native_rgba"] = "circle_alpha"
     border_color: str = ZuntoPalette.IMPACT_YELLOW
     border_width: int = 6
-    overlay_x_expr: str = "W-w-54"
-    overlay_y_expr: str = "H-h-320"
+    overlay_x_expr: str = f"W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}"
+    overlay_y_expr: str = f"H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}"
     enable_waveform: bool = True
     waveform_color: str = "#FACC15@0.85"
 
@@ -85,7 +85,7 @@ class BaseAvatarAnimator(ABC):
 
 
 class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
-    """Gera vídeo do avatar (300x300) a partir de foto base com recorte circular em canal alfa e espectro reativo."""
+    """Gera vídeo do avatar circular em canal alfa e espectro reativo calibrado por SafeZones9x16."""
 
     def __init__(
         self,

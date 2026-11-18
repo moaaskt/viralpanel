@@ -16,15 +16,15 @@ from viralpanel.studio.voice import MockVoiceSynthesizer
 
 
 def test_avatar_config_defaults_and_immutability():
-    """Valida DTO AvatarConfig tipado, imutável e com defaults calibrados per D-05."""
+    """Valida DTO AvatarConfig tipado, imutável e com defaults calibrados em SafeZones9x16."""
     config = AvatarConfig()
     assert config.avatar_image_path is None
-    assert config.size == SafeZones9x16.AVATAR_SIZE == 300
+    assert config.size == SafeZones9x16.AVATAR_SIZE == 260
     assert config.crop_mode == "circle_alpha"
     assert config.border_color == ZuntoPalette.IMPACT_YELLOW == "#FACC15"
     assert config.border_width == 6
-    assert config.overlay_x_expr == "W-w-54"
-    assert config.overlay_y_expr == "H-h-320"
+    assert config.overlay_x_expr == f"W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}" == "W-w-140"
+    assert config.overlay_y_expr == f"H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}" == "H-h-300"
     assert config.enable_waveform is True
     assert config.waveform_color == "#FACC15@0.85"
 
@@ -150,32 +150,34 @@ def test_avatar_circular_alpha_and_yellow_border_pixels(tmp_path):
         capture_output=True,
     )
 
+    size = SafeZones9x16.AVATAR_SIZE
+    center = size // 2
     raw_bytes = raw_path.read_bytes()
-    assert len(raw_bytes) == 300 * 300 * 4
+    assert len(raw_bytes) == size * size * 4
 
     def get_rgba(x: int, y: int) -> tuple[int, int, int, int]:
-        offset = (y * 300 + x) * 4
+        offset = (y * size + x) * 4
         return tuple(raw_bytes[offset : offset + 4])
 
-    # 1. Quatro cantos externos do bounding box 300x300 possuem Alpha == 0 (transparência total)
-    corners = [(10, 10), (290, 10), (10, 290), (290, 290)]
+    # 1. Quatro cantos externos do bounding box possuem Alpha == 0 (transparência total)
+    corners = [(10, 10), (size - 10, 10), (10, size - 10), (size - 10, size - 10)]
     for pt in corners:
         rgba = get_rgba(*pt)
         assert rgba[3] == 0, f"Canto {pt} deveria ter alfa 0, obteve: {rgba}"
 
-    # 2. Pontos na borda anelar circular (raio entre 146px e 150px) possuem Alpha > 200 e cor amarela ZUNTO! (#FACC15: R > 220, G > 180, B < 60)
-    border_points = [(150, 2), (150, 297), (2, 150), (297, 150)]
+    # 2. Pontos na borda anelar circular possuem Alpha > 200 e cor amarela ZUNTO! (#FACC15: R > 220, G > 180, B < 60)
+    border_points = [(center, 2), (center, size - 3), (2, center), (size - 3, center)]
     for pt in border_points:
         r, g, b, a = get_rgba(*pt)
         assert a > 200, f"Borda {pt} deveria ter alfa > 200, obteve: {a}"
         assert r > 220 and g > 180 and b < 60, f"Borda {pt} deveria ser amarela #FACC15, obteve R={r}, G={g}, B={b}"
 
-    # 3. Centro do avatar (150, 150) é opaco (alpha == 255)
-    center_rgba = get_rgba(150, 150)
+    # 3. Centro do avatar é opaco (alpha == 255)
+    center_rgba = get_rgba(center, center)
     assert center_rgba[3] == 255, f"Centro deveria ter alfa 255, obteve: {center_rgba[3]}"
 
     # 4. Confinamento do showwaves: cantos inferiores externos mantêm Alpha == 0
-    lower_outside = [(15, 250), (285, 250)]
+    lower_outside = [(15, size - 40), (size - 15, size - 40)]
     for pt in lower_outside:
         rgba = get_rgba(*pt)
         assert rgba[3] == 0, f"Canto inferior externo {pt} deveria ter alfa 0, obteve: {rgba}"
@@ -186,6 +188,8 @@ def test_showwaves_background_transparency(tmp_path):
     if not shutil.which("ffmpeg"):
         pytest.skip("ffmpeg não disponível no ambiente")
 
+    size = SafeZones9x16.AVATAR_SIZE
+    center = size // 2
     blue_img = tmp_path / "solid_blue.png"
     subprocess.run(
         [
@@ -194,7 +198,7 @@ def test_showwaves_background_transparency(tmp_path):
             "-f",
             "lavfi",
             "-i",
-            "color=c=blue:s=300x300:d=0.1",
+            f"color=c=blue:s={size}x{size}:d=0.1",
             "-frames:v",
             "1",
             "-update",
@@ -232,21 +236,21 @@ def test_showwaves_background_transparency(tmp_path):
     )
 
     raw_bytes = raw_path.read_bytes()
-    assert len(raw_bytes) == 300 * 300 * 4
+    assert len(raw_bytes) == size * size * 4
 
     def get_rgba(x: int, y: int) -> tuple[int, int, int, int]:
-        offset = (y * 300 + x) * 4
+        offset = (y * size + x) * 4
         return tuple(raw_bytes[offset : offset + 4])
 
-    # Amostrar linha vertical central na região da onda (Y=200..280)
+    # Amostrar linha vertical central na região da onda (Y = size - 100 .. size - 20)
     # Pixels onde não há traço sonoro preservam o azul e alfa intactos (sem caixa preta opaca)
-    wave_sample_ys = [205, 210, 220, 230, 240, 250, 260, 270]
+    wave_sample_ys = [size - 95, size - 85, size - 75, size - 65, size - 55, size - 45, size - 35, size - 25]
     for y in wave_sample_ys:
-        r, g, b, a = get_rgba(150, y)
-        assert a == 255, f"Pixel em (150, {y}) teve alfa degradado: {a}"
-        assert not (r == 0 and g == 0 and b == 0), f"Pixel em (150, {y}) tornou-se preto indesejado"
+        r, g, b, a = get_rgba(center, y)
+        assert a == 255, f"Pixel em ({center}, {y}) teve alfa degradado: {a}"
+        assert not (r == 0 and g == 0 and b == 0), f"Pixel em ({center}, {y}) tornou-se preto indesejado"
         is_blue = (b > 200 and r < 50 and g < 50)
         is_yellow = (r > 150 and g > 120)
-        assert is_blue or is_yellow, f"Pixel em (150, {y}) tem cor inesperada: R={r}, G={g}, B={b}"
+        assert is_blue or is_yellow, f"Pixel em ({center}, {y}) tem cor inesperada: R={r}, G={g}, B={b}"
 
 
