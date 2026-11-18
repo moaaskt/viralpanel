@@ -84,6 +84,7 @@ def test_validate_avatar_asset_format(tmp_path: Path):
 
     # 2. Avatar inválido sem canal alfa (h264 / yuv420p)
     invalid_avatar = tmp_path / "avatar_opaque.mp4"
+    av_size = SafeZones9x16.AVATAR_SIZE
     subprocess.run(
         [
             "ffmpeg",
@@ -91,7 +92,7 @@ def test_validate_avatar_asset_format(tmp_path: Path):
             "-f",
             "lavfi",
             "-i",
-            "color=c=black:s=300x300:r=24:d=1.5",
+            f"color=c=black:s={av_size}x{av_size}:r=24:d=1.5",
             "-c:v",
             "libx264",
             "-pix_fmt",
@@ -266,6 +267,9 @@ def test_inspect_composed_avatar_transparency(tmp_path: Path):
     assert res_ok.details["distributed_points_failed"] == 0
 
     # 2. Caixa branca opaca inteira no lugar do avatar deve reprovar
+    box_x0 = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
+    box_y0 = SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_BOTTOM
+    av_size = SafeZones9x16.AVATAR_SIZE
     opaque_box_video = tmp_path / "composed_white_box.mp4"
     subprocess.run(
         [
@@ -274,7 +278,7 @@ def test_inspect_composed_avatar_transparency(tmp_path: Path):
             "-i",
             str(composed_ok),
             "-vf",
-            "drawbox=x=726:y=1300:w=300:h=300:color=white:t=fill",
+            f"drawbox=x={box_x0}:y={box_y0}:w={av_size}:h={av_size}:color=white:t=fill",
             "-c:v",
             "libx264",
             "-pix_fmt",
@@ -295,8 +299,7 @@ def test_inspect_composed_avatar_transparency(tmp_path: Path):
     assert any("Canto" in e for e in res_white.errors)
 
     # 3. Defeito opaco parcial localizado ENTRE os cantos (onde os 4 cantos permanecem intactos)
-    # Ponto (760, 1334) está dentro da bounding box [726..1026, 1300..1600], fora do círculo
-    # (hypot(760-876, 1334-1450) = hypot(-116, -116) = 164.0 > 156), mas longe dos 4 cantos!
+    # Região [box_x0+20..box_x0+44, box_y0+20..box_y0+44] está fora dos 4 cantos e fora do círculo (hypot >= radius+5)
     partial_defect_video = tmp_path / "composed_partial_defect.mp4"
     subprocess.run(
         [
@@ -305,7 +308,7 @@ def test_inspect_composed_avatar_transparency(tmp_path: Path):
             "-i",
             str(composed_ok),
             "-vf",
-            "drawbox=x=752:y=1326:w=20:h=20:color=white:t=fill",
+            f"drawbox=x={box_x0 + 20}:y={box_y0 + 20}:w=24:h=24:color=white:t=fill",
             "-c:v",
             "libx264",
             "-pix_fmt",
