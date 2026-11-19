@@ -287,7 +287,7 @@ class SubtitleCue(BaseModel):
 
 @dataclass(frozen=True)
 class SubtitleJobConfig:
-    """Configuração de geração e estilização do arquivo ASS (Phase 10 / Phase 13.2)."""
+    """Configuração de geração e estilização do arquivo ASS (Phase 10 / Phase 13.3)."""
 
     script_text: str
     total_duration: float
