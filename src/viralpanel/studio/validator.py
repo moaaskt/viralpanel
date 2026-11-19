@@ -624,7 +624,7 @@ class MediaQualityValidator:
             )
 
         # 3. Verificação da borda amarela ZUNTO! (#FACC15 -> R=250, G=204, B=21)
-        # Amostra raios relativos ao raio calibrado no arco superior/lateral (livre do showwaves inferior)
+        # Amostra raios relativos ao raio calibrado no arco superior/lateral (avatar estático sem ondas sonoras)
         border_angles_deg = [-90, -45, 0, -135, 180]
         border_samples: dict[str, tuple[int, int, int]] = {}
         yellow_detected_count = 0

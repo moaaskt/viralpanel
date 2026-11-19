@@ -10,11 +10,15 @@ from viralpanel.branding import (
     resolve_typography_font,
 )
 from viralpanel.studio.subtitles import (
+    FontWidthMeasurer,
     SubtitleCue,
     SubtitleJobConfig,
+    _load_ttf_horizontal_metrics,
     align_words_with_timestamps,
     build_ass_header,
     build_cues_from_script,
+    find_balanced_two_line_split,
+    fit_chunk_to_two_lines,
     format_ass_dialogue_line,
     generate_subtitles,
     generate_word_karaoke_dialogue_events,
@@ -40,8 +44,8 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
     assert config.margin_l == 80
     assert config.margin_r == SafeZones9x16.SUBTITLE_MARGIN_RIGHT  # 440
     assert config.margin_r == 440
-    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 420
-    assert config.margin_v == 420
+    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 365
+    assert config.margin_v == 365
     assert config.resolved_font is None
     assert config.box_padding == 16
     assert config.font_size == ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
@@ -52,7 +56,7 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
 
 
 def test_ass_header_zunto_style():
-    """Valida que o cabeçalho ASS possui BorderStyle=3, margens assimétricas (80,440,420) e cores ZUNTO!."""
+    """Valida que o cabeçalho ASS possui BorderStyle=3, margens assimétricas (80,440,365) e cores ZUNTO!."""
     header = build_ass_header()
 
     assert "PlayResX: 1080" in header
@@ -73,7 +77,7 @@ def test_ass_header_zunto_style():
     assert len(style_lines) == 1
     style = style_lines[0]
 
-    # Style: Default,Montserrat,64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,80,440,420,1
+    # Style: Default,Montserrat,64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,80,440,365,1
     tokens = style.replace("Style: ", "").split(",")
     assert tokens[0] == "Default"
     assert tokens[2] == "64"
@@ -87,7 +91,7 @@ def test_ass_header_zunto_style():
     assert tokens[18] == "2"  # Alignment=2 (Bottom-center)
     assert tokens[19] == "80"  # MarginL=80
     assert tokens[20] == "440"  # MarginR=440
-    assert tokens[21] == "420"  # MarginV=420
+    assert tokens[21] == "365"  # MarginV=365
 
 
 def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
@@ -113,6 +117,7 @@ def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
         f",3,16,0,2,{SafeZones9x16.SUBTITLE_MARGIN_LEFT},"
         f"{SafeZones9x16.SUBTITLE_MARGIN_RIGHT},{SafeZones9x16.SUBTITLE_MARGIN_V},1"
     ) in content
+    assert ",3,16,0,2,80,440,365,1" in content
     assert "Dialogue: 0," in content
 
 
@@ -653,9 +658,9 @@ def test_subtitle_service_wiring_and_sidecar_validation(tmp_path: Path):
 
 
 def test_ass_header_contains_asymmetric_margins():
-    """Valida que build_ass_header emite Alignment=2, MarginL=80, MarginR=440, MarginV=420."""
+    """Valida que build_ass_header emite Alignment=2, MarginL=80, MarginR=440, MarginV=365."""
     header = build_ass_header()
-    assert ",2,80,440,420,1" in header
+    assert ",2,80,440,365,1" in header
 
 
 def test_subtitle_job_config_custom_margins(tmp_path: Path):
@@ -710,6 +715,195 @@ def test_build_ass_header_derives_font_name_from_resolved_font(tmp_path: Path):
     header_uncoupled = build_ass_header(cfg_uncoupled)
     assert f"Style: Default,{resolved_default.font_name}," in header_uncoupled
     assert "Comic Sans MS" not in header_uncoupled
+
+
+def test_font_width_measurer_uses_hmtx_cmap_units_per_em_only(tmp_path: Path):
+    """Comprova que FontWidthMeasurer calcula largura via hmtx+cmap+unitsPerEm sem usar OS/2 (usWinAscent/usWinDescent)."""
+    import inspect
+
+    src_loader = inspect.getsource(_load_ttf_horizontal_metrics)
+    src_measurer = inspect.getsource(FontWidthMeasurer)
+    combined_src = src_loader + "\n" + src_measurer
+    # Nenhuma leitura de tabela OS/2 ou métricas verticais no código executável
+    code_only = "\n".join(
+        line for line in combined_src.splitlines()
+        if not line.strip().startswith("#") and "Nenhuma métrica vertical" not in line
+    )
+    assert "OS/2" not in code_only
+    assert "usWinAscent" not in code_only
+    assert "usWinDescent" not in code_only
+
+    resolved = resolve_typography_font()
+    measurer = FontWidthMeasurer(font_path=resolved.font_path)
+    assert measurer.uses_ttf_metrics is True
+    assert measurer.units_per_em is not None and measurer.units_per_em > 0
+
+    w_64 = measurer.measure_text("seus dentes são", 64)
+    w_32 = measurer.measure_text("seus dentes são", 32)
+    assert w_64 > 0
+    assert w_64 == pytest.approx(2.0 * w_32, rel=1e-6)
+    assert measurer.measure_text("constantemente", 64) > measurer.measure_text("são", 64)
+
+    # Fallback seguro para TTF sintético/dummy
+    dummy_ttf = tmp_path / "dummy.ttf"
+    dummy_ttf.write_bytes(b"TTF-DUMMY")
+    fallback_measurer = FontWidthMeasurer(font_path=dummy_ttf)
+    assert fallback_measurer.uses_ttf_metrics is False
+    assert fallback_measurer.units_per_em is None
+    assert fallback_measurer.measure_text("teste", 64) > fallback_measurer.measure_text("teste", 32) > 0
+
+
+def test_shark_script_reflow_enforces_max_two_lines_at_default_font_size(tmp_path: Path):
+    """Roteiro real do tubarão-branco (61 palavras) gera 100% dos blocos em <=2 linhas mantendo Fontsize=64."""
+    import re
+
+    shark_script = (
+        "Você sabia que existe um predador capaz de detectar até os sinais elétricos dos músculos de suas presas?\n\n"
+        "Esse é o tubarão-branco!\n\n"
+        "Ele pode ultrapassar seis metros de comprimento e pesar mais de duas toneladas.\n\n"
+        "E tem um detalhe impressionante: seus dentes são constantemente substituídos ao longo da vida.\n\n"
+        "Agora imagine encontrar esse gigante cara a cara no fundo do oceano!"
+    )
+    words = [w.strip() for w in shark_script.replace("\n", " ").split() if w.strip()]
+    assert len(words) == 61
+
+    word_ts = [
+        {"word": w, "start": round(i * 0.35, 3), "end": round((i + 1) * 0.35 - 0.03, 3)}
+        for i, w in enumerate(words)
+    ]
+    total_dur = 22.8
+
+    # 1. Modo Active Word Highlight (word_timestamp_aligned)
+    ass_wb = tmp_path / "shark_wb.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text=shark_script,
+            total_duration=total_dur,
+            output_path=ass_wb,
+            word_timestamps=word_ts,
+            timing_mode="word_timestamp_aligned",
+        )
+    )
+    content_wb = ass_wb.read_text(encoding="utf-8")
+    dialogues_wb = [l for l in content_wb.splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogues_wb) == len(words)
+
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+    highlighted_sequence: list[str] = []
+    for line in dialogues_wb:
+        text_part = line.split(",", 9)[9]
+        assert text_part.count("\\N") <= 1, f"Mais de 2 linhas em evento ASS: {text_part}"
+        assert "\\fs" not in text_part, f"Reflow deveria resolver sem reduzir fonte no roteiro do tubarão: {text_part}"
+        assert text_part.count(f"\\c{yellow}") == 1
+        assert text_part.count(f"\\c{white}") == 1
+        assert "\\k" not in text_part and "\\kf" not in text_part
+        m = re.search(rf"\{{\\c{re.escape(yellow)}\}}([^\{{\}}]+)\{{\\c{re.escape(white)}\}}", text_part)
+        assert m is not None
+        highlighted_sequence.append(m.group(1))
+
+    # 100% das 61 palavras preservadas na ordem exata (zero corte ou omissão)
+    assert highlighted_sequence == words
+
+    # 2. Modo proporcional (sem word_timestamps)
+    ass_prop = tmp_path / "shark_prop.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text=shark_script,
+            total_duration=total_dur,
+            output_path=ass_prop,
+            word_timestamps=None,
+        )
+    )
+    content_prop = ass_prop.read_text(encoding="utf-8")
+    dialogues_prop = [l for l in content_prop.splitlines() if l.startswith("Dialogue:")]
+    reconstructed_prop: list[str] = []
+    for line in dialogues_prop:
+        text_part = line.split(",", 9)[9]
+        assert text_part.count("\\N") <= 1
+        assert "\\fs" not in text_part
+        plain = re.sub(r"\{[^}]*\}", "", text_part).replace("\\N", " ")
+        reconstructed_prop.extend(plain.split())
+    assert reconstructed_prop == words
+
+
+def test_extreme_long_word_triggers_controlled_font_size_fallback_without_truncation(tmp_path: Path):
+    """Palavra indivisível gigante aciona {\\fsN} controlado apenas no bloco afetado sem cortar nenhuma palavra."""
+    import re
+
+    script = "Veja isso agora. A palavra inconstitucionalissimamente apareceu hoje."
+    words = script.split()
+    word_ts = [
+        {"word": w, "start": round(i * 0.5, 3), "end": round((i + 1) * 0.5 - 0.05, 3)}
+        for i, w in enumerate(words)
+    ]
+
+    ass_path = tmp_path / "extreme_word.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text=script,
+            total_duration=5.0,
+            output_path=ass_path,
+            word_timestamps=word_ts,
+            timing_mode="word_timestamp_aligned",
+        )
+    )
+    dialogues = [l for l in ass_path.read_text(encoding="utf-8").splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogues) == len(words)
+
+    extreme_events = []
+    normal_events = []
+    for line in dialogues:
+        text_part = line.split(",", 9)[9]
+        assert text_part.count("\\N") <= 1
+        if "inconstitucionalissimamente" in text_part:
+            extreme_events.append(text_part)
+        else:
+            normal_events.append(text_part)
+
+    assert len(extreme_events) >= 1
+    assert len(normal_events) >= 1
+    # Bloco extremo recebe redução controlada de fonte local {\\fsN} (42 <= N < 64)
+    for ev in extreme_events:
+        m = re.match(r"^\{\\fs(\d+)\}", ev)
+        assert m is not None, f"Esperado fallback {{\\fsN}} no bloco extremo: {ev}"
+        fs_val = int(m.group(1))
+        assert 42 <= fs_val < ZuntoTypography.SUBTITLE_FONT_SIZE
+        assert "inconstitucionalissimamente" in re.sub(r"\{[^}]*\}", "", ev)
+    # Blocos normais vizinhos mantêm fonte padrão 64px (sem {\\fs})
+    for ev in normal_events:
+        assert "\\fs" not in ev, f"Redução de fonte não deve vazar para bloco normal: {ev}"
+
+
+def test_format_ass_dialogue_line_handles_newline_break_before_highlight_selection():
+    """Trata \\N como separador antes de select_highlight_word e destaca palavra iniciada em N após \\N sem vazamento."""
+    cue = SubtitleCue(
+        start=0.0,
+        end=2.0,
+        text="E um\\NNada simples.",
+    )
+    line = format_ass_dialogue_line(cue)
+    text_part = line.split(",", 9)[9]
+
+    yellow = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
+    white = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
+    assert f"E um\\N{{\\c{yellow}}}Nada{{\\c{white}}} simples." == text_part
+    assert text_part.count(f"\\c{yellow}") == 1
+    assert text_part.count(f"\\c{white}") == 1
+
+    cue_fs = SubtitleCue(
+        start=2.0,
+        end=4.0,
+        text="Palavra\\Nextrema",
+        font_size_override=52,
+    )
+    line_fs = format_ass_dialogue_line(cue_fs)
+    text_fs = line_fs.split(",", 9)[9]
+    assert text_fs.startswith("{\\fs52}")
+    assert "\\N" in text_fs
+    assert text_fs.count(f"\\c{yellow}") == 1
+    assert text_fs.count(f"\\c{white}") == 1
+
 
 
 

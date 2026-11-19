@@ -40,6 +40,7 @@ def test_zunto_typography_constants():
     assert typography.PRIMARY_FONT == "Montserrat"
     assert typography.FALLBACK_FONT == "DejaVu Sans"
     assert typography.SUBTITLE_FONT_SIZE == 64
+    assert typography.SUBTITLE_MIN_FONT_SIZE == 48
     assert typography.TITLE_FONT_SIZE == 84
     assert typography.SUBTITLE_MAX_CHARS_PER_LINE == 28
     assert typography.SUBTITLE_MAX_LINES == 2
@@ -50,7 +51,7 @@ def test_zunto_typography_constants():
 
 
 def test_safe_zones_9x16_constants():
-    """Valida SafeZones9x16 calibradas para Phase 13.2 como referências conservadoras configuráveis."""
+    """Valida SafeZones9x16 calibradas para Phase 13.3 como referências conservadoras configuráveis."""
     safe = SafeZones9x16()
     assert safe.WIDTH == 1080
     assert safe.HEIGHT == 1920
@@ -62,11 +63,11 @@ def test_safe_zones_9x16_constants():
     assert safe.LEFT_MARGIN == 48
 
     # Zonas calibradas de legendas no terço inferior
-    assert safe.SUBTITLE_MARGIN_V == 420
+    assert safe.SUBTITLE_MARGIN_V == 365
     assert safe.SUBTITLE_MARGIN_RIGHT == 440
     assert safe.SUBTITLE_MARGIN_LEFT == 80
-    assert safe.SUBTITLE_Y_MIN == 1340
-    assert safe.SUBTITLE_Y_MAX == 1500
+    assert safe.SUBTITLE_Y_MIN == 1400
+    assert safe.SUBTITLE_Y_MAX == 1580
 
     # Avatar PIP calibrado (X in [680, 940], Y in [1360, 1620])
     assert safe.AVATAR_SIZE == 260
@@ -229,7 +230,7 @@ def test_subtitle_and_avatar_no_overlap_with_outline():
 
 
 def test_stage_fg_conformance():
-    """Valida que o stage foreground respeita topo >= 220px e termina acima das legendas (< 1340px)."""
+    """Valida que o stage foreground respeita topo >= 220px e termina acima das legendas (< 1400px)."""
     safe = SafeZones9x16()
     assert safe.STAGE_FG_Y_TOP > safe.TOP_MARGIN
     assert safe.STAGE_FG_Y_TOP + safe.STAGE_FG_MAX_H == 1140
@@ -372,3 +373,114 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 f"Folga física inferior a 24px: max_x={max_x}, x_avatar_min={x_avatar_min}"
             )
             assert min_x >= safe.SUBTITLE_MARGIN_LEFT - box_padding - 4
+
+
+def test_subtitle_vertical_optical_alignment_with_avatar(tmp_path):
+    """Mede empiricamente no libass o alinhamento vertical da legenda (2 linhas e 1 linha) frente ao avatar (Y=1490px)."""
+    assert shutil.which("ffmpeg") is not None, "FFmpeg deve estar disponível no ambiente de teste."
+
+    resolved_font = resolve_typography_font()
+    safe = SafeZones9x16()
+    box_padding = 16
+    escaped_fontsdir = str(resolved_font.fonts_dir).replace("\\", "/").replace(":", "\\:")
+
+    cues = [
+        ("0:00:00.00", "0:00:01.00", "Evidências fósseis de escamas atribuídas"),  # 2 linhas
+        ("0:00:01.00", "0:00:02.00", "Você não sabia."),  # 1 linha
+    ]
+    events_lines = "\n".join(
+        f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}"
+        for start, end, text in cues
+    )
+    ass_path = tmp_path / "optical_alignment.ass"
+    raw_path = tmp_path / "optical_alignment.rgb"
+    ass_content = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {safe.WIDTH}
+PlayResY: {safe.HEIGHT}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{resolved_font.font_name},{ZuntoTypography.SUBTITLE_FONT_SIZE},&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,{box_padding},0,2,{safe.SUBTITLE_MARGIN_LEFT},{safe.SUBTITLE_MARGIN_RIGHT},{safe.SUBTITLE_MARGIN_V},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+{events_lines}
+"""
+    ass_path.write_text(ass_content, encoding="utf-8")
+    escaped_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=magenta:s={safe.WIDTH}x{safe.HEIGHT}:r=1:d=2",
+            "-vf",
+            f"ass='{escaped_ass}':fontsdir='{escaped_fontsdir}'",
+            "-frames:v",
+            "2",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            str(raw_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    raw_bytes = raw_path.read_bytes()
+    frame_size = safe.WIDTH * safe.HEIGHT * 3
+    assert len(raw_bytes) == frame_size * 2
+
+    def _measure_box(frame_idx: int) -> tuple[int, int, int, int]:
+        offset = frame_idx * frame_size
+        min_x, max_x = safe.WIDTH, -1
+        min_y, max_y = safe.HEIGHT, -1
+        box_pixels = 0
+        for y in range(1200, safe.HEIGHT):
+            row_start = offset + y * safe.WIDTH * 3
+            for x in range(safe.WIDTH):
+                idx = row_start + x * 3
+                r, g, b = raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
+                if r < 30 and g < 30 and b < 30:
+                    box_pixels += 1
+                    min_x = min(min_x, x)
+                    max_x = max(max_x, x)
+                    min_y = min(min_y, y)
+                    max_y = max(max_y, y)
+        assert box_pixels > 500, f"Caixa opaca não encontrada no frame {frame_idx}"
+        return min_x, max_x, min_y, max_y
+
+    x_avatar_min = safe.WIDTH - safe.AVATAR_SIZE - safe.AVATAR_MARGIN_RIGHT  # 680
+    avatar_y_min = safe.HEIGHT - safe.AVATAR_SIZE - safe.AVATAR_MARGIN_BOTTOM  # 1360
+    avatar_y_max = safe.HEIGHT - safe.AVATAR_MARGIN_BOTTOM  # 1620
+    avatar_center_y = (avatar_y_min + avatar_y_max) / 2.0  # 1490.0
+
+    # Frame 0: bloco de 2 linhas (prioridade de alinhamento óptico Y = 1490 +- 5 px)
+    min_x_2l, max_x_2l, min_y_2l, max_y_2l = _measure_box(0)
+    y_center_2l = (min_y_2l + max_y_2l) / 2.0
+    assert min_y_2l >= safe.SUBTITLE_Y_MIN, f"Topo de 2 linhas abaixo do limite: {min_y_2l} < {safe.SUBTITLE_Y_MIN}"
+    assert max_y_2l <= safe.SUBTITLE_Y_MAX, f"Base de 2 linhas invadiu safe zone: {max_y_2l} > {safe.SUBTITLE_Y_MAX}"
+    assert abs(y_center_2l - avatar_center_y) <= 5.0, (
+        f"Centro de 2 linhas ({y_center_2l:.1f}) fora da tolerância de +-5px do avatar ({avatar_center_y})"
+    )
+    assert max_x_2l <= 656 and (x_avatar_min - max_x_2l) >= 24
+
+    # Frame 1: bloco de 1 linha (contenção harmônica na faixa do avatar [1360, 1620], sem forçar +-20px)
+    min_x_1l, max_x_1l, min_y_1l, max_y_1l = _measure_box(1)
+    assert avatar_y_min <= min_y_1l <= max_y_1l <= avatar_y_max, (
+        f"Bloco de 1 linha [{min_y_1l}, {max_y_1l}] fora da faixa do avatar [{avatar_y_min}, {avatar_y_max}]"
+    )
+    assert max_y_1l <= safe.SUBTITLE_Y_MAX, f"Base de 1 linha invadiu safe zone: {max_y_1l} > {safe.SUBTITLE_Y_MAX}"
+    assert abs(max_y_1l - max_y_2l) <= 4, (
+        f"Instabilidade vertical (jumping subtitles): base 1L={max_y_1l} vs base 2L={max_y_2l}"
+    )
+    assert max_x_1l <= 656 and (x_avatar_min - max_x_1l) >= 24
+

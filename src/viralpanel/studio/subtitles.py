@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from functools import lru_cache
 import logging
 from pathlib import Path
 import re
+import struct
 from typing import Final, Literal
 
 from pydantic import BaseModel, Field
@@ -16,6 +18,269 @@ from viralpanel.branding import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Fatores horizontais para cálculo determinístico de largura de linha ASS (hmtx + cmap + unitsPerEm)
+_ASS_HORIZONTAL_SCALE_FACTOR: Final[float] = 0.72
+_SUBTITLE_USABLE_WIDTH_SAFETY_FACTOR: Final[float] = 0.94
+_EMERGENCY_MIN_FONT_SIZE: Final[int] = 42
+_NARROW_FALLBACK_CHARS: Final[frozenset[str]] = frozenset(" iIljtfr.,;:'\"!|()-")
+
+
+@lru_cache(maxsize=8)
+def _load_ttf_horizontal_metrics(
+    ttf_path_str: str,
+) -> tuple[int, tuple[int, ...], dict[int, int]] | None:
+    """Lê exclusivamente métricas horizontais TrueType (head.unitsPerEm, hhea.numberOfHMetrics, hmtx, cmap).
+
+    Nenhuma métrica vertical (como usWinAscent/usWinDescent da tabela OS/2) é lida ou utilizada.
+    Retorna None de forma segura se o arquivo for ausente ou sintético (ex.: TTF dummy em testes).
+    """
+    path = Path(ttf_path_str)
+    if not path.is_file():
+        return None
+
+    try:
+        data = path.read_bytes()
+        if len(data) < 12:
+            return None
+
+        num_tables = struct.unpack_from(">H", data, 4)[0]
+        if num_tables <= 0 or len(data) < 12 + num_tables * 16:
+            return None
+
+        tables: dict[str, tuple[int, int]] = {}
+        for idx in range(num_tables):
+            tag_bytes, _, offset, length = struct.unpack_from(">4sIII", data, 12 + idx * 16)
+            tag = tag_bytes.decode("ascii", errors="ignore")
+            if tag in ("head", "hhea", "hmtx", "cmap"):
+                tables[tag] = (offset, length)
+
+        if not all(t in tables for t in ("head", "hhea", "hmtx", "cmap")):
+            return None
+
+        head_off, head_len = tables["head"]
+        hhea_off, hhea_len = tables["hhea"]
+        hmtx_off, hmtx_len = tables["hmtx"]
+        cmap_off, cmap_len = tables["cmap"]
+
+        if head_len < 20 or hhea_len < 36 or hmtx_len < 4 or cmap_len < 4:
+            return None
+
+        units_per_em = struct.unpack_from(">H", data, head_off + 18)[0]
+        num_hmetrics = struct.unpack_from(">H", data, hhea_off + 34)[0]
+        if units_per_em <= 0 or num_hmetrics <= 0 or hmtx_off + num_hmetrics * 4 > len(data):
+            return None
+
+        advances = tuple(
+            struct.unpack_from(">H", data, hmtx_off + i * 4)[0]
+            for i in range(num_hmetrics)
+        )
+
+        num_subtables = struct.unpack_from(">H", data, cmap_off + 2)[0]
+        subtable_off: int | None = None
+        for i in range(num_subtables):
+            rec_pos = cmap_off + 4 + i * 8
+            if rec_pos + 8 > len(data):
+                break
+            platform_id, encoding_id, rel_off = struct.unpack_from(">HHI", data, rec_pos)
+            cand_off = cmap_off + rel_off
+            if cand_off + 2 > len(data):
+                continue
+            fmt = struct.unpack_from(">H", data, cand_off)[0]
+            if fmt == 4 and ((platform_id == 3 and encoding_id == 1) or platform_id == 0):
+                subtable_off = cand_off
+                if platform_id == 3 and encoding_id == 1:
+                    break
+
+        if subtable_off is None or subtable_off + 14 > len(data):
+            return None
+
+        seg_count_x2 = struct.unpack_from(">H", data, subtable_off + 6)[0]
+        seg_count = seg_count_x2 // 2
+        if seg_count <= 0:
+            return None
+
+        end_codes = struct.unpack_from(f">{seg_count}H", data, subtable_off + 14)
+        start_codes = struct.unpack_from(f">{seg_count}H", data, subtable_off + 16 + 2 * seg_count)
+        id_deltas = struct.unpack_from(f">{seg_count}h", data, subtable_off + 16 + 4 * seg_count)
+        id_range_pos = subtable_off + 16 + 6 * seg_count
+        id_range_offsets = struct.unpack_from(f">{seg_count}H", data, id_range_pos)
+
+        char_to_gid: dict[int, int] = {}
+        for i in range(seg_count):
+            start_cp = start_codes[i]
+            end_cp = end_codes[i]
+            if start_cp == 0xFFFF and end_cp == 0xFFFF:
+                continue
+            range_off = id_range_offsets[i]
+            delta = id_deltas[i]
+            for cp in range(start_cp, end_cp + 1):
+                if range_off == 0:
+                    gid = (cp + delta) & 0xFFFF
+                else:
+                    addr = id_range_pos + i * 2 + range_off + (cp - start_cp) * 2
+                    if addr + 2 > len(data):
+                        gid = 0
+                    else:
+                        gid = struct.unpack_from(">H", data, addr)[0]
+                        if gid != 0:
+                            gid = (gid + delta) & 0xFFFF
+                char_to_gid[cp] = gid
+
+        return units_per_em, advances, char_to_gid
+    except (OSError, struct.error, ValueError):
+        return None
+
+
+class FontWidthMeasurer:
+    """Medidor horizontal determinístico baseado estritamente em hmtx, cmap e head.unitsPerEm."""
+
+    def __init__(
+        self,
+        font_path: Path | None = None,
+        ass_scale_factor: float = _ASS_HORIZONTAL_SCALE_FACTOR,
+    ) -> None:
+        self.font_path = Path(font_path).resolve() if font_path is not None else None
+        self.ass_scale_factor = float(ass_scale_factor)
+        metrics = (
+            _load_ttf_horizontal_metrics(str(self.font_path))
+            if self.font_path is not None
+            else None
+        )
+        if metrics is not None:
+            self._units_per_em: int | None = metrics[0]
+            self._advances: tuple[int, ...] = metrics[1]
+            self._cmap: dict[int, int] = metrics[2]
+            self.uses_ttf_metrics: bool = True
+        else:
+            self._units_per_em = None
+            self._advances = ()
+            self._cmap = {}
+            self.uses_ttf_metrics = False
+
+    @property
+    def units_per_em(self) -> int | None:
+        return self._units_per_em
+
+    def measure_text(self, text: str, font_size: float) -> float:
+        """Calcula a largura horizontal estimada em pixels para ``text`` no ``font_size`` ASS."""
+        if not text:
+            return 0.0
+        safe_size = max(float(font_size), 1.0)
+        if self.uses_ttf_metrics and self._units_per_em and self._advances:
+            scale = (safe_size / float(self._units_per_em)) * self.ass_scale_factor
+            last_adv = self._advances[-1]
+            num_adv = len(self._advances)
+            total_advance = 0
+            for ch in text:
+                gid = self._cmap.get(ord(ch), 0)
+                total_advance += self._advances[gid] if gid < num_adv else last_adv
+            return float(total_advance) * scale
+
+        # Fallback conservador para fontes sintéticas/dummy em testes unitários
+        unit = safe_size * self.ass_scale_factor
+        return sum(0.30 * unit if ch in _NARROW_FALLBACK_CHARS else 0.60 * unit for ch in text)
+
+
+def _join_tokens_with_line_break(tokens: list[str], break_idx: int | None) -> str:
+    """Une tokens com espaço ou quebra explícita ASS (\\N) exatamente no índice informado."""
+    if break_idx is not None and 0 < break_idx < len(tokens):
+        return " ".join(tokens[:break_idx]) + "\\N" + " ".join(tokens[break_idx:])
+    return " ".join(tokens)
+
+
+def find_balanced_two_line_split(
+    words: list[str],
+    measurer: FontWidthMeasurer,
+    font_size: float,
+    usable_width_px: float,
+) -> tuple[int | None, list[str]] | None:
+    """Retorna a melhor distribuição em 1 ou 2 linhas dentro de ``usable_width_px`` ou None se exceder 2 linhas."""
+    if not words:
+        return None, []
+    full_text = " ".join(words)
+    if measurer.measure_text(full_text, font_size) <= usable_width_px:
+        return None, [full_text]
+
+    if len(words) < 2:
+        return None
+
+    best_split: tuple[int | None, list[str]] | None = None
+    best_cost: tuple[float, float] | None = None
+    for k in range(1, len(words)):
+        line1 = " ".join(words[:k])
+        line2 = " ".join(words[k:])
+        w1 = measurer.measure_text(line1, font_size)
+        w2 = measurer.measure_text(line2, font_size)
+        if w1 <= usable_width_px and w2 <= usable_width_px:
+            cost = (max(w1, w2), abs(w1 - w2))
+            if best_cost is None or cost < best_cost:
+                best_cost = cost
+                best_split = (k, [line1, line2])
+    return best_split
+
+
+def fit_chunk_to_two_lines(
+    words: list[str],
+    measurer: FontWidthMeasurer,
+    base_font_size: int = ZuntoTypography.SUBTITLE_FONT_SIZE,
+    min_font_size: int = ZuntoTypography.SUBTITLE_MIN_FONT_SIZE,
+    usable_width_px: float = 526.4,
+) -> tuple[int | None, int]:
+    """Garante enquadramento em no máximo 2 linhas: prioriza fonte padrão e usa redução controlada apenas em fallback."""
+    if not words:
+        return None, base_font_size
+
+    direct = find_balanced_two_line_split(words, measurer, base_font_size, usable_width_px)
+    if direct is not None:
+        return direct[0], base_font_size
+
+    # Fallback moderado e controlado: reduz em passos de 2px até SUBTITLE_MIN_FONT_SIZE (48px)
+    for cand_fs in range(base_font_size - 2, min_font_size - 1, -2):
+        res = find_balanced_two_line_split(words, measurer, cand_fs, usable_width_px)
+        if res is not None:
+            return res[0], cand_fs
+
+    # Fallback de emergência para palavra patológica extrema (> ~24 chars sem espaço): nunca corta/omite palavras
+    for cand_fs in range(min_font_size - 2, _EMERGENCY_MIN_FONT_SIZE - 1, -2):
+        res = find_balanced_two_line_split(words, measurer, cand_fs, usable_width_px)
+        if res is not None:
+            logger.warning(
+                "Bloco extremo '%s' exigiu redução emergencial de fonte para %dpx para respeitar limite de 2 linhas.",
+                " ".join(words),
+                cand_fs,
+            )
+            return res[0], cand_fs
+
+    full_text = " ".join(words)
+    measured_at_emergency = max(measurer.measure_text(full_text, _EMERGENCY_MIN_FONT_SIZE), 1.0)
+    if len(words) == 1:
+        computed_fs = max(24, int(_EMERGENCY_MIN_FONT_SIZE * (usable_width_px / measured_at_emergency)))
+        logger.warning(
+            "Palavra indivisível extrema '%s' ajustada proporcionalmente para %dpx sem truncamento.",
+            full_text,
+            computed_fs,
+        )
+        return None, computed_fs
+
+    # Para múltiplos tokens ainda excedendo no piso emergencial, escolhe o melhor ponto de quebra de 2 linhas
+    best_k = 1
+    best_max_w = float("inf")
+    for k in range(1, len(words)):
+        w_pair = max(
+            measurer.measure_text(" ".join(words[:k]), _EMERGENCY_MIN_FONT_SIZE),
+            measurer.measure_text(" ".join(words[k:]), _EMERGENCY_MIN_FONT_SIZE),
+        )
+        if w_pair < best_max_w:
+            best_max_w = w_pair
+            best_k = k
+    computed_fs = max(24, int(_EMERGENCY_MIN_FONT_SIZE * (usable_width_px / max(best_max_w, 1.0))))
+    logger.warning(
+        "Bloco extremo '%s' ajustado para 2 linhas com fonte %dpx.",
+        full_text,
+        computed_fs,
+    )
+    return best_k, computed_fs
 
 # Stopwords comuns em português para heurística de palavras de impacto
 _PORTUGUESE_STOPWORDS: Final[set[str]] = {
@@ -283,11 +548,15 @@ class SubtitleCue(BaseModel):
         default="proportional_character_estimate",
         description="Modo de temporização ('proportional_character_estimate' ou 'word_timestamp_aligned')",
     )
+    font_size_override: int | None = Field(
+        default=None,
+        description="Sobrescrita controlada de tamanho de fonte ASS (px) apenas quando o reflow não bastar",
+    )
 
 
 @dataclass(frozen=True)
 class SubtitleJobConfig:
-    """Configuração de geração e estilização do arquivo ASS (Phase 10 / Phase 13.2)."""
+    """Configuração de geração e estilização do arquivo ASS (Phase 10 / Phase 13.3)."""
 
     script_text: str
     total_duration: float
@@ -385,6 +654,8 @@ def generate_word_karaoke_dialogue_events(
     yellow_ass_color: str,
     white_ass_color: str,
     total_audio_duration: float,
+    break_idx: int | None = None,
+    font_size_override: int | None = None,
 ) -> list[str]:
     """Gera eventos Dialogue sequenciais por palavra ativa no estilo ZUNTO! Word Highlight.
 
@@ -431,7 +702,8 @@ def generate_word_karaoke_dialogue_events(
         })
 
     sanitized_words = [w["word"] for w in calibrated_words]
-    neutral_text = " ".join(sanitized_words)
+    fs_prefix = f"{{\\fs{int(font_size_override)}}}" if font_size_override is not None else ""
+    neutral_text = f"{fs_prefix}{_join_tokens_with_line_break(sanitized_words, break_idx)}"
     start_cs_list = [max(int(round(w["start"] * 100)), 0) for w in calibrated_words]
     end_cs_list = [max(int(round(w["end"] * 100)), start_cs_list[idx]) for idx, w in enumerate(calibrated_words)]
 
@@ -458,7 +730,7 @@ def generate_word_karaoke_dialogue_events(
                 formatted_tokens.append(f"{{\\c{yellow_tag}}}{token}{{\\c{white_tag}}}")
             else:
                 formatted_tokens.append(token)
-        dialogue_text = " ".join(formatted_tokens)
+        dialogue_text = f"{fs_prefix}{_join_tokens_with_line_break(formatted_tokens, break_idx)}"
 
         dialogues.append(
             f"Dialogue: 0,{_format_cs(start_cs)},{_format_cs(end_cs)},Default,,0,0,0,,{dialogue_text}"
@@ -497,7 +769,7 @@ def select_highlight_word(words: list[str]) -> str | None:
 
 
 def format_ass_dialogue_line(cue: SubtitleCue) -> str:
-    """Formata a linha Dialogue com escape blindado e destaque amarelo com fechamento explícito."""
+    """Formata a linha Dialogue com escape blindado, tratamento seguro de \\N e destaque amarelo com fechamento explícito."""
     sanitized = sanitize_ass_text(cue.text)
     start_str = _format_ass_timestamp(cue.start)
     end_str = _format_ass_timestamp(cue.end)
@@ -505,15 +777,26 @@ def format_ass_dialogue_line(cue: SubtitleCue) -> str:
     yellow_ass = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)  # &H0015CCFA&
     white_ass = hex_to_ass_color(ZuntoPalette.PURE_WHITE)      # &H00FFFFFF&
 
-    highlight = cue.highlight_word or select_highlight_word(sanitized.split())
+    # Trata \\N como separador de palavras antes de select_highlight_word para evitar aglutinação
+    words_for_highlight = [w for w in sanitized.replace("\\N", " ").split() if w]
+    highlight = cue.highlight_word or select_highlight_word(words_for_highlight)
 
-    if highlight and highlight.lower() in sanitized.lower():
+    if highlight:
         pattern = re.compile(rf"\b({re.escape(highlight)})\b", re.IGNORECASE)
-        formatted_text = pattern.sub(
-            rf"{{\\c{yellow_ass}}}\1{{\\c{white_ass}}}", sanitized, count=1
-        )
+        ass_lines = sanitized.split("\\N")
+        replaced = False
+        formatted_lines: list[str] = []
+        for seg in ass_lines:
+            if not replaced and pattern.search(seg):
+                seg = pattern.sub(rf"{{\\c{yellow_ass}}}\1{{\\c{white_ass}}}", seg, count=1)
+                replaced = True
+            formatted_lines.append(seg)
+        formatted_text = "\\N".join(formatted_lines)
     else:
         formatted_text = sanitized
+
+    if cue.font_size_override is not None:
+        formatted_text = f"{{\\fs{int(cue.font_size_override)}}}{formatted_text}"
 
     return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{formatted_text}"
 
@@ -522,13 +805,29 @@ def _segment_words_into_chunks(
     words: list[str],
     min_words: int = 3,
     max_words: int = 5,
+    *,
+    usable_width_px: float | None = None,
+    font_size: int = ZuntoTypography.SUBTITLE_FONT_SIZE,
+    measurer: FontWidthMeasurer | None = None,
 ) -> list[list[str]]:
-    """Segmenta palavras do roteiro em blocos rítmicos de 3 a 5 palavras sensíveis à pontuação."""
+    """Segmenta palavras do roteiro em blocos rítmicos sensíveis à pontuação e ao limite de 2 linhas."""
+    width_aware = usable_width_px is not None and measurer is not None
+
+    def _fits_two_lines(candidate_words: list[str]) -> bool:
+        if not width_aware or measurer is None or usable_width_px is None:
+            return True
+        return find_balanced_two_line_split(candidate_words, measurer, font_size, usable_width_px) is not None
+
     chunks: list[list[str]] = []
     current_chunk: list[str] = []
 
     for i, word in enumerate(words):
-        current_chunk.append(word)
+        if current_chunk and not _fits_two_lines(current_chunk + [word]):
+            chunks.append(current_chunk)
+            current_chunk = [word]
+        else:
+            current_chunk.append(word)
+
         has_strong_punct = bool(re.search(r"[.!?]+$", word))
         has_pause_punct = bool(re.search(r"[,;:]+$", word))
         words_left = len(words) - (i + 1)
@@ -540,7 +839,11 @@ def _segment_words_into_chunks(
         next_has_strong = bool(re.search(r"[.!?]+$", next_word))
 
         if len(current_chunk) >= max_words:
-            if next_has_strong and len(current_chunk) < max_words + 2:
+            if (
+                next_has_strong
+                and len(current_chunk) < max_words + 2
+                and _fits_two_lines(current_chunk + [next_word])
+            ):
                 continue
             chunks.append(current_chunk)
             current_chunk = []
@@ -556,7 +859,10 @@ def _segment_words_into_chunks(
 
     if current_chunk:
         if len(current_chunk) < min_words and chunks:
-            if len(chunks[-1]) + len(current_chunk) <= max_words + 2:
+            if (
+                len(chunks[-1]) + len(current_chunk) <= max_words + 2
+                and _fits_two_lines(chunks[-1] + current_chunk)
+            ):
                 chunks[-1].extend(current_chunk)
             else:
                 chunks.append(current_chunk)
@@ -572,6 +878,10 @@ def split_script_into_cues(
     min_words: int = 3,
     max_words: int = 5,
     word_timestamps: list[dict] | None = None,
+    *,
+    usable_width_px: float | None = None,
+    font_size: int = ZuntoTypography.SUBTITLE_FONT_SIZE,
+    measurer: FontWidthMeasurer | None = None,
 ) -> list[SubtitleCue]:
     """Segmenta o roteiro em blocos sintáticos naturais e aloca duração proporcional.
 
@@ -591,8 +901,15 @@ def split_script_into_cues(
             )
         ]
 
-    # 1. Segmentação em blocos rítmicos orientados a pontuação
-    chunks = _segment_words_into_chunks(words, min_words=min_words, max_words=max_words)
+    # 1. Segmentação em blocos rítmicos orientados a pontuação e limite horizontal de 2 linhas
+    chunks = _segment_words_into_chunks(
+        words,
+        min_words=min_words,
+        max_words=max_words,
+        usable_width_px=usable_width_px,
+        font_size=font_size,
+        measurer=measurer,
+    )
 
     # 2. Alinhamento temporal com word_timestamps (quando disponível)
     if word_timestamps:
@@ -710,10 +1027,19 @@ def write_ass_subtitles(cues: list[SubtitleCue], output_path: Path) -> Path:
 
 
 def generate_subtitles(config: SubtitleJobConfig) -> Path:
-    """Gera o arquivo de legendas .ass estruturado a partir da configuração de job."""
+    """Gera o arquivo de legendas .ass estruturado a partir da configuração de job com limite global de 2 linhas."""
     config.output_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_font = (
+        config.resolved_font
+        if config.resolved_font is not None
+        else resolve_typography_font()
+    )
     header = build_ass_header(config)
     lines = [header.rstrip()]
+
+    measurer = FontWidthMeasurer(font_path=resolved_font.font_path)
+    available_box_width = max(float(config.play_res_x - config.margin_l - config.margin_r), 120.0)
+    usable_width_px = available_box_width * _SUBTITLE_USABLE_WIDTH_SAFETY_FACTOR
 
     words = [w.strip() for w in config.script_text.replace("\n", " ").split() if w.strip()]
     if words and config.word_timestamps:
@@ -726,6 +1052,9 @@ def generate_subtitles(config: SubtitleJobConfig) -> Path:
             words,
             min_words=config.min_words_per_cue,
             max_words=config.max_words_per_cue,
+            usable_width_px=usable_width_px,
+            font_size=config.font_size,
+            measurer=measurer,
         )
         yellow_ass = hex_to_ass_color(ZuntoPalette.IMPACT_YELLOW)
         white_ass = hex_to_ass_color(ZuntoPalette.PURE_WHITE)
@@ -735,12 +1064,21 @@ def generate_subtitles(config: SubtitleJobConfig) -> Path:
             chunk_len = len(chunk)
             cue_words = aligned_words[word_offset : word_offset + chunk_len]
             word_offset += chunk_len
+            break_idx, eff_fs = fit_chunk_to_two_lines(
+                chunk,
+                measurer,
+                base_font_size=config.font_size,
+                min_font_size=ZuntoTypography.SUBTITLE_MIN_FONT_SIZE,
+                usable_width_px=usable_width_px,
+            )
             lines.extend(
                 generate_word_karaoke_dialogue_events(
                     cue_words=cue_words,
                     yellow_ass_color=yellow_ass,
                     white_ass_color=white_ass,
                     total_audio_duration=config.total_duration,
+                    break_idx=break_idx,
+                    font_size_override=(eff_fs if eff_fs != config.font_size else None),
                 )
             )
     else:
@@ -750,9 +1088,26 @@ def generate_subtitles(config: SubtitleJobConfig) -> Path:
             min_words=config.min_words_per_cue,
             max_words=config.max_words_per_cue,
             word_timestamps=config.word_timestamps,
+            usable_width_px=usable_width_px,
+            font_size=config.font_size,
+            measurer=measurer,
         )
         for cue in cues:
-            lines.append(format_ass_dialogue_line(cue))
+            cue_tokens = [w for w in cue.text.replace("\\N", " ").split() if w]
+            break_idx, eff_fs = fit_chunk_to_two_lines(
+                cue_tokens,
+                measurer,
+                base_font_size=config.font_size,
+                min_font_size=ZuntoTypography.SUBTITLE_MIN_FONT_SIZE,
+                usable_width_px=usable_width_px,
+            )
+            fitted_cue = cue.model_copy(
+                update={
+                    "text": _join_tokens_with_line_break(cue_tokens, break_idx),
+                    "font_size_override": (eff_fs if eff_fs != config.font_size else None),
+                }
+            )
+            lines.append(format_ass_dialogue_line(fitted_cue))
 
     config.output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config.output_path
