@@ -40,6 +40,7 @@ class ZuntoTypography:
     PRIMARY_FONT: Final[str] = "Montserrat"
     FALLBACK_FONT: Final[str] = "DejaVu Sans"
     SUBTITLE_FONT_SIZE: Final[int] = 64
+    SUBTITLE_MIN_FONT_SIZE: Final[int] = 48
     TITLE_FONT_SIZE: Final[int] = 84
     SUBTITLE_MAX_CHARS_PER_LINE: Final[int] = 28
     SUBTITLE_MAX_LINES: Final[int] = 2
