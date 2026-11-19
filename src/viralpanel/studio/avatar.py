@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AvatarConfig:
-    """Configuração geométrica e visual do avatar reaction circular ZUNTO!."""
+    """Configuração geométrica e visual do avatar reaction circular estático ZUNTO!.
+
+    O pipeline oficial de produção (ReactionVideoRenderer e StudioService) opera estritamente
+    com mascote 100% estático (``enable_waveform=False``). O parâmetro ``enable_waveform=True``
+    existe exclusivamente como modo legado isolado para testes unitários, sendo terminantemente
+    proibida sua ativação na esteira de produção do canal ZUNTO!.
+    """
 
     avatar_image_path: Path | str | None = None
     size: int = SafeZones9x16.AVATAR_SIZE
@@ -24,7 +30,7 @@ class AvatarConfig:
     border_width: int = 6
     overlay_x_expr: str = f"W-w-{SafeZones9x16.AVATAR_MARGIN_RIGHT}"
     overlay_y_expr: str = f"H-h-{SafeZones9x16.AVATAR_MARGIN_BOTTOM}"
-    enable_waveform: bool = True
+    enable_waveform: bool = False
     waveform_color: str = "#FACC15@0.85"
 
 
@@ -85,7 +91,7 @@ class BaseAvatarAnimator(ABC):
 
 
 class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
-    """Gera vídeo do avatar circular em canal alfa e espectro reativo calibrado por SafeZones9x16."""
+    """Gera vídeo do avatar circular estático em canal alfa calibrado por SafeZones9x16."""
 
     def __init__(
         self,
@@ -144,28 +150,31 @@ class AudioReactiveAvatarAnimator(BaseAvatarAnimator):
             else:
                 r_val, g_val, b_val = 250, 204, 21
 
-            showwaves_color = self.config.waveform_color
-            if showwaves_color.startswith("#"):
-                showwaves_color = f"0x{showwaves_color[1:]}"
-
-            if self.config.enable_waveform:
-                wave_filter = (
-                    f"[1:a]showwaves=s={size}x80:mode=line:colors={showwaves_color}:draw=full:rate=24,format=rgba[wave];"
-                    f"[base][wave]overlay=x=0:y=H-h-20:shortest=1[composed];"
-                )
-            else:
-                wave_filter = "[base]null[composed];"
-
-            filter_complex = (
-                f"[0:v]scale={size}:{size}:force_original_aspect_ratio=increase,"
-                f"crop={size}:{size},format=rgba[base];"
-                f"{wave_filter}"
-                f"[composed]geq="
+            geq_expr = (
+                f"geq="
                 f"r='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{r_val},r(X,Y)))':"
                 f"g='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{g_val},g(X,Y)))':"
                 f"b='if(gt(hypot(X-{cx},Y-{cy}),{r_outer + 1.0}),0,if(gt(hypot(X-{cx},Y-{cy}),{r_inner}),{b_val},b(X,Y)))':"
-                f"a='clip(255*({r_outer + 1.0}-hypot(X-{cx},Y-{cy}))/2.0, 0, 255)'[vout]"
+                f"a='clip(255*({r_outer + 1.0}-hypot(X-{cx},Y-{cy}))/2.0, 0, 255)'"
             )
+
+            if self.config.enable_waveform:
+                # Modo legado isolado exclusivamente para testes unitários; proibido na esteira de produção ZUNTO!
+                showwaves_color = self.config.waveform_color
+                if showwaves_color.startswith("#"):
+                    showwaves_color = f"0x{showwaves_color[1:]}"
+                filter_complex = (
+                    f"[0:v]scale={size}:{size}:force_original_aspect_ratio=increase,"
+                    f"crop={size}:{size},format=rgba[base];"
+                    f"[1:a]showwaves=s={size}x80:mode=line:colors={showwaves_color}:draw=full:rate=24,format=rgba[wave];"
+                    f"[base][wave]overlay=x=0:y=H-h-20:shortest=1[composed];"
+                    f"[composed]{geq_expr}[vout]"
+                )
+            else:
+                filter_complex = (
+                    f"[0:v]scale={size}:{size}:force_original_aspect_ratio=increase,"
+                    f"crop={size}:{size},format=rgba,{geq_expr}[vout]"
+                )
             cmd = [
                 "ffmpeg",
                 "-y",
