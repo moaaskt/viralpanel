@@ -163,7 +163,7 @@ def test_validate_source_footage_quality_fractional_fps(tmp_path, monkeypatch):
 
 
 def test_check_subtitle_avatar_non_overlap_matrix_with_padding():
-    """Valida por AABB 2D que legendas (1 e 2 linhas) com MarginR=440 e MarginV=420 têm folga >=24px do avatar."""
+    """Valida por AABB 2D que legendas (1 e 2 linhas) com MarginR=440 e MarginV=365 têm folga >=24px do avatar."""
     safe = SafeZones9x16()
     av_x1 = safe.WIDTH - safe.AVATAR_SIZE - safe.AVATAR_MARGIN_RIGHT  # 680
     av_y1 = safe.HEIGHT - safe.AVATAR_SIZE - safe.AVATAR_MARGIN_BOTTOM  # 1360
@@ -174,10 +174,12 @@ def test_check_subtitle_avatar_non_overlap_matrix_with_padding():
     x_text_left = safe.SUBTITLE_MARGIN_LEFT  # 80
     x_text_right = safe.WIDTH - safe.SUBTITLE_MARGIN_RIGHT  # 640
 
-    # 1 linha e 2 linhas no terço inferior (MarginV=420 -> Y_base=1500, Y_topo=1340)
-    sub_1_line = (x_text_left, 1420, x_text_right, safe.SUBTITLE_Y_MAX)
+    # 1 linha e 2 linhas no terço inferior (MarginV=365 -> Y_topo=1400 defensivo, Y_base=1580 defensivo)
+    sub_1_line = (x_text_left, 1474, x_text_right, 1571)
     sub_2_lines = (x_text_left, safe.SUBTITLE_Y_MIN, x_text_right, safe.SUBTITLE_Y_MAX)
 
+    assert safe.SUBTITLE_Y_MIN == 1400
+    assert safe.SUBTITLE_Y_MAX == 1580
     assert check_subtitle_avatar_non_overlap(sub_1_line, avatar_bbox, box_padding=16) is True
     assert check_subtitle_avatar_non_overlap(sub_2_lines, avatar_bbox, box_padding=16) is True
     assert (av_x1 - (x_text_right + 16)) >= 24

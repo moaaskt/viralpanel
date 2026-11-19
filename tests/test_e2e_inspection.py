@@ -608,7 +608,7 @@ def test_avatar_yellow_border_integrity_h264(tmp_path: Path):
 
 
 def test_avatar_no_green_artifacts_synthetic(tmp_path: Path):
-    """Comprova ausência total de artefatos verdes na região de sobreposição do waveform sobre o busto neutro do avatar sintético."""
+    """Comprova ausência total de artefatos verdes na região inferior sobre o busto neutro do avatar sintético."""
     if shutil.which("ffmpeg") is None:
         pytest.skip("FFmpeg necessário para teste de ausência de verde")
 
@@ -665,7 +665,7 @@ def test_avatar_no_green_artifacts_synthetic(tmp_path: Path):
         idx = (y * 1080 + x) * 3
         return raw_bytes[idx], raw_bytes[idx + 1], raw_bytes[idx + 2]
 
-    # Região de interseção do busto do avatar padrão com o waveform calibrada via SafeZones9x16
+    # Região inferior do busto do avatar padrão calibrada via SafeZones9x16
     box_x0 = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT
     box_y0 = SafeZones9x16.HEIGHT - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_BOTTOM
     box_x1 = box_x0 + SafeZones9x16.AVATAR_SIZE

@@ -142,7 +142,7 @@ def test_studio_service_renders_vertical_9x16_reaction_video(tmp_path):
         assert captions_path.exists(), "captions.ass deve ser gerado em service.produce"
         ass_content = captions_path.read_text(encoding="utf-8")
 
-        # 1. Validar BorderStyle=3, MarginL=80, MarginR=440, MarginV=420 e cor de fundo &H000A0A0A&
+        # 1. Validar BorderStyle=3, MarginL=80, MarginR=440, MarginV=365 e cor de fundo &H000A0A0A&
         assert "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding" in ass_content
         assert (
             f",3,16,0,2,{SafeZones9x16.SUBTITLE_MARGIN_LEFT},"
@@ -310,7 +310,7 @@ def test_empirical_reference_frame_ass_rendering(tmp_path):
       * PlayResY = 1920 (espaço de coordenadas vertical)
       * FontSize = 64px
       * Outline / box_padding = 16px (em BorderStyle=3 funciona como padding da caixa)
-      * MarginV = 640px (distância nominal a partir da base inferior)
+      * MarginV = 365px (distância nominal a partir da base inferior)
     - Inspeciona empiricamente a presença de pixels da caixa opaca (#0A0A0A) na região segura
       (Y ≈ 1080px a 1280px) sobre fundo contrastante magenta.
     - Delegação Formal: A comprovação visual definitiva perante as interfaces dinâmicas dos apps móveis
@@ -374,7 +374,7 @@ def test_empirical_reference_frame_ass_rendering(tmp_path):
     bot_r, bot_g, bot_b = get_pixel_rgb(540, 1700)
     assert bot_r > 200 and bot_g < 30 and bot_b > 200, "Base inferior deve permanecer fundo magenta"
 
-    # 2. Inspecionar empiricamente a presença da caixa opaca ZUNTO! (#0A0A0A) no terço inferior (Y 1340..1500, X 80..656)
+    # 2. Inspecionar empiricamente a presença da caixa opaca ZUNTO! (#0A0A0A) no terço inferior (Y 1400..1580, X 80..656)
     dark_box_pixels = 0
     for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
         for x in range(SafeZones9x16.SUBTITLE_MARGIN_LEFT, 657):
@@ -724,7 +724,7 @@ def test_karaoke_subtitles_rendered_pixel_inspection(tmp_path: Path):
         yellow_xs: list[int] = []
         white_count = 0
         dark_box_count = 0
-        # Região Safe Zone calibrada das legendas no terço inferior (Y ~ 1340..1500, X ~ 80..656)
+        # Região Safe Zone calibrada das legendas no terço inferior (Y ~ 1400..1580, X ~ 80..656)
         for y in range(SafeZones9x16.SUBTITLE_Y_MIN, SafeZones9x16.SUBTITLE_Y_MAX + 1):
             for x in range(SafeZones9x16.SUBTITLE_MARGIN_LEFT, 657):
                 idx = (y * 1080 + x) * 3

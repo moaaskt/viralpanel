@@ -40,8 +40,8 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
     assert config.margin_l == 80
     assert config.margin_r == SafeZones9x16.SUBTITLE_MARGIN_RIGHT  # 440
     assert config.margin_r == 440
-    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 420
-    assert config.margin_v == 420
+    assert config.margin_v == SafeZones9x16.SUBTITLE_MARGIN_V  # 365
+    assert config.margin_v == 365
     assert config.resolved_font is None
     assert config.box_padding == 16
     assert config.font_size == ZuntoTypography.SUBTITLE_FONT_SIZE  # 64
@@ -52,7 +52,7 @@ def test_subtitle_job_config_defaults(tmp_path: Path):
 
 
 def test_ass_header_zunto_style():
-    """Valida que o cabeçalho ASS possui BorderStyle=3, margens assimétricas (80,440,420) e cores ZUNTO!."""
+    """Valida que o cabeçalho ASS possui BorderStyle=3, margens assimétricas (80,440,365) e cores ZUNTO!."""
     header = build_ass_header()
 
     assert "PlayResX: 1080" in header
@@ -73,7 +73,7 @@ def test_ass_header_zunto_style():
     assert len(style_lines) == 1
     style = style_lines[0]
 
-    # Style: Default,Montserrat,64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,80,440,420,1
+    # Style: Default,Montserrat,64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,80,440,365,1
     tokens = style.replace("Style: ", "").split(",")
     assert tokens[0] == "Default"
     assert tokens[2] == "64"
@@ -87,7 +87,7 @@ def test_ass_header_zunto_style():
     assert tokens[18] == "2"  # Alignment=2 (Bottom-center)
     assert tokens[19] == "80"  # MarginL=80
     assert tokens[20] == "440"  # MarginR=440
-    assert tokens[21] == "420"  # MarginV=420
+    assert tokens[21] == "365"  # MarginV=365
 
 
 def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
@@ -113,6 +113,7 @@ def test_generate_subtitles_tracer_end_to_end(tmp_path: Path):
         f",3,16,0,2,{SafeZones9x16.SUBTITLE_MARGIN_LEFT},"
         f"{SafeZones9x16.SUBTITLE_MARGIN_RIGHT},{SafeZones9x16.SUBTITLE_MARGIN_V},1"
     ) in content
+    assert ",3,16,0,2,80,440,365,1" in content
     assert "Dialogue: 0," in content
 
 
@@ -653,9 +654,9 @@ def test_subtitle_service_wiring_and_sidecar_validation(tmp_path: Path):
 
 
 def test_ass_header_contains_asymmetric_margins():
-    """Valida que build_ass_header emite Alignment=2, MarginL=80, MarginR=440, MarginV=420."""
+    """Valida que build_ass_header emite Alignment=2, MarginL=80, MarginR=440, MarginV=365."""
     header = build_ass_header()
-    assert ",2,80,440,420,1" in header
+    assert ",2,80,440,365,1" in header
 
 
 def test_subtitle_job_config_custom_margins(tmp_path: Path):
