@@ -151,6 +151,13 @@ None yet.
 
 None yet.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 261119-12d | Render first real ZUNTO! Great White Shark Short in run_google_flow_shark_001 | 2026-11-19 | none | complete | .planning/quick/261119-12d-render-first-real-zunto-great-white-shar |
+| 261119-1pv | Enforce strict two-line subtitle limit with width-aware reflow and font fallback | 2026-11-19 | none | complete | .planning/quick/261119-1pv-enforce-strict-two-line-subtitle-limit-w |
+
 ## Session
 
 **Last session:** 2026-11-19T03:30:00Z
