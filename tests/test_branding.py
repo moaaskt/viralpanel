@@ -40,6 +40,7 @@ def test_zunto_typography_constants():
     assert typography.PRIMARY_FONT == "Montserrat"
     assert typography.FALLBACK_FONT == "DejaVu Sans"
     assert typography.SUBTITLE_FONT_SIZE == 64
+    assert typography.SUBTITLE_MIN_FONT_SIZE == 48
     assert typography.TITLE_FONT_SIZE == 84
     assert typography.SUBTITLE_MAX_CHARS_PER_LINE == 28
     assert typography.SUBTITLE_MAX_LINES == 2

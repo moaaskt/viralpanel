@@ -930,3 +930,266 @@ def test_mp4_karaoke_audio_energy_cross_validation(tmp_path: Path):
         assert sil_stats["yellow_count"] == 0, f"Destaque amarelo indevido durante silêncio t={sil_t}s: {sil_stats}"
 
 
+def count_rendered_text_lines_in_rgb_frame(
+    raw_bytes: bytes,
+    width: int = 1080,
+    height: int = 1920,
+    *,
+    y_start: int = 1000,
+    max_diacritic_gap_px: int = 6,
+    min_band_height_px: int = 8,
+) -> dict:
+    """Conta explicitamente o número real de linhas de texto renderizadas pelo libass em um frame RGB24.
+
+    Projeta horizontalmente pixels reais de glifos (branco #FFFFFF e destaque amarelo #FACC15,
+    excluindo fundo magenta #FF00FF e caixa opaca #0A0A0A) e agrupa bandas verticais contíguas.
+    O limiar ``max_diacritic_gap_px=6`` funde diacríticos portugueses (á, é, í, ã, õ, ç) ao corpo
+    do glifo sem unir linhas distintas mesmo com fonte reduzida (48px ou 42px).
+    """
+    box_min_x, box_max_x = width, -1
+    box_min_y, box_max_y = height, -1
+    glyph_rows: list[int] = []
+
+    for y in range(y_start, height):
+        row_start = y * width * 3
+        glyph_px_in_row = 0
+        for x in range(width):
+            idx = row_start + x * 3
+            r = raw_bytes[idx]
+            g = raw_bytes[idx + 1]
+            b = raw_bytes[idx + 2]
+            # Caixa opaca #0A0A0A
+            if r < 30 and g < 30 and b < 30:
+                if x < box_min_x:
+                    box_min_x = x
+                if x > box_max_x:
+                    box_max_x = x
+                if y < box_min_y:
+                    box_min_y = y
+                if y > box_max_y:
+                    box_max_y = y
+            # Glifo de texto (branco #FFFFFF ou amarelo ativo #FACC15), excluindo fundo magenta (255, 0, 255)
+            elif r > 130 and g > 120:
+                glyph_px_in_row += 1
+        if glyph_px_in_row >= 4:
+            glyph_rows.append(y)
+
+    raw_bands: list[list[int]] = []
+    for y in glyph_rows:
+        if not raw_bands or y - raw_bands[-1][1] > 1:
+            raw_bands.append([y, y])
+        else:
+            raw_bands[-1][1] = y
+
+    merged_bands: list[list[int]] = []
+    for band in raw_bands:
+        if merged_bands and (band[0] - merged_bands[-1][1] - 1) <= max_diacritic_gap_px:
+            merged_bands[-1][1] = band[1]
+        else:
+            merged_bands.append(list(band))
+
+    valid_bands = [
+        (b0, b1) for b0, b1 in merged_bands if (b1 - b0 + 1) >= min_band_height_px
+    ]
+    return {
+        "line_count": len(valid_bands),
+        "bands": valid_bands,
+        "box_bounds": (box_min_x, box_max_x, box_min_y, box_max_y),
+    }
+
+
+def _render_ass_events_one_frame_each(
+    ass_source_path: Path,
+    tmp_path: Path,
+    prefix: str,
+) -> tuple[list[str], list[dict]]:
+    """Remapeia cada evento Dialogue do arquivo ASS para 1 frame (1 fps) e mede todos via libass."""
+    resolved_font = resolve_typography_font()
+    escaped_fontsdir = str(resolved_font.fonts_dir).replace("\\", "/").replace(":", "\\:")
+
+    src_lines = ass_source_path.read_text(encoding="utf-8").splitlines()
+    header_lines = [l for l in src_lines if not l.startswith("Dialogue:")]
+    dialogue_lines = [l for l in src_lines if l.startswith("Dialogue:")]
+    assert len(dialogue_lines) > 0
+
+    def _fmt_sec(sec: int) -> str:
+        mins, s = divmod(sec, 60)
+        hrs, m = divmod(mins, 60)
+        return f"{hrs}:{m:02d}:{s:02d}.00"
+
+    remapped_dialogues: list[str] = []
+    event_texts: list[str] = []
+    for idx, dl in enumerate(dialogue_lines):
+        text_part = dl.split(",", 9)[9]
+        event_texts.append(text_part)
+        remapped_dialogues.append(
+            f"Dialogue: 0,{_fmt_sec(idx)},{_fmt_sec(idx + 1)},Default,,0,0,0,,{text_part}"
+        )
+
+    packed_ass = tmp_path / f"{prefix}_packed.ass"
+    packed_ass.write_text("\n".join(header_lines + remapped_dialogues) + "\n", encoding="utf-8")
+    escaped_ass = str(packed_ass.resolve()).replace("\\", "/").replace(":", "\\:")
+
+    raw_path = tmp_path / f"{prefix}_frames.rgb"
+    n_frames = len(remapped_dialogues)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=magenta:s=1080x1920:r=1:d={n_frames}",
+            "-vf",
+            f"ass='{escaped_ass}':fontsdir='{escaped_fontsdir}'",
+            "-frames:v",
+            str(n_frames),
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            str(raw_path),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=90,
+    )
+
+    raw_bytes = raw_path.read_bytes()
+    frame_size = 1080 * 1920 * 3
+    assert len(raw_bytes) == frame_size * n_frames
+
+    results: list[dict] = []
+    for idx in range(n_frames):
+        frame_slice = raw_bytes[idx * frame_size : (idx + 1) * frame_size]
+        results.append(count_rendered_text_lines_in_rgb_frame(frame_slice))
+    return event_texts, results
+
+
+def test_libass_rendered_line_counter_calibration_including_reduced_fonts(tmp_path: Path):
+    """Valida a calibração do contador de linhas no libass: 1L, 2L (64px/48px/42px) e controle negativo 3L."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para calibração de contagem de linhas no libass")
+
+    resolved_font = resolve_typography_font()
+    safe = SafeZones9x16()
+    ass_path = tmp_path / "line_counter_calibration.ass"
+    cues = [
+        ("0:00:00.00", "0:00:01.00", "Você não sabia."),
+        ("0:00:01.00", "0:00:02.00", "seus dentes são\\Nconstantemente"),
+        ("0:00:02.00", "0:00:03.00", "{\\fs48}seus dentes são\\Nconstantemente"),
+        ("0:00:03.00", "0:00:04.00", "{\\fs42}seus dentes são\\Nconstantemente"),
+        ("0:00:04.00", "0:00:05.00", "linha um\\Nlinha dois\\Nlinha três"),
+    ]
+    events = "\n".join(f"Dialogue: 0,{s},{e},Default,,0,0,0,,{t}" for s, e, t in cues)
+    ass_path.write_text(
+        f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {safe.WIDTH}
+PlayResY: {safe.HEIGHT}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{resolved_font.font_name},64,&H00FFFFFF&,&H0015CCFA&,&H000A0A0A&,&H000A0A0A&,-1,0,0,0,100,100,0,0,3,16,0,2,{safe.SUBTITLE_MARGIN_LEFT},{safe.SUBTITLE_MARGIN_RIGHT},{safe.SUBTITLE_MARGIN_V},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+{events}
+""",
+        encoding="utf-8",
+    )
+
+    _, stats = _render_ass_events_one_frame_each(ass_path, tmp_path, "calib")
+    assert stats[0]["line_count"] == 1, f"1L acentuada falhou: {stats[0]}"
+    assert stats[1]["line_count"] == 2, f"2L em 64px falhou: {stats[1]}"
+    assert stats[2]["line_count"] == 2, f"2L em 48px não pode ser fundida em 1 linha: {stats[2]}"
+    assert stats[3]["line_count"] == 2, f"2L em 42px não pode ser fundida em 1 linha: {stats[3]}"
+    assert stats[4]["line_count"] == 3, f"Controle negativo 3L deve retornar 3: {stats[4]}"
+
+
+def test_all_individual_active_word_highlight_events_never_exceed_two_rendered_lines(tmp_path: Path):
+    """Comprova via renderização real no libass que 100% dos eventos individuais (inclusive 61 eventos do tubarão e palavra extrema) têm <=2 linhas."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("FFmpeg necessário para inspeção real de contagem de linhas no libass")
+
+    resolved_font = resolve_typography_font()
+    shark_script = (
+        "Você sabia que existe um predador capaz de detectar até os sinais elétricos dos músculos de suas presas?\n\n"
+        "Esse é o tubarão-branco!\n\n"
+        "Ele pode ultrapassar seis metros de comprimento e pesar mais de duas toneladas.\n\n"
+        "E tem um detalhe impressionante: seus dentes são constantemente substituídos ao longo da vida.\n\n"
+        "Agora imagine encontrar esse gigante cara a cara no fundo do oceano!"
+    )
+    shark_words = [w.strip() for w in shark_script.replace("\n", " ").split() if w.strip()]
+    shark_ts = [
+        {"word": w, "start": round(i * 0.35, 3), "end": round((i + 1) * 0.35 - 0.03, 3)}
+        for i, w in enumerate(shark_words)
+    ]
+
+    shark_ass = tmp_path / "shark_real_61_events.ass"
+    generate_subtitles(
+        SubtitleJobConfig(
+            script_text=shark_script,
+            total_duration=22.8,
+            output_path=shark_ass,
+            resolved_font=resolved_font,
+            word_timestamps=shark_ts,
+            timing_mode="word_timestamp_aligned",
+        )
+    )
+
+    event_texts, shark_stats = _render_ass_events_one_frame_each(shark_ass, tmp_path, "shark61")
+    assert len(shark_stats) == 61
+    avatar_left_x = SafeZones9x16.WIDTH - SafeZones9x16.AVATAR_SIZE - SafeZones9x16.AVATAR_MARGIN_RIGHT  # 680
+
+    for idx, (ev_txt, st) in enumerate(zip(event_texts, shark_stats)):
+        assert 1 <= st["line_count"] <= 2, (
+            f"Evento #{idx} ({ev_txt!r}) renderizou {st['line_count']} linhas (> 2): bands={st['bands']}"
+        )
+        assert ev_txt.count("\\N") <= 1
+        _, max_x, min_y, max_y = st["box_bounds"]
+        assert min_y >= SafeZones9x16.SUBTITLE_Y_MIN, f"Evento #{idx} invadiu topo {min_y} < 1400: {ev_txt!r}"
+        assert max_y <= SafeZones9x16.SUBTITLE_Y_MAX, f"Evento #{idx} invadiu base {max_y} > 1580: {ev_txt!r}"
+        assert max_x <= 656 and (avatar_left_x - max_x) >= 24, (
+            f"Evento #{idx} violou folga horizontal (max_x={max_x}): {ev_txt!r}"
+        )
+
+    # Cenário misto: frases curtas, médias, longas e palavra extrema indivisível (Active Word Highlight + proporcional)
+    mixed_script = (
+        "Foco agora. "
+        "Um detalhe extraordinariamente relevante sobre responsabilidade. "
+        "A palavra inconstitucionalissimamente apareceu hoje."
+    )
+    mixed_words = mixed_script.split()
+    mixed_ts = [
+        {"word": w, "start": round(i * 0.4, 3), "end": round((i + 1) * 0.4 - 0.04, 3)}
+        for i, w in enumerate(mixed_words)
+    ]
+
+    for mode_label, ts_arg in [("karaoke", mixed_ts), ("proportional", None)]:
+        mixed_ass = tmp_path / f"mixed_{mode_label}.ass"
+        generate_subtitles(
+            SubtitleJobConfig(
+                script_text=mixed_script,
+                total_duration=8.0,
+                output_path=mixed_ass,
+                resolved_font=resolved_font,
+                word_timestamps=ts_arg,
+                timing_mode="word_timestamp_aligned" if ts_arg else "proportional_character_estimate",
+            )
+        )
+        m_texts, m_stats = _render_ass_events_one_frame_each(mixed_ass, tmp_path, f"mixed_{mode_label}")
+        assert len(m_stats) >= 1
+        for idx, (ev_txt, st) in enumerate(zip(m_texts, m_stats)):
+            assert 1 <= st["line_count"] <= 2, (
+                f"[{mode_label}] Evento #{idx} ({ev_txt!r}) renderizou {st['line_count']} linhas (> 2): bands={st['bands']}"
+            )
+            _, max_x, min_y, max_y = st["box_bounds"]
+            assert min_y >= SafeZones9x16.SUBTITLE_Y_MIN
+            assert max_y <= SafeZones9x16.SUBTITLE_Y_MAX
+            assert max_x <= 656 and (avatar_left_x - max_x) >= 24
+
+
+
