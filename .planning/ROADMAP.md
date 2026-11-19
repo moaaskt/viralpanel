@@ -17,6 +17,7 @@
 - [ ] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados
 - [x] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** - Active Word Highlight palavra por palavra sincronizado com WordBoundary real da narração (completed 2026-11-17)
 - [ ] **Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)** - Composição visual 9:16 preservando 100% do footage original com fundo desfocado e legendas no terço inferior sem colisão com o mascote
+- [ ] **Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)** - Realinhamento vertical das legendas ao centro do avatar ZUNTO! e remoção do efeito de frequência mantendo o mascote estático
 - [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
 - [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
 
@@ -135,6 +136,17 @@ Plans:
 - [x] 13-01-PLAN.md
 - [ ] 13-02-PLAN.md
 
+### Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)
+
+**Goal:** Calibrar o alinhamento vertical da caixa de legendas no terço inferior em relação ao centro vertical do avatar ZUNTO! ($Y \approx 1490\text{ px}$), avaliando legendas de 1 e 2 linhas e preservando as margens assimétricas ($MarginL=80, MarginR=440$), ausência de colisão com folga $\ge 24\text{ px}$ e safe zones mobile, além de remover completamente o efeito de frequência/ondas (`showwaves`) do interior do avatar, mantendo o mascote 100% estático com máscara circular suave e anel amarelo oficial `#FACC15`.
+**Requirements**: SUB-04, AVTR-04, QUAL-03
+**Depends on:** Phase 13.2
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 13.3 to break down)
+
 ### Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)
 
 **Goal:** Implementar a composição visual "Cinematic Backdrop & Stage 9:16" no `ReactionVideoRenderer`, preservando 100% da área do footage original (sem cortes laterais destrutivos) através de foreground dinâmico nítido e background ampliado com desfoque e escurecimento, reposicionar as legendas dinâmicas no terço inferior ($MarginV \approx 420$) com reserva de margem horizontal configurável ($MarginR \ge 440$) garantindo separação física estrita de no mínimo 24px com contorno em relação ao mascote ($X \ge 680$), calibrar o avatar contra a safe zone de botões de engajamento mobile ($X \le 940$), especificar composições para Landscape, Portrait e Square/4:5, e validar visualmente com footage real.
@@ -173,6 +185,7 @@ Plans:
 | Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 0/0 | In progress | - |
 | Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
 | Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 0/1 | Planned | - |
+| Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED) | 0/1 | Planned | - |
 | Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
 | Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
