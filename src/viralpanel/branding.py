@@ -62,13 +62,13 @@ class SafeZones9x16:
     RIGHT_MARGIN: Final[int] = 140     # Evitar botões de like, comentários, salvar e compartilhar
     LEFT_MARGIN: Final[int] = 48       # Margem lateral esquerda segura base
 
-    # Zonas calibradas de legendas no terço inferior (Phase 13.2)
+    # Zonas calibradas de legendas no terço inferior (Phase 13.3)
     # MarginL=80, MarginR=440 confinam texto em X in [80, 640] e caixa com padding<=656px
-    SUBTITLE_MARGIN_V: Final[int] = 420
+    SUBTITLE_MARGIN_V: Final[int] = 365
     SUBTITLE_MARGIN_RIGHT: Final[int] = 440
     SUBTITLE_MARGIN_LEFT: Final[int] = 80
-    SUBTITLE_Y_MIN: Final[int] = 1340
-    SUBTITLE_Y_MAX: Final[int] = 1500
+    SUBTITLE_Y_MIN: Final[int] = 1400
+    SUBTITLE_Y_MAX: Final[int] = 1580
 
     # Avatar Reaction: Canto inferior direito livre da coluna de botões (X<=940) e barra (Y<=1620)
     # Bounding box: X in [680, 940], Y in [1360, 1620]
