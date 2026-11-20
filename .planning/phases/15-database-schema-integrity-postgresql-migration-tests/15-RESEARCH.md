@@ -774,7 +774,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]" || pip install -r requirements.txt
+          pip install -e ".[dev]"
 
       - name: Run PostgreSQL Migration Tests (Mandatory in CI)
         run: |
@@ -823,4 +823,4 @@ jobs:
   - Teste contra PostgreSQL real consome EXCLUSIVAMENTE `TEST_DATABASE_URL` (zero fallback para database_url da aplicação), com pré-validação estrita do banco dedicado, descartável e recriável `viralpanel_test`, hosts restritos a `SAFE_LOCAL_HOSTS` de modo coerente em local e CI sem bypass de CI (ou controle separado `ALLOW_REMOTE_TEST_DATABASE=true`), autorização explícita obrigatória `ALLOW_DESTRUCTIVE_TEST_DATABASE=true` antes de criar a engine ou conectar, e asserção em runtime de `SELECT current_database() == 'viralpanel_test'`.
   - No CI, falha obrigatória com `pytest.fail()` se `TEST_DATABASE_URL` estiver ausente/inválida, apontar para outro banco, `ALLOW_DESTRUCTIVE_TEST_DATABASE` não for `true` ou o banco estiver inacessível. Em dev local, skip informativo seguro sem tentar acessar nenhum banco.
 - [ ] Arquivo `.github/workflows/ci.yml` configurado com serviço `postgres:16`, `TEST_DATABASE_URL` apontando para `viralpanel_test`, `ALLOW_DESTRUCTIVE_TEST_DATABASE: "true"` e execução obrigatória dos testes de migração.
-- [ ] 100% dos testes passando (`117 passed` preexistentes + novos testes de migração).
+- [ ] 100% dos testes passando (aprovação integral de toda a suíte de regressão do repositório + novos testes de migração).

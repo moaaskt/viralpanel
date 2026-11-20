@@ -2,11 +2,67 @@
   "contract": "1.0.0",
   "flavor": "core",
   "milestone": "v1.1 — ZUNTO! Visual Engine",
-  "phases": [],
+  "phases": [
+    {
+      "number": "8",
+      "name": "Auditoria, Contratos e Diagnóstico de Causa Raiz",
+      "status": "complete"
+    },
+    {
+      "number": "9",
+      "name": "Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!",
+      "status": "complete"
+    },
+    {
+      "number": "10",
+      "name": "Motor de Legendas ZUNTO! e Desacoplamento",
+      "status": "complete"
+    },
+    {
+      "number": "11",
+      "name": "Avatar Reaction e Composição Visual Orgânica",
+      "status": "complete"
+    },
+    {
+      "number": "12",
+      "name": "Refatoração do Video Composer FFmpeg e Integração",
+      "status": "complete"
+    },
+    {
+      "number": "13",
+      "name": "Validação Técnica Automatizada e Inspeção Audiovisual E2E",
+      "status": "complete"
+    },
+    {
+      "number": "13.1",
+      "name": "Word-by-Word Karaoke Captions (INSERTED)",
+      "status": "complete"
+    },
+    {
+      "number": "13.2",
+      "name": "Cinematic Backdrop and Subtitle Stage Composition (INSERTED)",
+      "status": "complete"
+    },
+    {
+      "number": "13.3",
+      "name": "Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)",
+      "status": "complete"
+    },
+    {
+      "number": "14",
+      "name": "Formalização da Coleta e Scraper (Retrospectiva)",
+      "status": "complete"
+    },
+    {
+      "number": "15",
+      "name": "Database Schema Integrity & PostgreSQL Migration Tests",
+      "status": "pending"
+    }
+  ],
   "next": {
-    "command": "/gsd-progress --next",
-    "label": "Advance to the next step (Phase 13 complete)",
-    "reason": "Phase 13 complete — ready for milestone completion review or Phase 15"
+    "command": "/gsd-progress",
+    "label": "Show progress",
+    "reason": "Unsure of state — showing progress"
   },
-  "updated_at": "2026-11-19T20:21:12.701Z"
+  "updated_at": "2026-11-19T22:39:12.060Z"
 }

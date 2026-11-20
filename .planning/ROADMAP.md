@@ -177,17 +177,17 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
-| Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
-| Phase 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
-| Phase 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
-| Phase 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
-| Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 2/2 | Complete | 2026-11-19 |
-| Phase 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
-| Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 1/1 | Complete | 2026-11-19 |
-| Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED) | 1/1 | Complete | 2026-11-19 |
-| Phase 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
-| Phase 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
+| 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
+| 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
+| 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
+| 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
+| 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
+| 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 2/2 | Complete | 2026-11-19 |
+| 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
+| 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 1/1 | Complete | 2026-11-19 |
+| 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED) | 1/1 | Complete | 2026-11-19 |
+| 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
+| 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
 
 ### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
 
