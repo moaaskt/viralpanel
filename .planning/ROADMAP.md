@@ -19,7 +19,7 @@
 - [x] **Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)** - Composição visual 9:16 preservando 100% do footage original com fundo desfocado e legendas no terço inferior sem colisão com o mascote (completed 2026-11-19)
 - [x] **Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)** - Realinhamento vertical das legendas ao centro do avatar ZUNTO! e remoção do efeito de frequência mantendo o mascote estático (completed 2026-11-19)
 - [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
-- [ ] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL
+- [x] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL (completed 2026-11-20)
 
 ## Phase Details
 
@@ -187,7 +187,7 @@ Plans:
 | 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 1/1 | Complete | 2026-11-19 |
 | 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED) | 1/1 | Complete | 2026-11-19 |
 | 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
-| 15: Database Schema Integrity & PostgreSQL Migration Tests | 0/0 | Not started | - |
+| 15: Database Schema Integrity & PostgreSQL Migration Tests | 1/1 | Complete | 2026-11-20 |
 
 ### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
 
@@ -205,10 +205,10 @@ Plans:
 **Goal:** Corrigir o schema drift do banco de dados, implementar migração incremental isolada mantendo imutabilidade de 001, refatorar alembic/env.py para injeção de conexão e validar migrações com PostgreSQL real e SQLite.
 **Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05
 **Depends on:** Phase 14
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 
 **Wave 1:**
 
-- [ ] 15-01-PLAN.md — Refatoração de alembic/env.py, Migração Incremental 002 e Testes de Schema Drift
+- [x] 15-01-PLAN.md — Refatoração de alembic/env.py, Migração Incremental 002 e Testes de Schema Drift

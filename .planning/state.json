@@ -56,13 +56,13 @@
     {
       "number": "15",
       "name": "Database Schema Integrity & PostgreSQL Migration Tests",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd-progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd-new-milestone",
+    "label": "Start a new milestone",
+    "reason": "All phases complete — start a new milestone"
   },
-  "updated_at": "2026-11-19T22:39:12.060Z"
+  "updated_at": "2026-11-20T03:12:37.681Z"
 }
