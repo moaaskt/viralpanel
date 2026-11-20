@@ -27,9 +27,9 @@ created: "2026-11-14"
 
 ## Sampling Rate
 
-- **After every task commit:** Run `.venv\Scripts\pytest.exe -q tests/test_migrations.py`
+- **After every task:** Run `.venv\Scripts\pytest.exe -q tests/test_migrations.py` (execução local após cada tarefa, sem criação de commits; commits dependem de autorização expressa do Project Owner)
 - **After every plan wave:** Run `.venv\Scripts\pytest.exe -q`
-- **Before `/gsd-verify-work`:** Full suite must be green (117+ tests passed)
+- **Before `/gsd-verify-work`:** Full suite must be green (100% de aprovação integral da suíte global de testes)
 - **Max feedback latency:** 10 seconds
 
 ---
