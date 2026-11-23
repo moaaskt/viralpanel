@@ -4,6 +4,7 @@ import json
 import logging
 import shutil
 import subprocess
+import wave
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -259,7 +260,13 @@ class MockVoiceSynthesizer(BaseVoiceSynthesizer):
             actual = probe_duration(output_path) or duration
             return output_path, round(actual, 2)
 
-        output_path.write_bytes(b"RIFFMOCKWAV")
+        sample_rate = 24000
+        num_frames = int(duration * sample_rate)
+        with wave.open(str(output_path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(b"\x00\x00" * num_frames)
         return output_path, duration
 
 
