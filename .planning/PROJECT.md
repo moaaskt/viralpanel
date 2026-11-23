@@ -8,17 +8,10 @@ ViralPanel é um pipeline autônomo de geração e publicação de conteúdo vir
 
 Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos curtos de alta qualidade com consistência diária (meta de 6 vídeos por dia) e controle de qualidade supervisionado via Telegram, liberando o criador solo da rotina de produção manual.
 
-## Current Milestone: v1.1 ZUNTO! Visual Engine
+## Milestone Status
 
-**Goal:** Refatorar e aprimorar o pipeline de geração e composição audiovisual, elevando a qualidade dos vídeos produzidos automaticamente pelo sistema com a identidade visual ZUNTO!.
-
-**Target features:**
-- Motor de legendas com sincronização refinada, sem duplicação e visual ZUNTO!
-- Composição e recorte orgânico de avatar reaction sem aspecto de imagem quadrada
-- Refatoração do Video Composer em camadas limpas com validação de saída 1080x1920
-- Identidade visual e branding ZUNTO! (preto, amarelo de impacto e branco)
-- Aprimoramento editorial dos roteiros no Gemini (ganchos provocativos, retenção alta)
-- Validação automatizada de integridade e qualidade audiovisual do vídeo final
+- **v1.0 MVP**: Shipped (2026-11-05) — Pipeline autônomo ponta a ponta validado.
+- **v1.1 ZUNTO! Visual Engine**: Shipped (2026-11-20) — Motor de legendas karaokê desacoplado, avatar circular reaction, composition stage 9:16 com backdrop cinematográfico, roteirista Gemini e zero schema drift em PostgreSQL 16. *(Nota: Execução remota no GitHub Actions pendente de push — `POSTGRES-16-CI-EXECUTION`).*
 
 ## Business Context
 
@@ -31,28 +24,31 @@ Automatizar 100% do ciclo de descoberta, produção e publicação de vídeos cu
 
 ### Validated
 
-- [x] RF01: Execução agendada diária às 01:00 (America/Sao_Paulo) e orquestração de tarefas distribuídas via Celery + Redis
-- [x] RF02: Módulo Discovery de vídeos virais no TikTok no nicho de desenvolvimento pessoal via scraper próprio (Playwright + yt-dlp)
-- [x] RF03: Algoritmo de cálculo de score de viralidade configurável via YAML (views mínimas, likes/views ratio, taxa de crescimento em 24h)
-- [x] RF04: Seleção do melhor vídeo candidato por score com filtro de descarte para itens já processados
-- [x] RF05: Download automatizado do vídeo candidato e extração de áudio isolado via yt-dlp e FFmpeg
-- [x] RF06: Transcrição de áudio com marcação de tempo (timestamps) usando Whisper / faster-whisper
-- [x] RF07: Geração de roteiro original com Gemini 2.5 Flash com estrutura rígida (gancho 0–3s, desenvolvimento 4–45s, CTA final)
-- [x] RF08: Módulo de voz com interface modular para voz clonada do criador utilizando XTTS / Voice Studio
-- [x] RF09: Geração do avatar virtual (formato reaction em overlay) e composição do vídeo final 9:16 com legendas automáticas via FFmpeg
-- [x] RF10: Integração de publicação direta com APIs oficiais: TikTok Content Posting API, Meta Graph API (Instagram Reels) e YouTube Data API v3
-- [x] RF11: Bot no Telegram para observabilidade em tempo real e modo supervisionado (aprovação/rejeição com preview de vídeo antes da postagem)
-- [x] RF12: Persistência relacional em PostgreSQL (modelos: source_videos, scripts, assets, publications, runs)
-- [x] RF13: Painel web administrativo em React + Chakra UI (design limpo, profissional, sem neon) para monitoramento de filas, histórico e métricas
+- [x] RF01: Execução agendada diária às 01:00 (America/Sao_Paulo) e orquestração de tarefas distribuídas via Celery + Redis *(v1.0)*
+- [x] RF02: Módulo Discovery de vídeos virais no TikTok no nicho de desenvolvimento pessoal via scraper próprio (Playwright + yt-dlp) *(v1.0)*
+- [x] RF03: Algoritmo de cálculo de score de viralidade configurável via YAML (views mínimas, likes/views ratio, taxa de crescimento em 24h) *(v1.0)*
+- [x] RF04: Seleção do melhor vídeo candidato por score com filtro de descarte para itens já processados *(v1.0)*
+- [x] RF05: Download automatizado do vídeo candidato e extração de áudio isolado via yt-dlp e FFmpeg *(v1.0)*
+- [x] RF06: Transcrição de áudio com marcação de tempo (timestamps) usando Whisper / faster-whisper *(v1.0)*
+- [x] RF07: Geração de roteiro original com Gemini 2.5 Flash com estrutura rígida (gancho 0–3s, desenvolvimento 4–45s, CTA final) *(v1.0)*
+- [x] RF08: Módulo de voz com interface modular para voz clonada do criador utilizando XTTS / Voice Studio *(v1.0)*
+- [x] RF09: Geração do avatar virtual (formato reaction em overlay) e composição do vídeo final 9:16 com legendas automáticas via FFmpeg *(v1.0)*
+- [x] RF10: Integração de publicação direta com APIs oficiais: TikTok Content Posting API, Meta Graph API (Instagram Reels) e YouTube Data API v3 *(v1.0)*
+- [x] RF11: Bot no Telegram para observabilidade em tempo real e modo supervisionado (aprovação/rejeição com preview de vídeo antes da postagem) *(v1.0)*
+- [x] RF12: Persistência relacional em PostgreSQL (modelos: source_videos, scripts, assets, publications, runs) *(v1.0)*
+- [x] RF13: Painel web administrativo em React + Chakra UI (design limpo, profissional, sem neon) para monitoramento de filas, histórico e métricas *(v1.0)*
+- [x] RF14: Motor de legendas desacoplado, sem duplicações e estilização ASS/SRT ZUNTO! com Active Word Highlight (karaokê) *(v1.1)*
+- [x] RF15: Avatar reaction com recorte circular suave (RGBA PNG em MP4), borda amarela de 3px e safe zone vertical ($X \le 940$, $Y=1320..1600$) *(v1.1)*
+- [x] RF16: Video Composer em single-pass FFmpeg com composição determinística 9:16 e Cinematic Backdrop (desfocado e escurecido) para 16:9 *(v1.1)*
+- [x] RF17: Identidade visual ZUNTO! integrada (#0A0A0A, #FACC15, #FFFFFF) e slogan contextual sem repetição mecânica forçada *(v1.1)*
+- [x] RF18: Roteirista Gemini 2.5 Flash com ganchos fortes de 0-3s, CTA dinâmico e rastreabilidade factual em metadata_json *(v1.1)*
+- [x] RF19: Módulo MediaQualityValidator para validação de integridade audiovisual automatizada combinada com inspeção humana *(v1.1)*
+- [x] RF20: Deduplicação e normalização canônica de URLs do TikTok com limpeza atômica em retries de download *(v1.1)*
+- [x] RF21: Migração incremental 002 (metadata_json), injeção dinâmica de conexão no Alembic e zero schema drift em PostgreSQL 16 *(v1.1)*
 
 ### Active
 
-- [ ] Motor de legendas com sincronização precisa e sem duplicações (identidade ZUNTO!)
-- [ ] Composição aprimorada do avatar (recorte, proporção 9:16 sem bordas quadradas)
-- [ ] Refatoração do Video Composer (camadas estruturadas, sem sobreposição de filtros/legendas)
-- [ ] Identidade visual ZUNTO! integrada (paleta preto/amarelo/branco, slogan "Você não sabia. Agora sabe.")
-- [ ] Prompts do roteirista Gemini aprimorados (ganchos fortes 0-3s, narrativa provocativa e dinâmica)
-- [ ] Suite de validação de qualidade audiovisual do vídeo final gerado
+*Nenhum requisito ativo no momento. Aguardando definição do próximo ciclo de milestone.*
 
 ### Out of Scope
 

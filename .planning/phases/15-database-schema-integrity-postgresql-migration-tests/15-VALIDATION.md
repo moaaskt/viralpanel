@@ -1,9 +1,9 @@
 ---
 phase: "15"
 slug: "database-schema-integrity-postgresql-migration-tests"
-status: draft
+status: complete
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: "2026-11-14"
 ---
 
@@ -38,10 +38,10 @@ created: "2026-11-14"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 15-01-01 | 01 | 1 | MIGR-02 | T-15-01 | Previne injeção não autorizada de DDL validando conexão e URL controladas | unit | `.venv\Scripts\pytest.exe tests/test_migrations.py -k "test_alembic_env_connection_injection"` | ❌ W0 | ⬜ pending |
-| 15-01-02 | 01 | 1 | MIGR-01 | T-15-02 | Imutabilidade da migração 001 e idempotência do downgrade 002 | migration | `.venv\Scripts\pytest.exe tests/test_migrations.py -k "test_migration_002_upgrade_and_downgrade"` | ❌ W0 | ⬜ pending |
-| 15-01-03 | 01 | 1 | MIGR-03, MIGR-04, MIGR-05 | T-15-03, T-15-04 | Isolamento estrito de TEST_DATABASE_URL (zero fallback para banco da aplicação, banco dedicado/descartável/recriável viralpanel_test, validação coerente de SAFE_LOCAL_HOSTS={'localhost','127.0.0.1','::1','postgres'} em local e CI sem bypass de CI, controle separado ALLOW_REMOTE_TEST_DATABASE, autorização explícita ALLOW_DESTRUCTIVE_TEST_DATABASE='true' antes de criar engine ou conectar e asserção em runtime de current_database()), ciclo round-trip (head->001->base->head), integridade de dados legados, allowlist SQLite restritiva baseada no formato real de 7 posições do Alembic 1.20+ (diff_item[5] True vs diff_item[6] False em PK id e UniqueConstraint anônima em source_videos.url) e zero drift sem filtros no PostgreSQL | integration | `.venv\Scripts\pytest.exe tests/test_migrations.py` | ❌ W0 | ⬜ pending |
-| 15-01-04 | 01 | 1 | MIGR-05 | T-15-03, T-15-04 | Configuração de CI com PostgreSQL 16 obrigatório, TEST_DATABASE_URL para viralpanel_test, ALLOW_DESTRUCTIVE_TEST_DATABASE='true' e execução sem bypass | config | `.venv\Scripts\python.exe -c "import yaml; data = yaml.safe_load(open('.github/workflows/ci.yml', encoding='utf-8')); svc = data['jobs']['test']['services']['postgres']; assert 'postgres:16' in svc['image']; assert '5432:5432' in svc['ports']; assert 'TEST_DATABASE_URL' in data['jobs']['test']['env']; assert data['jobs']['test']['env'].get('ALLOW_DESTRUCTIVE_TEST_DATABASE') == 'true'; print('CI workflow valid')"` | ❌ W0 | ⬜ pending |
+| 15-01-01 | 01 | 1 | MIGR-02 | T-15-01 | Previne injeção não autorizada de DDL validando conexão e URL controladas | unit | `.venv\Scripts\pytest.exe tests/test_migrations.py -k "test_alembic_env_connection_injection"` | ✅ | ✅ green |
+| 15-01-02 | 01 | 1 | MIGR-01 | T-15-02 | Imutabilidade da migração 001 e idempotência do downgrade 002 | migration | `.venv\Scripts\pytest.exe tests/test_migrations.py -k "test_migration_002_upgrade_and_downgrade"` | ✅ | ✅ green |
+| 15-01-03 | 01 | 1 | MIGR-03, MIGR-04, MIGR-05 | T-15-03, T-15-04 | Isolamento estrito de TEST_DATABASE_URL (zero fallback para banco da aplicação, banco dedicado/descartável/recriável viralpanel_test, validação coerente de SAFE_LOCAL_HOSTS={'localhost','127.0.0.1','::1','postgres'} em local e CI sem bypass de CI, controle separado ALLOW_REMOTE_TEST_DATABASE, autorização explícita ALLOW_DESTRUCTIVE_TEST_DATABASE='true' antes de criar engine ou conectar e asserção em runtime de current_database()), ciclo round-trip (head->001->base->head), integridade de dados legados, allowlist SQLite restritiva baseada no formato real de 7 posições do Alembic 1.20+ (diff_item[5] True vs diff_item[6] False em PK id e UniqueConstraint anônima em source_videos.url) e zero drift sem filtros no PostgreSQL | integration | `.venv\Scripts\pytest.exe tests/test_migrations.py` | ✅ | ✅ green |
+| 15-01-04 | 01 | 1 | MIGR-05 | T-15-03, T-15-04 | Configuração de CI com PostgreSQL 16 obrigatório, TEST_DATABASE_URL para viralpanel_test, ALLOW_DESTRUCTIVE_TEST_DATABASE='true' e execução sem bypass | config | `.venv\Scripts\python.exe -c "import yaml; data = yaml.safe_load(open('.github/workflows/ci.yml', encoding='utf-8')); svc = data['jobs']['test']['services']['postgres']; assert 'postgres:16' in svc['image']; assert '5432:5432' in svc['ports']; assert 'TEST_DATABASE_URL' in data['jobs']['test']['env']; assert data['jobs']['test']['env'].get('ALLOW_DESTRUCTIVE_TEST_DATABASE') == 'true'; print('CI workflow valid')"` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,9 +49,9 @@ created: "2026-11-14"
 
 ## Wave 0 Requirements
 
-- [ ] `tests/test_migrations.py` — Stubs e harness de testes de migração e schema drift
-- [ ] `alembic/versions/002_add_metadata_json_to_scripts.py` — Arquivo de migração incremental
-- [ ] `.github/workflows/ci.yml` — Workflow de CI com serviço PostgreSQL 16 obrigatório
+- [x] `tests/test_migrations.py` — Stubs e harness de testes de migração e schema drift
+- [x] `alembic/versions/002_add_metadata_json_to_scripts.py` — Arquivo de migração incremental
+- [x] `.github/workflows/ci.yml` — Workflow de CI com serviço PostgreSQL 16 obrigatório
 
 ---
 
