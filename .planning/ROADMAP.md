@@ -3,212 +3,33 @@
 ## Milestones
 
 - 🏁 **v1.0 ViralPanel MVP** — Phases 1–7 (Completed 2026-11-05, archived to [.planning/milestones/v1.0-ROADMAP.md](file:///.planning/milestones/v1.0-ROADMAP.md))
-- 🚧 **v1.1 ZUNTO! Visual Engine** — Phases 8–13 (In progress)
+- 🏁 **v1.1 ZUNTO! Visual Engine** — Phases 8–15 (Completed 2026-11-20, archived to [.planning/milestones/v1.1-ROADMAP.md](file:///.planning/milestones/v1.1-ROADMAP.md))
 
-## Phases
+---
+
+## Completed Milestones
 
 ### Milestone v1.1 — ZUNTO! Visual Engine
-
-- [x] **Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz** - Investigação técnica das causas de duplicação de legendas, artefatos do avatar e mapeamento rigoroso dos contratos entre subtitles.py, renderer.py e tasks Celery (completed 2026-11-06)
-- [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** - Refinamento de prompts no Gemini 2.5 Flash para retenção, rastreabilidade de fontes factuais, CTA contextual e identidade visual ZUNTO! (completed 2026-11-06)
-- [x] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** - Desacoplamento de formatação de legendas, eliminação definitiva de duplicação, sincronização milimétrica e estilização visual ZUNTO! (completed 2026-11-08)
-- [x] **Phase 11: Avatar Reaction e Composição Visual Orgânica** - Recorte orgânico baseado na auditoria dos assets, calibração de proporção, safe zones e posicionamento no layout vertical 9:16 (completed 2026-11-08)
-- [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** - Grafo de filtros integrado em single-pass (sem reencodificações intermediárias), 1080x1920 e preservação dos contratos Celery/Publishing (completed 2026-11-08)
-- [x] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** - Validação técnica automatizada (A/V, specs) combinada obrigatoriamente com inspeção visual humana de vídeos reais renderizados (completed 2026-11-19)
-- [x] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** - Active Word Highlight palavra por palavra sincronizado com WordBoundary real da narração (completed 2026-11-17)
-- [x] **Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)** - Composição visual 9:16 preservando 100% do footage original com fundo desfocado e legendas no terço inferior sem colisão com o mascote (completed 2026-11-19)
-- [x] **Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)** - Realinhamento vertical das legendas ao centro do avatar ZUNTO! e remoção do efeito de frequência mantendo o mascote estático (completed 2026-11-19)
-- [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** - Deduplicação canônica de URLs do TikTok, resiliência cross-platform de yt-dlp e limpeza atômica de arquivos em retentativas (completed 2026-11-13)
-- [x] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** - Alinhamento de schema, migração Alembic 002 e validação de migrações PostgreSQL (completed 2026-11-20)
-
-## Phase Details
-
-### Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz
-
-**Goal**: Identificar com precisão técnica a causa raiz de duplicações de legendas, problemas de formato/recorte do avatar reaction e gargalos nos filtros FFmpeg, além de mapear integralmente contratos e interfaces atuais antes de qualquer refatoração de código.
-**Depends on**: Nothing (primeira fase do milestone v1.1)
-**Requirements**: SUB-01, AVTR-01, COMP-01
-**Success Criteria** (what must be TRUE):
-
-  1. Relatório técnico documentando o ponto exato no fluxo (`subtitles.py` vs `renderer.py` vs Celery task) onde ocorre a duplicação ou conflito de renderização de legendas.
-  2. Diagnóstico conclusivo do formato real dos assets de avatar (canais alfa/chroma, codecs, dimensões) definindo a técnica nativa de recorte e transparência mais adequada sem assumir máscaras a priori.
-  3. Mapeamento exaustivo dos contratos e interfaces atuais entre `subtitles.py`, `renderer.py`, geração de avatar e tasks Celery, documentando entradas, saídas, responsabilidades e dependências para blindar contra regressões.
-  4. Mapeamento completo do grafo de filtros FFmpeg atual com identificação de filtros redundantes, reencodificações intermediárias ou passes desnecessários.
-
-**Plans**: 2/2 plans executed
-Plans:
-
-- [x] 08-01-PLAN.md — Mapeamento de Contratos & Interfaces e Análise dos Passes e Grafo FFmpeg
-- [x] 08-02-PLAN.md — Diagnóstico de Causa Raiz (Legendas Duplicadas e Formato de Avatar) e Consolidação do Relatório Final AUDIT-REPORT.md
-
-### Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!
-
-**Goal**: Elevar a qualidade editorial dos roteiros gerados pelo Gemini 2.5 Flash para máxima retenção, garantindo rastreabilidade de fatos/fontes, CTAs contextuais sem repetições artificiais e alinhamento à identidade da marca ZUNTO!.
-**Depends on**: Phase 8
-**Requirements**: BRND-01, BRND-02, SCRP-01, SCRP-02
-**Success Criteria** (what must be TRUE):
-
-  1. Prompts do Gemini 2.5 Flash geram roteiros com ganchos magnéticos nos primeiros 3 segundos, ritmo dinâmico e frases fluidas e naturais para sintetização TTS.
-  2. Fechamentos e CTAs tornam-se contextuais e opcionais conforme a narrativa do vídeo, orientados pela essência da marca ZUNTO! sem repetição mecânica forçada do slogan em todos os episódios.
-  3. Mecanismo de rastreabilidade e preservação de referências/fontes utilizado na elaboração dos roteiros, assegurando precisão factual sem dependência cega exclusiva da LLM.
-  4. Diretrizes oficiais de identidade visual ZUNTO! (paleta preto profundo, amarelo de impacto e branco puro) e guia de safe zones (TikTok, Reels, Shorts) especificadas para balizar overlays e legendas.
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 09-01-PLAN.md — Módulo Central de Identidade Visual `branding.py` e Suíte de Testes (BRND-01, BRND-02)
-- [x] 09-02-PLAN.md — Roteirista Gemini Editorial, Schemas (closing_thought + cta opcional), Rastreabilidade de Claims e Persistência de Metadados (SCRP-01, SCRP-02)
-
-**UI hint**: yes
-
-### Phase 10: Motor de Legendas ZUNTO! e Desacoplamento
-
-**Goal**: Desacoplar a geração e estilização de legendas do renderer FFmpeg, eliminar qualquer duplicidade e entregar legendas no padrão ZUNTO! com sincronia temporal precisa.
-**Depends on**: Phase 9
-**Requirements**: SUB-01, SUB-02, SUB-03, BRND-01
-**Success Criteria** (what must be TRUE):
-
-  1. `subtitles.py` desacoplado de `renderer.py`, atuando estritamente como formatador e construtor de legendas (ASS/SRT) com tipografia marcante, quebras de linha responsivas para mobile e alto contraste ZUNTO!.
-  2. Execução da esteira de composição sem qualquer duplicidade de legenda na tela (burn-in único garantido).
-  3. Sincronização temporal milimétrica entre a locução gerada e a cadência de exibição das palavras, com suporte a realce/destaque dinâmico de palavras-chave.
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 10-01-PLAN.md — Núcleo do Motor de Legendas ZUNTO! em `subtitles.py`, DTO `SubtitleJobConfig`, Quebra Sintática, Temporização Proporcional, Sanitização ASS e Destaque Amarelo (SUB-01, SUB-02, SUB-03, BRND-01)
-- [x] 10-02-PLAN.md — Integração em `StudioService.produce` e `ReactionVideoRenderer`, Cobertura de Hard-Subs com `MarginV=640`, Camada Única e Validação de Regressão da Suíte Completa (SUB-01, SUB-02, SUB-03, BRND-01)
-
-**UI hint**: yes
-
-### Phase 11: Avatar Reaction e Composição Visual Orgânica
-
-**Goal**: Integrar o avatar virtual de reaction de forma orgânica, sem aspecto de caixa quadrada, utilizando a técnica de recorte identificada na auditoria e respeitando safe zones verticais 9:16.
-**Depends on**: Phase 8, Phase 9
-**Requirements**: AVTR-01, AVTR-02, AVTR-03, BRND-02
-**Success Criteria** (what must be TRUE):
-
-  1. Avatar reaction integrado sem aparência de caixa/imagem quadrada, utilizando a técnica de transparência e recorte nativo validada a partir dos assets reais na Phase 8.
-  2. Posicionamento e dimensionamento calibrados estritamente dentro da safe zone vertical 9:16, assegurando que elementos centrais do vídeo e legendas nunca sejam ocluídos.
-  3. Proporção, nitidez, sincronização e qualidade visual preservadas, respeitando a taxa de quadros e conformidade técnica esperada pelo pipeline.
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 11-01-PLAN.md — Núcleo do Avatar Reaction em `avatar.py` e `branding.py`, DTO `AvatarConfig`, Recorte Circular com Canal Alfa Suave, Borda Amarela ZUNTO! (#FACC15) e Codec PNG em MP4 (AVTR-01, AVTR-03, BRND-01, BRND-02)
-- [x] 11-02-PLAN.md — Integração no `ReactionVideoRenderer`, Calibração SafeZone em W-w-54:H-h-320, Remoção da Moldura Branca e Teste Empírico de Composição sem Regressão (AVTR-01, AVTR-02, BRND-01, BRND-02)
-
-**UI hint**: yes
-
-### Phase 12: Refatoração do Video Composer FFmpeg e Integração
-
-**Goal**: Reestruturar o Video Composer em camadas limpas com grafo de filtros integrado em single-pass (evitando reencodificações intermediárias desnecessárias), saída 1080x1920 e preservação rigorosa dos contratos com Celery e publicação.
-**Depends on**: Phase 10, Phase 11
-**Requirements**: COMP-01, COMP-02, COMP-03, BRND-01, BRND-02
-**Success Criteria** (what must be TRUE):
-
-  1. Composição audiovisual realizada em grafo de filtros integrado em um único passe com codificação final única sempre que tecnicamente viável, eliminando reencodificações intermediárias desnecessárias.
-  2. Saída do vídeo rigorosamente padronizada em 1080x1920 (9:16 vertical Full HD) com sincronia perfeita entre áudio e vídeo e ordenação clara de camadas (fundo, avatar, legendas, branding).
-  3. Contratos de interface com as tasks Celery preservados, assegurando que as integrações de publicação permaneçam funcionais e desacopladas da refatoração.
-
-**Plans**: 2/2 plans complete
-
-Plans:
-
-- [x] 12-01-PLAN.md — Núcleo do Video Composer Single-Pass, DTOs ReactionCompositionSpec e StudioRenderRequest, Lavfi Inline Fallback e Flags de Encoding (COMP-01, COMP-02, BRND-01, BRND-02)
-- [x] 12-02-PLAN.md — Integração do StudioService, Preservação de Contratos Celery, Persistência Atômica de Assets e Regressão E2E (COMP-03, COMP-01, COMP-02, BRND-01, BRND-02)
-
-### Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E
-
-**Goal**: Validar rigorosamente o pipeline através de inspeções técnicas automatizadas de integridade de mídia complementadas obrigatoriamente por inspeção visual humana de vídeos reais renderizados.
-**Depends on**: Phase 12
-**Requirements**: QUAL-01, QUAL-02
-**Success Criteria** (what must be TRUE):
-
-  1. Validador técnico automatizado inspeciona o vídeo gerado verificando resolução exata (1080x1920), aspect ratio (9:16), duração, taxa de quadros, integridade de streams A/V e integridade do arquivo.
-  2. Geração de vídeos de teste completos a partir de dados reais com inspeção visual humana explícita, comprovando ausência de legendas duplicadas, ausência de artefatos no avatar, enquadramento correto em safe zones e sincronia labial (quando o avatar possuir fala/movimento de boca) e harmonia narrativa.
-  3. Aprovação formal do milestone condicionada cumulativamente aos testes automatizados verdes e à validação perceptual positiva dos vídeos gerados.
-
-**Plans**: 2/2 plans complete
-
-- [x] 13-01-PLAN.md
-- [x] 13-02-PLAN.md
-
-### Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)
-
-**Goal:** Calibrar o alinhamento vertical da caixa de legendas no terço inferior em relação ao centro vertical do avatar ZUNTO! ($Y \approx 1490\text{ px}$), avaliando legendas de 1 e 2 linhas e preservando as margens assimétricas ($MarginL=80, MarginR=440$), ausência de colisão com folga $\ge 24\text{ px}$ e safe zones mobile, além de remover completamente o efeito de frequência/ondas (`showwaves`) do interior do avatar, mantendo o mascote 100% estático com máscara circular suave e anel amarelo oficial `#FACC15`.
-**Requirements**: SUB-04, AVTR-04, QUAL-03
-**Depends on:** Phase 13.2
-**Plans:** 1/1 plans complete
-
-Plans:
-
-- [x] 13.3-01-PLAN.md — Realinhamento Vertical de Legendas (MarginV=365) e Mascote Reaction 100% Estático sem showwaves
-
-### Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)
-
-**Goal:** Implementar a composição visual "Cinematic Backdrop & Stage 9:16" no `ReactionVideoRenderer`, preservando 100% da área do footage original (sem cortes laterais destrutivos) através de foreground dinâmico nítido e background ampliado com desfoque e escurecimento, reposicionar as legendas dinâmicas no terço inferior ($MarginV \approx 420$) com reserva de margem horizontal configurável ($MarginR \ge 440$) garantindo separação física estrita de no mínimo 24px com contorno em relação ao mascote ($X \ge 680$), calibrar o avatar contra a safe zone de botões de engajamento mobile ($X \le 940$), especificar composições para Landscape, Portrait e Square/4:5, e validar visualmente com footage real.
-**Requirements**: COMP-04, COMP-05, SUB-04, AVTR-04, QUAL-03
-**Depends on:** Phase 13.1
-**Plans:** 1/1 plans complete
-
-Plans:
-
-**Wave 1:**
-
-- [x] 13.2-01-PLAN.md — Cinematic Backdrop 9:16, Adaptação por Aspect Ratio, Reposicionamento de Legendas e Calibração de Safe Zones
-
-### Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)
-
-**Goal:** Implementar legendas dinâmicas Active Word Highlight palavra por palavra sincronizadas com timestamps reais da fala (`WordBoundary`), mantendo branco puro (`#FFFFFF`) para palavras passadas/futuras, amarelo de impacto (`#FACC15`) apenas na palavra pronunciada, continuidade da caixa opaca sem flicker e fallback proporcional.
-**Requirements**: SUB-02, SUB-03
-**Depends on:** Phase 13
-**Plans:** 1/1 plans complete
-
-Plans:
-
-**Wave 1:**
-
-- [x] 13.1-01-PLAN.md — Motor Active Word Highlight ZUNTO!, Sincronização WordBoundary, Sidecar com Duplo Hash e Validação A/V
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 8: Auditoria, Contratos e Diagnóstico de Causa Raiz | 2/2 | Complete | 2026-11-06 |
-| 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO! | 2/2 | Complete | 2026-11-06 |
-| 10: Motor de Legendas ZUNTO! e Desacoplamento | 2/2 | Complete | 2026-11-08 |
-| 11: Avatar Reaction e Composição Visual Orgânica | 2/2 | Complete | 2026-11-08 |
-| 12: Refatoração do Video Composer FFmpeg e Integração | 2/2 | Complete | 2026-11-08 |
-| 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E | 2/2 | Complete | 2026-11-19 |
-| 13.1: Word-by-Word Karaoke Captions (INSERTED) | 1/1 | Complete | 2026-11-17 |
-| 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED) | 1/1 | Complete | 2026-11-19 |
-| 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED) | 1/1 | Complete | 2026-11-19 |
-| 14: Formalização da Coleta e Scraper (Retrospectiva) | 1/1 | Complete | 2026-11-13 |
-| 15: Database Schema Integrity & PostgreSQL Migration Tests | 1/1 | Complete | 2026-11-20 |
-
-### Phase 14: Formalização da Coleta e Scraper (Retrospectiva)
-
-**Goal:** Formalizar retrospectivamente no GSD e validar tecnicamente as melhorias de resiliência e estabilização de coleta implementadas na esteira discovery/media (normalização e deduplicação canônica de URLs do TikTok, suporte cross-platform ao executável yt-dlp, limpeza atômica de arquivos prévios em retries e rejeição de candidatos com score não-positivo), vinculando as evidências dos 12 commits existentes aos requisitos DISC-04 e DISC-05 e comprovando 100% de aprovação na suíte de testes de regressão.
-**Depends on:** Phase 13
-**Requirements**: DISC-04, DISC-05
-**Plans:** 1/1 plans complete
-
-Plans:
-
-- [x] 14-01-PLAN.md — Formalização Retrospectiva da Coleta, Deduplicação Canônica e Resiliência yt-dlp (DISC-04, DISC-05)
-
-### Phase 15: Database Schema Integrity & PostgreSQL Migration Tests
-
-**Goal:** Corrigir o schema drift do banco de dados, implementar migração incremental isolada mantendo imutabilidade de 001, refatorar alembic/env.py para injeção de conexão e validar migrações com PostgreSQL real e SQLite.
-**Requirements**: MIGR-01, MIGR-02, MIGR-03, MIGR-04, MIGR-05
-**Depends on:** Phase 14
-**Plans:** 1/1 plans complete
-
-Plans:
-
-**Wave 1:**
-
-- [x] 15-01-PLAN.md — Refatoração de alembic/env.py, Migração Incremental 002 e Testes de Schema Drift
+*Completed 2026-11-20 — 11 phases, 17 plans, 27 requirements satisfied.*  
+*Full details archived to [.planning/milestones/v1.1-ROADMAP.md](file:///.planning/milestones/v1.1-ROADMAP.md) and [.planning/milestones/v1.1-REQUIREMENTS.md](file:///.planning/milestones/v1.1-REQUIREMENTS.md).*
+
+- [x] **Phase 8: Auditoria, Contratos e Diagnóstico de Causa Raiz** (completed 2026-11-06)
+- [x] **Phase 9: Roteirista Editorial Gemini, Rastreabilidade e Branding ZUNTO!** (completed 2026-11-06)
+- [x] **Phase 10: Motor de Legendas ZUNTO! e Desacoplamento** (completed 2026-11-08)
+- [x] **Phase 11: Avatar Reaction e Composição Visual Orgânica** (completed 2026-11-08)
+- [x] **Phase 12: Refatoração do Video Composer FFmpeg e Integração** (completed 2026-11-08)
+- [x] **Phase 13: Validação Técnica Automatizada e Inspeção Audiovisual E2E** (completed 2026-11-19)
+- [x] **Phase 13.1: Word-by-Word Karaoke Captions (INSERTED)** (completed 2026-11-17)
+- [x] **Phase 13.2: Cinematic Backdrop and Subtitle Stage Composition (INSERTED)** (completed 2026-11-19)
+- [x] **Phase 13.3: Subtitle Vertical Realignment and Static Mascot Avatar (INSERTED)** (completed 2026-11-19)
+- [x] **Phase 14: Formalização da Coleta e Scraper (Retrospectiva)** (completed 2026-11-13)
+- [x] **Phase 15: Database Schema Integrity & PostgreSQL Migration Tests** (completed 2026-11-20)
+
+---
+
+## Backlog
+
+### Futuro / Pós-v1.1
+- **Geração de Miniaturas/Covers Dinâmicas**: Covers automatizadas com tipografia de alto impacto e identidade ZUNTO!.
+- **Multi-Host e Multi-Persona**: Suporte a diferentes avatares e múltiplas vozes clonadas no mesmo vídeo.
+- **Analytics & Feedback Loop**: Coleta de métricas sociais pós-publicação para retroalimentação automática do algoritmo de scoring.
