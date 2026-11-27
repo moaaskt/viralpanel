@@ -21,7 +21,7 @@ Durante o ciclo de transição e auditoria do projeto ZUNTO! (anteriormente Vira
 7. `5e99225`: Deduplicação canônica de URLs equivalentes e filtro de score estritamente positivo (`score > 0.0`).
 8. `a9c4945`: Resiliência de download no `MediaDownloader` com sobrescrita limpa (`--force-overwrites`) e `get_ytdlp_cmd`.
 9. `2628e09`: Limpeza de arquivos de mídia órfãos em `ScriptingService` em caso de `InsufficientSpeechError`.
-10. `746a598`: Eliminação de fallback silencioso para `MockPublisher` / `MockGeminiScriptWriter` quando `PIPELINE_MOCK_MODE=false`.
+10. `746a598`: Eliminação de fallback silencioso para `MockGeminiScriptWriter` em `src/viralpanel/scripting/gemini.py` quando `PIPELINE_MOCK_MODE=false` *(nota: `MockPublisher` não foi alterado neste commit e permanece no escopo de F-02 para o Milestone v1.2)*.
 11. `9c27de6`: Atualização de asserções de testes para hashtags e nicho ZUNTO!.
 12. `10229d6`: Adição da suíte de regressão `tests/test_phase14_recovery.py` (10 testes cobrindo todas as correções).
 
