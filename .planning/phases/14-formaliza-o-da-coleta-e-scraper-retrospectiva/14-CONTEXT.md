@@ -37,7 +37,7 @@ Como essas alterações foram aplicadas diretamente no repositório antes de sua
 
 ### D-DISC-02: Deduplicação e Filtro de Score Estritamente Positivo (`DISC-04`)
 - **Implementação:** `DiscoveryService.collect_and_rank()` e `select_best_candidate()` em `src/viralpanel/discovery/service.py`.
-- **Comportamento:** Mantém conjunto `seen_urls` normalizado durante a coleta, evitando duplicatas no banco de dados. Exige explicitamente `score > 0.0` para que qualquer candidato seja elegível a processamento pelo pipeline diário.
+- **Comportamento:** Mantém o dicionário `persisted_map` indexado pela URL normalizada durante a coleta e realiza consulta ao banco por `(SourceVideo.url == item.url) | (SourceVideo.url == norm_url)`, evitando duplicatas tanto no lote atual quanto contra registros já persistidos. Exige explicitamente `score > 0.0` para que qualquer candidato seja elegível a processamento pelo pipeline diário.
 
 ### D-DISC-03: Comando `yt-dlp` Cross-Platform Tolerante a Falhas (`DISC-05`)
 - **Implementação:** `get_ytdlp_cmd()` em `src/viralpanel/discovery/tiktok.py` e `src/viralpanel/media/downloader.py`.
@@ -47,9 +47,15 @@ Como essas alterações foram aplicadas diretamente no repositório antes de sua
 - **Implementação:** `MediaDownloader.fetch()` em `src/viralpanel/media/downloader.py` e `ScriptingService.process()` em `src/viralpanel/scripting/service.py`.
 - **Comportamento:** Na troca de candidatos dentro do mesmo `run_id`, arquivos antigos (`source.mp4`, `audio.wav`) são limpos antes do novo download com flag `--force-overwrites`. Em caso de erro de fala insuficiente (`InsufficientSpeechError`), os arquivos de mídia associados são imediatamente removidos do disco e o vídeo é marcado como `skipped_no_speech`.
 
-### D-DISC-05: Travas contra Mocks Silenciosos
+---
+
+## 2.1. Contexto Complementar dos 12 Commits (Fora de `DISC-04` e `DISC-05`)
+
+> **Fronteira de requisitos:** O item abaixo compõe o histórico dos 12 commits catalogados, mas **não pertence ao requisito `DISC-05`** (que cobre exclusivamente detecção/fallback do `yt-dlp`, sobrescrita limpa em retries e limpeza de mídia órfã).
+
+### Trava contra Mock Silencioso no Roteirista (`746a598` — Não-DISC)
 - **Implementação:** `FallbackScriptWriter` em `src/viralpanel/scripting/gemini.py`.
-- **Comportamento:** Se `PIPELINE_MOCK_MODE=false` e as chaves de API estiverem ausentes, o construtor lança `RuntimeError` imediato em vez de instanciar `MockGeminiScriptWriter`.
+- **Comportamento:** Se `PIPELINE_MOCK_MODE=false` e as chaves de API estiverem ausentes, o construtor lança `RuntimeError` imediato em vez de instanciar `MockGeminiScriptWriter`. *(Nota: `MockPublisher` não foi alterado neste commit e permanece sob F-02 no escopo do Milestone v1.2.)*
 
 ---
 
