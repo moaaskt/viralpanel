@@ -105,5 +105,5 @@ Nenhum commit de tarefa: fase retrospectiva sem alterações de código. O traba
 
 ## Issues / Notes
 
-- HEAD avançou de `10229d6` para `0a006c8` (commit de docs do owner) antes da execução; nenhum arquivo de `src/` ou `tests/` foi alterado entre eles.
-- `REQUIREMENTS.md` e `ROADMAP.md` não foram atualizados para "Complete" nesta execução. A promoção de status fica para depois da revisão do owner.
+- HEAD avançou de `10229d6` para `0a006c8` (commit de docs do owner) antes da execução original em 2026-11-13; nenhum arquivo de `src/` ou `tests/` foi alterado entre eles.
+- **Reconciliação de Fronteira (2026-11-26 — Opção A):** `DISC-04` e `DISC-05` foram posteriormente promovidos e formalmente arquivados como concluídos no Milestone v1.1 (`.planning/milestones/v1.1-ROADMAP.md` e `.planning/milestones/v1.1-REQUIREMENTS.md`). Na entrada do Milestone v1.2 Core Engine, a Phase 14 permanece consolidada como pré-requisito concluído no v1.1 (sem duplicação no roadmap do v1.2), e a imprecisão histórica sobre `746a598` em `14-CONTEXT.md` foi corrigida para refletir estritamente `MockGeminiScriptWriter` (mantendo `MockPublisher` sob F-02 no escopo do v1.2).

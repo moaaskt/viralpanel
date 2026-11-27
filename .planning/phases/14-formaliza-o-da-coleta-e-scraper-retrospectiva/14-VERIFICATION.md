@@ -42,3 +42,14 @@ Não há itens de UI ou perceptuais. Nenhum item exige verificação humana.
 ## Gaps
 
 Nenhum gap bloqueante. Ponto informativo: o comportamento de `get_ytdlp_cmd` quando o yt-dlp está ausente é assimétrico entre os módulos (`None` vs `RuntimeError`).
+
+## Revalidação de Baseline (Entrada v1.2 — Opção A)
+
+- **Data da revalidação:** 2026-11-26
+- **HEAD verificado:** `9c6cea4` (`developer`, sincronizado com `origin/developer`)
+- **Deriva de código desde `0a006c8`:** 0 alterações em `src/viralpanel/discovery/`, `src/viralpanel/media/`, `src/viralpanel/scripting/`, `tests/test_phase14_recovery.py` e `tests/test_discovery_scoring.py`.
+- **Evidência local de testes (`9c6cea4`):**
+  - `tests/test_phase14_recovery.py` + `tests/test_discovery_scoring.py`: **15 passed**
+  - Suíte ampliada de coleta/downloader (`test_phase14_recovery.py`, `test_discovery_scoring.py`, `test_discovery_service.py`, `test_media_downloader.py`): **19 passed**
+- **Evidência remota de CI (GitHub Actions):** Run `45102737583` no HEAD `9c6cea4` concluída com **`success`** em todos os steps (incluindo `Install system dependencies (FFmpeg)`, `Run PostgreSQL Migration Tests (Mandatory in CI)` e `Run Full Test Suite`).
+- **Decisão de fronteira v1.1 -> v1.2:** Phase 14 mantida como pré-requisito formalmente concluído e arquivado no Milestone v1.1 (Opção A), sem duplicação de fase no roadmap do Milestone v1.2.
